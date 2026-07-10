@@ -25,7 +25,8 @@ def test_sha256_file():
     try:
         h = sha256_file(path)
         assert len(h) == 64
-        assert h == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        # This is the SHA-256 of b"hello world", not a secret.
+        assert h == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"  # pragma: allowlist secret
     finally:
         os.unlink(path)
     print("✓ sha256_file")

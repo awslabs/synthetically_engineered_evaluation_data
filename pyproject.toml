@@ -90,8 +90,8 @@ docs = [
 ]
 
 [tool.uv]
-default-groups = ["dev"]
 # Wait 7 days before resolving newly published package versions, so a freshly
 # compromised or unstable release is not pulled in immediately.
 # https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns
 exclude-newer = "7 days"
+default-groups = ["dev"]
