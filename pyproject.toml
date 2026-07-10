@@ -1,0 +1,97 @@
+[project]
+name = "synthetically-engineered-evaluation-data"
+version = "0.1.0"
+description = "AI-powered synthetic document generation pipeline for benchmarking document extraction (IDP/KIE) systems"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "strands-agents",
+    "strands-agents-tools",
+    "reportlab",
+    "weasyprint",
+    "pillow",
+    "python-dotenv",
+    "boto3",
+    "jinja2",
+    "augraphy",
+    "pypdfium2",
+    "pypdf",
+    "opencv-python",
+    "pyyaml",
+]
+
+# pip-compatible extras (for `pip install -e ".[dev]"`)
+# Note: the `dev` extra must be kept in sync with [dependency-groups].dev below
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-awesome-nav",
+    "mkdocstrings-python",
+    "pymdown-extensions",
+]
+
+[project.urls]
+Homepage = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
+Repository = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
+Documentation = "https://awslabs.github.io/synthetically-engineered-evaluation-data/"
+Issues = "https://github.com/awslabs/synthetically-engineered-evaluation-data/issues"
+
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+# Put src/ on the import path so tests can `import doc_gen_agent` without an
+# editable install or per-file sys.path hacks.
+pythonpath = ["src"]
+testpaths = ["tests"]
+# Integration tests (tests/integration/) need live AWS credentials; exclude
+# them from the default run. Invoke explicitly: uv run pytest tests/integration
+addopts = "--ignore=tests/integration"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+doc_gen_agent = ["schemas/**/*.json", "schemas/**/*.md", "prompts/*.j2", "packets/**/*.json"]
+
+# uv-native dependency groups (for `uv sync`)
+# Keep in sync with [project.optional-dependencies] above
+[dependency-groups]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "docs"},
+]
+test = [
+    "pytest",
+]
+lint = [
+    "ruff",
+]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocs-awesome-nav",
+    "mkdocstrings-python",
+    "pymdown-extensions",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+# Wait 7 days before resolving newly published package versions, so a freshly
+# compromised or unstable release is not pulled in immediately.
+# https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns
+exclude-newer = "7 days"

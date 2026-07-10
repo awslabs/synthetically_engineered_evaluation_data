@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FCC-Invoice",
+  "description": "An FCC broadcast media invoice for advertising spots.",
+  "type": "object",
+  "required": [
+    "Agency",
+    "Advertiser",
+    "Station",
+    "GrossTotal",
+    "PaymentTerms",
+    "AgencyCommission",
+    "NetAmountDue",
+    "LineItems"
+  ],
+  "properties": {
+    "Agency": {
+      "type": "string",
+      "description": "The agency the invoice is addressed to"
+    },
+    "Advertiser": {
+      "type": "string",
+      "description": "The name of the advertiser"
+    },
+    "Station": {
+      "type": "string",
+      "description": "Station call letters and name (e.g. KNSD San Diego, KSTP Minneapolis)"
+    },
+    "InvoiceNumber": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Invoice number or ID"
+    },
+    "InvoiceDate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Invoice date (YYYY-MM-DD)"
+    },
+    "InvoicePeriod": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Billing period (e.g. 01/20/14 - 01/26/14)"
+    },
+    "GrossTotal": {
+      "anyOf": [
+        {
+          "type": "number",
+          "description": "The gross total amount"
+        },
+        {
+          "type": "null",
+          "description": "Output null if not shown"
+        }
+      ]
+    },
+    "PaymentTerms": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "Terms of payment"
+        },
+        {
+          "type": "null",
+          "description": "Output null if not shown"
+        }
+      ]
+    },
+    "AgencyCommission": {
+      "anyOf": [
+        {
+          "type": "number",
+          "description": "The agency commission amount"
+        },
+        {
+          "type": "null",
+          "description": "Output null if not shown"
+        }
+      ]
+    },
+    "NetAmountDue": {
+      "anyOf": [
+        {
+          "type": "number",
+          "description": "The net amount due after commission"
+        },
+        {
+          "type": "null",
+          "description": "Output null if not shown"
+        }
+      ]
+    },
+    "LineItems": {
+      "type": "array",
+      "description": "List of line item details on the invoice",
+      "items": {
+        "type": "object",
+        "required": [
+          "LineItemRate",
+          "LineItemDays",
+          "LineItemStartDate",
+          "LineItemEndDate",
+          "LineItemDescription"
+        ],
+        "properties": {
+          "LineItemRate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Rate for the line item"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "LineItemDays": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Days of the week as shown in the line item"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "LineItemStartDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Start date for the line item"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "LineItemEndDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "End date for the line item"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "LineItemDescription": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Description of the line item"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

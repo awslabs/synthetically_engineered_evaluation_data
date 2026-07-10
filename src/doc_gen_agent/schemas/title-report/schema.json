@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Title-Report",
+  "description": "A preliminary title report showing ownership history and encumbrances on a property.",
+  "type": "object",
+  "required": [
+    "PropertyAddress",
+    "LegalDescription",
+    "CurrentOwner",
+    "ReportDate",
+    "TitleCompany",
+    "Encumbrances",
+    "Easements"
+  ],
+  "properties": {
+    "PropertyAddress": {
+      "type": "string"
+    },
+    "LegalDescription": {
+      "type": "string",
+      "description": "Legal description of the property"
+    },
+    "ParcelNumber": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "CurrentOwner": {
+      "type": "string",
+      "description": "Name of current property owner"
+    },
+    "VestingType": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "How title is held: Community Property, Joint Tenancy, etc."
+    },
+    "ReportDate": {
+      "type": "string",
+      "description": "Date report was issued (YYYY-MM-DD)"
+    },
+    "EffectiveDate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "TitleCompany": {
+      "type": "string"
+    },
+    "TitleOfficer": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "OrderNumber": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Encumbrances": {
+      "type": "array",
+      "description": "Liens, mortgages, and other encumbrances on the property",
+      "items": {
+        "type": "object",
+        "required": [
+          "Type",
+          "Holder",
+          "Amount"
+        ],
+        "properties": {
+          "Type": {
+            "type": "string",
+            "description": "Mortgage, Tax Lien, HOA Lien, Judgment, etc."
+          },
+          "Holder": {
+            "type": "string"
+          },
+          "Amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "RecordedDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "InstrumentNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "Easements": {
+      "type": "array",
+      "description": "Easements affecting the property (empty array if none)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Type": {
+            "type": "string",
+            "description": "Utility, Access, Drainage, etc."
+          },
+          "Description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "PropertyTaxes": {
+      "type": "object",
+      "description": "Current property tax information",
+      "properties": {
+        "AnnualAmount": {
+          "type": "number"
+        },
+        "TaxYear": {
+          "type": "integer"
+        },
+        "Status": {
+          "type": "string",
+          "description": "Paid, Unpaid, Partial"
+        }
+      }
+    },
+    "TitleHistoryNarrative": {
+      "type": "string",
+      "description": "Optional 2-3 sentence narrative about the property's ownership history and chain of title.",
+      "x-probability": 0.7
+    },
+    "EncumbranceNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative explaining the existing encumbrances and their impact on the transaction.",
+      "x-probability": 0.7
+    },
+    "EasementNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative describing the easements and their practical effect on the property.",
+      "x-probability": 0.7
+    },
+    "TitleExceptionNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about any title exceptions or requirements to clear title.",
+      "x-probability": 0.7
+    }
+  }
+}

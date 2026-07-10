@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pay-Stub",
+  "description": "An employee pay stub showing earnings, deductions, and net pay for a pay period.",
+  "type": "object",
+  "required": [
+    "EmployeeName",
+    "EmployerName",
+    "PayPeriodStart",
+    "PayPeriodEnd",
+    "PayDate",
+    "GrossPay",
+    "Deductions",
+    "NetPay",
+    "YTDGross"
+  ],
+  "properties": {
+    "EmployeeName": {
+      "type": "string"
+    },
+    "EmployeeAddress": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "EmployeeID": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "EmployerName": {
+      "type": "string"
+    },
+    "EmployerAddress": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "PayPeriodStart": {
+      "type": "string",
+      "description": "Start of pay period (YYYY-MM-DD)"
+    },
+    "PayPeriodEnd": {
+      "type": "string",
+      "description": "End of pay period (YYYY-MM-DD)"
+    },
+    "PayDate": {
+      "type": "string",
+      "description": "Date payment was issued (YYYY-MM-DD)"
+    },
+    "PayFrequency": {
+      "type": "string",
+      "description": "Weekly, Bi-Weekly, Semi-Monthly, Monthly"
+    },
+    "HourlyRate": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hourly rate if applicable"
+    },
+    "HoursWorked": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hours worked this period"
+    },
+    "GrossPay": {
+      "type": "number",
+      "description": "Total gross earnings for the pay period"
+    },
+    "Deductions": {
+      "type": "array",
+      "description": "List of deductions",
+      "items": {
+        "type": "object",
+        "required": [
+          "DeductionType",
+          "Amount"
+        ],
+        "properties": {
+          "DeductionType": {
+            "type": "string",
+            "description": "Federal Tax, State Tax, Social Security, Medicare, 401k, Health Insurance, etc."
+          },
+          "Amount": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "TotalDeductions": {
+      "type": "number",
+      "description": "Sum of all deductions"
+    },
+    "NetPay": {
+      "type": "number",
+      "description": "GrossPay minus TotalDeductions"
+    },
+    "YTDGross": {
+      "type": "number",
+      "description": "Year-to-date gross earnings"
+    },
+    "YTDDeductions": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Year-to-date total deductions"
+    },
+    "YTDNet": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Year-to-date net pay"
+    },
+    "CompensationNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about the employee's compensation structure (salary, hourly, overtime).",
+      "x-probability": 0.7
+    },
+    "BenefitsNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about benefits included in the pay period (health, retirement, etc.).",
+      "x-probability": 0.7
+    },
+    "YTDSummaryNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative summarizing year-to-date earnings progress.",
+      "x-probability": 0.7
+    }
+  }
+}

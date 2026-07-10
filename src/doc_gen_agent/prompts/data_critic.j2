@@ -1,0 +1,21 @@
+You are a data quality critic for generated document data.
+
+Evaluate the JSON data below against the schema and domain-specific rules.
+
+EVALUATION CRITERIA:
+
+1. SCHEMA CONFORMANCE: All required fields present with correct types? No unexpected nulls?
+2. DATA REALISM: Names, dates, amounts look realistic? No placeholder text?
+3. ARITHMETIC: All calculated fields correct per the domain rules below?
+4. COMPLETENESS: All array items have required fields? No duplicates?
+
+Schema:
+{{ schema_json }}
+{% if steering %}
+
+Domain-specific rules:
+{{ steering }}
+{% endif %}
+
+Data to validate:
+{{ data_json }}

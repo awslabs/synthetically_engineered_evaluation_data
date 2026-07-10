@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Police-Incident-Report",
+  "description": "Law enforcement incident/offense report with detailed narrative.",
+  "type": "object",
+  "required": [
+    "DepartmentName",
+    "CaseNumber",
+    "ReportDate",
+    "ReportTime",
+    "Location",
+    "OffenseType",
+    "ReportingOfficer",
+    "BadgeNumber",
+    "Narrative"
+  ],
+  "properties": {
+    "DepartmentName": {
+      "type": "string"
+    },
+    "DepartmentAddress": {
+      "type": "string"
+    },
+    "CaseNumber": {
+      "type": "string",
+      "description": "Format: YY-NNNNN"
+    },
+    "ReportDate": {
+      "type": "string",
+      "description": "YYYY-MM-DD"
+    },
+    "ReportTime": {
+      "type": "string",
+      "description": "24-hour format HH:MM"
+    },
+    "Location": {
+      "type": "string",
+      "description": "Full street address where incident occurred"
+    },
+    "OffenseType": {
+      "type": "string",
+      "description": "e.g., Burglary, Assault, Theft, Vandalism, DUI"
+    },
+    "ReportingOfficer": {
+      "type": "string"
+    },
+    "BadgeNumber": {
+      "type": "string"
+    },
+    "Victims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "Name",
+          "DOB",
+          "Address"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "DOB": {
+            "type": "string"
+          },
+          "Address": {
+            "type": "string"
+          },
+          "Phone": {
+            "type": "string"
+          },
+          "InjuryDescription": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Suspects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "Description": {
+            "type": "string"
+          },
+          "Status": {
+            "type": "string",
+            "description": "e.g., At Large, Arrested, Identified"
+          }
+        }
+      }
+    },
+    "Witnesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Phone": {
+            "type": "string"
+          },
+          "Statement": {
+            "type": "string",
+            "description": "1-3 paragraphs of witness account"
+          }
+        }
+      }
+    },
+    "Narrative": {
+      "type": "string",
+      "description": "4-8 paragraphs. Officer's detailed first-person account of responding to and investigating the incident. This is the bulk of the document."
+    },
+    "EvidenceItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "Description",
+          "Disposition"
+        ],
+        "properties": {
+          "Description": {
+            "type": "string"
+          },
+          "Disposition": {
+            "type": "string",
+            "description": "e.g., Collected, Photographed, Released to Owner"
+          }
+        }
+      }
+    }
+  }
+}
