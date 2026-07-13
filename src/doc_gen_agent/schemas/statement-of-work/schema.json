@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Statement-of-Work",
+  "description": "A Statement of Work (SOW) defining the scope, deliverables, milestones, and payment terms for a vendor engagement.",
+  "type": "object",
+  "required": [
+    "VendorName",
+    "SOWStartDate",
+    "SOWEndDate",
+    "TotalSOWCost",
+    "ContractType",
+    "BusinessUnit",
+    "EngagementType",
+    "Milestones",
+    "PaymentTerms",
+    "Sections"
+  ],
+  "properties": {
+    "VendorName": {
+      "type": "string",
+      "description": "Full legal name of the vendor or consulting firm"
+    },
+    "VendorAddress": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "Vendor business address"
+    },
+    "ClientName": {
+      "type": "string",
+      "description": "Name of the client organization commissioning the work"
+    },
+    "ClientAddress": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "Client business address"
+    },
+    "SOWNumber": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "Unique SOW identifier or reference number (e.g., SOW-2024-0147)"
+    },
+    "SOWStartDate": {
+      "type": "string",
+      "description": "Engagement start date (YYYY-MM-DD)"
+    },
+    "SOWEndDate": {
+      "type": "string",
+      "description": "Engagement end date (YYYY-MM-DD)"
+    },
+    "TotalSOWCost": {
+      "type": "number",
+      "description": "Total contract value in dollars"
+    },
+    "ContractType": {
+      "type": "string",
+      "description": "Fixed Price, Time and Materials, or Cost Plus"
+    },
+    "IndustryDomain": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "Industry or domain of the engagement (e.g., Healthcare IT, Financial Services, Manufacturing)"
+    },
+    "BusinessUnit": {
+      "type": "string",
+      "description": "Internal business unit or department that owns the budget"
+    },
+    "EngagementType": {
+      "type": "string",
+      "description": "Category of work (e.g., Software Development, Consulting, Staff Augmentation, System Integration, Managed Services)"
+    },
+    "PaymentTerms": {
+      "type": "string",
+      "description": "Payment lag terms (e.g., Net 30, Net 45, Net 60, Due on Acceptance)"
+    },
+    "Milestones": {
+      "type": "array",
+      "description": "Payment milestones with amounts and target dates",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["MilestoneName", "TargetDate", "Amount"],
+        "properties": {
+          "MilestoneNumber": {
+            "type": "integer",
+            "description": "Sequential milestone number"
+          },
+          "MilestoneName": {
+            "type": "string",
+            "description": "Descriptive name of the milestone (e.g., Project Kickoff, Design Approval, UAT Complete)"
+          },
+          "TargetDate": {
+            "type": "string",
+            "description": "Target completion date (YYYY-MM-DD)"
+          },
+          "Amount": {
+            "type": "number",
+            "description": "Payment amount due upon milestone acceptance"
+          },
+          "Deliverables": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "description": "Brief description of deliverables associated with this milestone"
+          },
+          "AcceptanceCriteria": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "description": "Criteria that must be met for milestone sign-off"
+          }
+        }
+      }
+    },
+    "Sections": {
+      "type": "array",
+      "description": "Free-form prose sections of the SOW document",
+      "items": {
+        "type": "object",
+        "required": ["Title", "Content"],
+        "properties": {
+          "SectionNumber": {
+            "type": "integer"
+          },
+          "Title": {
+            "type": "string",
+            "description": "Section heading (e.g., Scope of Work, Assumptions, Governance)"
+          },
+          "Content": {
+            "type": "string",
+            "description": "1-4 paragraphs of prose for this section"
+          }
+        }
+      }
+    },
+    "ScopeNarrative": {
+      "type": "string",
+      "description": "Optional 2-3 sentence executive summary of the engagement scope and objectives.",
+      "x-probability": 0.8
+    },
+    "RateCardNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence description of billing rates or rate card structure for T and M contracts.",
+      "x-probability": 0.5
+    },
+    "GovernanceNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence description of project governance, reporting cadence, or escalation path.",
+      "x-probability": 0.6
+    },
+    "ChangeControlNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence description of the change order process.",
+      "x-probability": 0.5
+    },
+    "ConfidentialityNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence confidentiality or NDA reference clause.",
+      "x-probability": 0.4
+    }
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Homeowners-Insurance-Declaration",
+  "description": "A homeowners insurance declarations page showing coverage details for a property.",
+  "type": "object",
+  "required": [
+    "PolicyNumber",
+    "InsuredName",
+    "InsuredAddress",
+    "PropertyAddress",
+    "InsuranceCompany",
+    "PolicyPeriodStart",
+    "PolicyPeriodEnd",
+    "CoverageA",
+    "CoverageB",
+    "CoverageC",
+    "CoverageD",
+    "AnnualPremium"
+  ],
+  "properties": {
+    "PolicyNumber": {
+      "type": "string"
+    },
+    "InsuredName": {
+      "type": "string",
+      "description": "Name of the policyholder"
+    },
+    "InsuredAddress": {
+      "type": "string"
+    },
+    "PropertyAddress": {
+      "type": "string",
+      "description": "Address of the insured property"
+    },
+    "InsuranceCompany": {
+      "type": "string"
+    },
+    "AgentName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "AgentPhone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "PolicyPeriodStart": {
+      "type": "string",
+      "description": "Policy start date (YYYY-MM-DD)"
+    },
+    "PolicyPeriodEnd": {
+      "type": "string",
+      "description": "Policy end date (YYYY-MM-DD), typically 1 year after start"
+    },
+    "CoverageA": {
+      "type": "number",
+      "description": "Dwelling coverage amount in dollars"
+    },
+    "CoverageB": {
+      "type": "number",
+      "description": "Other structures coverage (typically 10% of Coverage A)"
+    },
+    "CoverageC": {
+      "type": "number",
+      "description": "Personal property coverage (typically 50% of Coverage A)"
+    },
+    "CoverageD": {
+      "type": "number",
+      "description": "Loss of use coverage (typically 20% of Coverage A)"
+    },
+    "LiabilityCoverage": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Personal liability coverage (e.g. 100000, 300000)"
+    },
+    "MedicalPayments": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Medical payments to others (e.g. 1000, 5000)"
+    },
+    "Deductible": {
+      "type": "number",
+      "description": "Policy deductible in dollars"
+    },
+    "AnnualPremium": {
+      "type": "number",
+      "description": "Total annual premium in dollars"
+    },
+    "MortgageeClause": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Lender listed as mortgagee (e.g. 'First National Bank ISAOA')"
+    },
+    "Discounts": {
+      "type": "array",
+      "description": "Applied discounts",
+      "items": {
+        "type": "object",
+        "properties": {
+          "DiscountType": {
+            "type": "string",
+            "description": "e.g. Multi-policy, New home, Claims-free"
+          },
+          "Amount": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "CoverageNarrative": {
+      "type": "string",
+      "description": "Optional 1-3 sentence narrative explaining the coverage selections and why they were chosen.",
+      "x-probability": 0.7
+    },
+    "PropertyDescriptionNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative describing the insured property's characteristics relevant to coverage.",
+      "x-probability": 0.7
+    },
+    "PremiumNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative explaining the premium calculation and applied discounts.",
+      "x-probability": 0.7
+    },
+    "MortgageeNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about the mortgagee clause and lender requirements.",
+      "x-probability": 0.7
+    }
+  }
+}

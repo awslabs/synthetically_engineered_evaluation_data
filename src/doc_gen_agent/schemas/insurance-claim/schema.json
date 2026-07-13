@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Insurance-Claim",
+  "description": "Property/casualty insurance claim form with narrative and itemized losses.",
+  "type": "object",
+  "required": [
+    "InsuranceCompany",
+    "ClaimNumber",
+    "PolicyNumber",
+    "InsuredName",
+    "DateOfLoss",
+    "TypeOfLoss",
+    "LossDescription",
+    "ItemizedLosses",
+    "TotalReplacementCost",
+    "Deductible",
+    "AmountClaimed"
+  ],
+  "properties": {
+    "InsuranceCompany": {
+      "type": "string"
+    },
+    "ClaimsAddress": {
+      "type": "string"
+    },
+    "ClaimNumber": {
+      "type": "string",
+      "description": "Format: CLM-YYYY-NNNNN"
+    },
+    "PolicyNumber": {
+      "type": "string",
+      "description": "Format: POL-NNNNNNN"
+    },
+    "InsuredName": {
+      "type": "string"
+    },
+    "InsuredAddress": {
+      "type": "string"
+    },
+    "InsuredPhone": {
+      "type": "string"
+    },
+    "InsuredEmail": {
+      "type": "string"
+    },
+    "PolicyType": {
+      "type": "string",
+      "description": "e.g., Homeowners, Renters, Commercial Property"
+    },
+    "DateOfLoss": {
+      "type": "string"
+    },
+    "DateReported": {
+      "type": "string"
+    },
+    "LocationOfLoss": {
+      "type": "string"
+    },
+    "TypeOfLoss": {
+      "type": "string",
+      "description": "e.g., Fire, Water Damage, Theft, Wind/Hail"
+    },
+    "LossDescription": {
+      "type": "string",
+      "description": "2-4 paragraphs describing what happened, when, how discovered, and immediate actions taken"
+    },
+    "ItemizedLosses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "Description",
+          "ReplacementCost",
+          "ActualCashValue"
+        ],
+        "properties": {
+          "Description": {
+            "type": "string"
+          },
+          "YearPurchased": {
+            "type": "integer"
+          },
+          "ReplacementCost": {
+            "type": "number"
+          },
+          "ActualCashValue": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "TotalReplacementCost": {
+      "type": "number",
+      "description": "Sum of all item ReplacementCost values"
+    },
+    "TotalActualCashValue": {
+      "type": "number",
+      "description": "Sum of all item ActualCashValue values"
+    },
+    "Deductible": {
+      "type": "number"
+    },
+    "AmountClaimed": {
+      "type": "number",
+      "description": "TotalActualCashValue minus Deductible"
+    },
+    "AdjusterNotes": {
+      "type": "string",
+      "description": "1-2 paragraphs of adjuster observations"
+    },
+    "AdjusterName": {
+      "type": "string"
+    }
+  }
+}

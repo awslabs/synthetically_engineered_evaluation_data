@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "W-2",
+  "description": "IRS Form W-2 Wage and Tax Statement issued by an employer to an employee.",
+  "type": "object",
+  "required": [
+    "TaxYear",
+    "EmployeeName",
+    "EmployeeAddress",
+    "EmployerName",
+    "EmployerAddress",
+    "EmployerEIN",
+    "WagesAndTips",
+    "FederalIncomeTaxWithheld",
+    "SocialSecurityWages",
+    "SocialSecurityTaxWithheld",
+    "MedicareWages",
+    "MedicareTaxWithheld"
+  ],
+  "properties": {
+    "TaxYear": {
+      "type": "integer",
+      "description": "Tax year (e.g. 2023)"
+    },
+    "EmployeeName": {
+      "type": "string"
+    },
+    "EmployeeAddress": {
+      "type": "string"
+    },
+    "EmployeeSSN": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Masked SSN e.g. XXX-XX-1234"
+    },
+    "EmployerName": {
+      "type": "string"
+    },
+    "EmployerAddress": {
+      "type": "string"
+    },
+    "EmployerEIN": {
+      "type": "string",
+      "description": "Employer Identification Number (e.g. 12-3456789)"
+    },
+    "WagesAndTips": {
+      "type": "number",
+      "description": "Box 1: Total wages, tips, and other compensation"
+    },
+    "FederalIncomeTaxWithheld": {
+      "type": "number",
+      "description": "Box 2: Federal income tax withheld"
+    },
+    "SocialSecurityWages": {
+      "type": "number",
+      "description": "Box 3: Social security wages"
+    },
+    "SocialSecurityTaxWithheld": {
+      "type": "number",
+      "description": "Box 4: Social security tax withheld (6.2% of Box 3)"
+    },
+    "MedicareWages": {
+      "type": "number",
+      "description": "Box 5: Medicare wages and tips"
+    },
+    "MedicareTaxWithheld": {
+      "type": "number",
+      "description": "Box 6: Medicare tax withheld (1.45% of Box 5)"
+    },
+    "SocialSecurityTips": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Box 7"
+    },
+    "StateWages": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Box 16: State wages"
+    },
+    "StateIncomeTax": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Box 17: State income tax withheld"
+    },
+    "State": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "State abbreviation (e.g. WA, OR)"
+    },
+    "RetirementPlan": {
+      "type": "boolean",
+      "description": "Box 12: Whether employee participates in retirement plan"
+    },
+    "Box12Codes": {
+      "type": "array",
+      "description": "Box 12 entries (e.g. 401k contributions)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "string",
+            "description": "IRS code letter (e.g. D for 401k)"
+          },
+          "Amount": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "WageSummaryNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative summarizing total compensation for the tax year.",
+      "x-probability": 0.7
+    },
+    "TaxWithholdingNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about federal and state tax withholding for the year.",
+      "x-probability": 0.7
+    },
+    "RetirementNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about retirement plan contributions (Box 12).",
+      "x-probability": 0.7
+    }
+  }
+}

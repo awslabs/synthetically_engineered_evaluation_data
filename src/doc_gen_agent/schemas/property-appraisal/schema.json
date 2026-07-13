@@ -1,0 +1,185 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Property-Appraisal",
+  "description": "A residential property appraisal report (URAR Form 1004) estimating market value.",
+  "type": "object",
+  "required": [
+    "PropertyAddress",
+    "AppraisalDate",
+    "AppraisedValue",
+    "PropertyType",
+    "LotSize",
+    "GrossLivingArea",
+    "YearBuilt",
+    "Bedrooms",
+    "Bathrooms",
+    "AppraiserName",
+    "ComparableSales"
+  ],
+  "properties": {
+    "PropertyAddress": {
+      "type": "string"
+    },
+    "LegalDescription": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "AppraisalDate": {
+      "type": "string",
+      "description": "Date of appraisal (YYYY-MM-DD)"
+    },
+    "AppraisedValue": {
+      "type": "number",
+      "description": "Estimated market value in dollars"
+    },
+    "PropertyType": {
+      "type": "string",
+      "description": "Single Family, Condo, Townhouse, Multi-Family"
+    },
+    "LotSize": {
+      "type": "string",
+      "description": "Lot size (e.g. 0.25 acres, 8,500 sq ft)"
+    },
+    "GrossLivingArea": {
+      "type": "number",
+      "description": "Total living area in square feet"
+    },
+    "YearBuilt": {
+      "type": "integer"
+    },
+    "Bedrooms": {
+      "type": "integer"
+    },
+    "Bathrooms": {
+      "type": "number",
+      "description": "e.g. 2.5"
+    },
+    "Garage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "e.g. 2-car attached"
+    },
+    "Condition": {
+      "type": "string",
+      "description": "C1-C6 condition rating or Good/Average/Fair"
+    },
+    "AppraiserName": {
+      "type": "string"
+    },
+    "AppraiserLicense": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "AppraisalCompany": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ComparableSales": {
+      "type": "array",
+      "description": "3 comparable sales used to support the appraised value",
+      "items": {
+        "type": "object",
+        "required": [
+          "Address",
+          "SalePrice",
+          "SaleDate",
+          "GrossLivingArea"
+        ],
+        "properties": {
+          "Address": {
+            "type": "string"
+          },
+          "SalePrice": {
+            "type": "number"
+          },
+          "SaleDate": {
+            "type": "string"
+          },
+          "GrossLivingArea": {
+            "type": "number"
+          },
+          "Bedrooms": {
+            "type": "integer"
+          },
+          "Bathrooms": {
+            "type": "number"
+          },
+          "Adjustments": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Net adjustment to sale price"
+          },
+          "AdjustedValue": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "NeighborhoodTrend": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Increasing, Stable, Declining"
+    },
+    "NeighborhoodNarrative": {
+      "type": "string",
+      "description": "Optional 2-3 sentence narrative describing the neighborhood, market conditions, and location factors.",
+      "x-probability": 0.7
+    },
+    "PropertyConditionNarrative": {
+      "type": "string",
+      "description": "Optional 2-3 sentence narrative describing the property's physical condition, updates, and notable features.",
+      "x-probability": 0.7
+    },
+    "MarketAnalysisNarrative": {
+      "type": "string",
+      "description": "Optional 2-3 sentence narrative about local market trends and how they support the appraised value.",
+      "x-probability": 0.7
+    },
+    "ApproachNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative explaining the appraisal approach used (sales comparison, cost, income).",
+      "x-probability": 0.7
+    },
+    "ReconciliationNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative reconciling the comparable sales to arrive at the final appraised value.",
+      "x-probability": 0.7
+    }
+  }
+}

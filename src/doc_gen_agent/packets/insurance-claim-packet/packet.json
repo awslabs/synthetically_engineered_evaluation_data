@@ -1,0 +1,34 @@
+{
+  "name": "insurance-claim-packet",
+  "description": "Property insurance claim submission packet containing the claim form, supporting bank statement, and related invoice for repair services.",
+  "documents": [
+    {
+      "document_class": "Insurance Claim",
+      "schema_dir": "insurance-claim",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Bank Statement",
+      "schema_dir": "bank-statement",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 2
+    },
+    {
+      "document_class": "Invoice",
+      "schema_dir": "invoice",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 3
+    }
+  ],
+  "shared_context": {
+    "claimant_name": "Full legal name of the person filing the claim",
+    "claimant_address": "Street address of the claimant / insured property",
+    "incident_date": "Date of the loss/incident (YYYY-MM-DD format)",
+    "claim_amount_range": "Approximate total claim value for consistency across documents"
+  },
+  "shared_context_hint": "All documents relate to the same insurance claim. The bank statement should show the claimant's account. The invoices are for repair/replacement services related to the claimed loss."
+}

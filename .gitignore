@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+
+# Security scanner output
+.ash/
+
+# Environment
+.env
+.venv/
+env/
+
+# PDFs / generated output
+output/
+critiques/
+
+# Reference sample documents — never commit these. They are local-only
+# style references for the doc critic and may contain third-party / real
+# content. See any schemas/<type>/samples/README.md for details.
+src/doc_gen_agent/schemas/*/samples/*.pdf
+src/doc_gen_agent/schemas/*/samples/*.png
+src/doc_gen_agent/schemas/*/samples/*.jpg
+src/doc_gen_agent/schemas/*/samples/*.jpeg
+
+# Archives
+*.zip
+
+# MkDocs build output
+docs/site/
+site/
+
+# REPL state
+repl_state/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Playwright MCP scratch output (screenshots, console/network dumps)
+.playwright-mcp/
+*.log
+.ash/*

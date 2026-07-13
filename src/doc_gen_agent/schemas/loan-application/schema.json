@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Loan-Application",
+  "description": "Uniform Residential Loan Application (Form 1003) for a mortgage.",
+  "type": "object",
+  "required": [
+    "BorrowerName",
+    "BorrowerAddress",
+    "LoanAmount",
+    "LoanPurpose",
+    "PropertyAddress",
+    "PropertyType",
+    "LoanType",
+    "InterestRate",
+    "LoanTerm",
+    "EmployerName",
+    "EmploymentYears",
+    "AnnualIncome",
+    "MonthlyDebt",
+    "Assets"
+  ],
+  "properties": {
+    "BorrowerName": {
+      "type": "string",
+      "description": "Full legal name of the primary borrower"
+    },
+    "CoBorrowerName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Full legal name of co-borrower if applicable"
+    },
+    "BorrowerAddress": {
+      "type": "string",
+      "description": "Current street address of the borrower"
+    },
+    "BorrowerPhone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Borrower phone number"
+    },
+    "BorrowerSSN": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Last 4 digits of SSN (e.g. XXX-XX-1234)"
+    },
+    "LoanAmount": {
+      "type": "number",
+      "description": "Total loan amount requested in dollars"
+    },
+    "LoanPurpose": {
+      "type": "string",
+      "description": "Purpose of loan: Purchase, Refinance, or Cash-Out Refinance"
+    },
+    "PropertyAddress": {
+      "type": "string",
+      "description": "Address of the subject property"
+    },
+    "PropertyType": {
+      "type": "string",
+      "description": "Type of property: Single Family, Condo, Townhouse, Multi-Family"
+    },
+    "LoanType": {
+      "type": "string",
+      "description": "Loan type: Conventional, FHA, VA, USDA"
+    },
+    "InterestRate": {
+      "type": "number",
+      "description": "Proposed interest rate as a percentage (e.g. 6.75)"
+    },
+    "LoanTerm": {
+      "type": "integer",
+      "description": "Loan term in months (e.g. 360 for 30-year)"
+    },
+    "EmployerName": {
+      "type": "string",
+      "description": "Name of borrower's current employer"
+    },
+    "EmployerAddress": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Address of employer"
+    },
+    "EmploymentYears": {
+      "type": "number",
+      "description": "Years at current employer"
+    },
+    "AnnualIncome": {
+      "type": "number",
+      "description": "Borrower's annual gross income in dollars"
+    },
+    "MonthlyIncome": {
+      "type": "number",
+      "description": "Borrower's monthly gross income in dollars (AnnualIncome / 12)"
+    },
+    "MonthlyDebt": {
+      "type": "number",
+      "description": "Total monthly debt obligations in dollars"
+    },
+    "DTIRatio": {
+      "type": "number",
+      "description": "Debt-to-income ratio as a percentage"
+    },
+    "Assets": {
+      "type": "array",
+      "description": "List of borrower assets",
+      "items": {
+        "type": "object",
+        "required": [
+          "AssetType",
+          "AssetValue"
+        ],
+        "properties": {
+          "AssetType": {
+            "type": "string",
+            "description": "Type of asset: Checking, Savings, 401k, Investment, etc."
+          },
+          "Institution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "AssetValue": {
+            "type": "number",
+            "description": "Value of asset in dollars"
+          }
+        }
+      }
+    },
+    "ApplicationDate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Date application was submitted (YYYY-MM-DD)"
+    },
+    "PropertyDescription": {
+      "type": "string",
+      "description": "Optional 1-3 sentence narrative describing the subject property \u2014 type, location, condition, notable features.",
+      "x-probability": 0.7
+    },
+    "BorrowerBackground": {
+      "type": "string",
+      "description": "Optional 1-3 sentence narrative about the borrower's financial profile and reason for the loan.",
+      "x-probability": 0.7
+    },
+    "EmploymentNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about the borrower's employment history and stability.",
+      "x-probability": 0.7
+    },
+    "LoanPurposeNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence explanation of the loan purpose and intended use of funds.",
+      "x-probability": 0.7
+    },
+    "AssetSummaryNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence summary of the borrower's overall asset position.",
+      "x-probability": 0.7
+    }
+  }
+}
