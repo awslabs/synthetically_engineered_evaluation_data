@@ -449,8 +449,3 @@ avoid broad/admin credentials.
 Generation runs make repeated Bedrock calls and use critic-driven retry loops.
 Large batch counts or high `--max-attempts` increase token spend. Keep
 `--max-attempts`/`--timeout` conservative and monitor Bedrock usage.
-
-### Reporting
-
-Scanner findings reviewed for this project are documented in
-[docs/security-scan-notes.md](docs/security-scan-notes.md).
