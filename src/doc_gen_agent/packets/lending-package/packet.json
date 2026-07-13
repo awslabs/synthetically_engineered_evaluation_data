@@ -1,0 +1,78 @@
+{
+  "name": "lending-package",
+  "description": "Mortgage lending package containing all documents required for a home loan application and underwriting review.",
+  "documents": [
+    {
+      "document_class": "Loan Application",
+      "schema_dir": "loan-application",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Credit Report",
+      "schema_dir": "credit-report",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Pay Stub",
+      "schema_dir": "pay-stub",
+      "required": true,
+      "min_instances": 2,
+      "max_instances": 3
+    },
+    {
+      "document_class": "Bank Statement",
+      "schema_dir": "bank-statement",
+      "required": true,
+      "min_instances": 2,
+      "max_instances": 3
+    },
+    {
+      "document_class": "W-2",
+      "schema_dir": "w2",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 2
+    },
+    {
+      "document_class": "Employment Verification Letter",
+      "schema_dir": "employment-verification-letter",
+      "required": false,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Property Appraisal",
+      "schema_dir": "property-appraisal",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Title Report",
+      "schema_dir": "title-report",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    },
+    {
+      "document_class": "Homeowners Insurance Declaration",
+      "schema_dir": "homeowners-insurance-declaration",
+      "required": true,
+      "min_instances": 1,
+      "max_instances": 1
+    }
+  ],
+  "shared_context": {
+    "borrower_name": "Full legal name of the primary borrower",
+    "borrower_address": "Current street address of the borrower",
+    "property_address": "Address of the property being purchased or refinanced",
+    "loan_amount": "Total loan amount being requested",
+    "employer_name": "Name of the borrower's employer",
+    "annual_income": "Borrower's annual gross income"
+  },
+  "shared_context_hint": "All documents relate to the same mortgage loan application. Pay stubs, W-2s, and employment verification should reflect the same employer and income. Bank statements should show the borrower's account. The appraisal and title report should reference the same property address."
+}

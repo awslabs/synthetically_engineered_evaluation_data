@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Credit-Report",
+  "description": "A tri-merge credit report from a consumer reporting agency for mortgage underwriting.",
+  "type": "object",
+  "required": [
+    "BorrowerName",
+    "BorrowerAddress",
+    "ReportDate",
+    "CreditScores",
+    "Tradelines",
+    "TotalMonthlyPayments",
+    "PublicRecords"
+  ],
+  "properties": {
+    "BorrowerName": {
+      "type": "string"
+    },
+    "BorrowerAddress": {
+      "type": "string"
+    },
+    "BorrowerSSN": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Masked SSN e.g. XXX-XX-1234"
+    },
+    "ReportDate": {
+      "type": "string",
+      "description": "Date report was pulled (YYYY-MM-DD)"
+    },
+    "ReportNumber": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "CreditScores": {
+      "type": "object",
+      "description": "Credit scores from the three bureaus",
+      "required": [
+        "Equifax",
+        "Experian",
+        "TransUnion"
+      ],
+      "properties": {
+        "Equifax": {
+          "type": "integer",
+          "description": "Equifax FICO score (300-850)"
+        },
+        "Experian": {
+          "type": "integer",
+          "description": "Experian FICO score (300-850)"
+        },
+        "TransUnion": {
+          "type": "integer",
+          "description": "TransUnion FICO score (300-850)"
+        },
+        "MiddleScore": {
+          "type": "integer",
+          "description": "Middle score used for underwriting"
+        }
+      }
+    },
+    "Tradelines": {
+      "type": "array",
+      "description": "List of credit accounts",
+      "items": {
+        "type": "object",
+        "required": [
+          "Creditor",
+          "AccountType",
+          "Balance",
+          "MonthlyPayment",
+          "Status"
+        ],
+        "properties": {
+          "Creditor": {
+            "type": "string"
+          },
+          "AccountType": {
+            "type": "string",
+            "description": "Mortgage, Auto, Credit Card, Student Loan, etc."
+          },
+          "AccountNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Masked account number"
+          },
+          "OpenDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "Balance": {
+            "type": "number"
+          },
+          "CreditLimit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "MonthlyPayment": {
+            "type": "number"
+          },
+          "Status": {
+            "type": "string",
+            "description": "Current, 30-day late, 60-day late, Closed, etc."
+          },
+          "PaymentHistory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "e.g. 24/24 on-time"
+          }
+        }
+      }
+    },
+    "TotalMonthlyPayments": {
+      "type": "number",
+      "description": "Sum of all monthly payments across tradelines"
+    },
+    "TotalBalances": {
+      "type": "number",
+      "description": "Sum of all balances across tradelines"
+    },
+    "PublicRecords": {
+      "type": "array",
+      "description": "Bankruptcies, judgments, liens (empty array if none)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Type": {
+            "type": "string"
+          },
+          "Date": {
+            "type": "string"
+          },
+          "Amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "Inquiries": {
+      "type": "array",
+      "description": "Recent hard inquiries",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Creditor": {
+            "type": "string"
+          },
+          "Date": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CreditSummaryNarrative": {
+      "type": "string",
+      "description": "Optional 1-3 sentence narrative summarizing the borrower's overall credit profile and history.",
+      "x-probability": 0.7
+    },
+    "DerogatorySummary": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about any derogatory marks or explaining a clean record.",
+      "x-probability": 0.7
+    },
+    "InquiryExplanation": {
+      "type": "string",
+      "description": "Optional 1-2 sentence explanation of recent hard inquiries.",
+      "x-probability": 0.7
+    },
+    "ScoreFactors": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about the key factors affecting the credit score.",
+      "x-probability": 0.7
+    }
+  }
+}

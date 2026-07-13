@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Employment-Verification-Letter",
+  "description": "A letter from an employer verifying an employee's employment status, title, and income.",
+  "type": "object",
+  "required": [
+    "EmployeeName",
+    "EmployerName",
+    "EmployerAddress",
+    "EmploymentStatus",
+    "JobTitle",
+    "StartDate",
+    "AnnualSalary",
+    "LetterDate"
+  ],
+  "properties": {
+    "EmployeeName": {
+      "type": "string"
+    },
+    "EmployerName": {
+      "type": "string"
+    },
+    "EmployerAddress": {
+      "type": "string"
+    },
+    "EmployerPhone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "HRContactName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Name of HR representative signing the letter"
+    },
+    "HRContactTitle": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "EmploymentStatus": {
+      "type": "string",
+      "description": "Full-Time, Part-Time, Contract"
+    },
+    "JobTitle": {
+      "type": "string"
+    },
+    "Department": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "StartDate": {
+      "type": "string",
+      "description": "Employment start date (YYYY-MM-DD)"
+    },
+    "AnnualSalary": {
+      "type": "number",
+      "description": "Annual gross salary in dollars"
+    },
+    "PayFrequency": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Bi-Weekly, Semi-Monthly, Monthly"
+    },
+    "LetterDate": {
+      "type": "string",
+      "description": "Date the letter was issued (YYYY-MM-DD)"
+    },
+    "RecipientName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Lender or institution the letter is addressed to"
+    },
+    "EmploymentHistoryNarrative": {
+      "type": "string",
+      "description": "Optional 1-3 sentence narrative about the employee's tenure and employment history at the company.",
+      "x-probability": 0.7
+    },
+    "RoleDescriptionNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative describing the employee's role and responsibilities.",
+      "x-probability": 0.7
+    },
+    "PerformanceNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence statement about the employee being in good standing and expected continued employment.",
+      "x-probability": 0.7
+    },
+    "SalaryContextNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative providing context about the salary structure or recent changes.",
+      "x-probability": 0.7
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Medical-Discharge-Summary",
+  "description": "Hospital discharge summary with clinical narrative.",
+  "type": "object",
+  "required": [
+    "FacilityName",
+    "PatientName",
+    "MRN",
+    "DOB",
+    "AdmissionDate",
+    "DischargeDate",
+    "DischargeDiagnoses",
+    "HistoryOfPresentIllness",
+    "HospitalCourse",
+    "DischargeMedications",
+    "FollowUpInstructions",
+    "AttendingPhysician"
+  ],
+  "properties": {
+    "FacilityName": {
+      "type": "string",
+      "description": "Hospital or facility name"
+    },
+    "FacilityAddress": {
+      "type": "string"
+    },
+    "PatientName": {
+      "type": "string"
+    },
+    "MRN": {
+      "type": "string",
+      "description": "Medical record number"
+    },
+    "DOB": {
+      "type": "string",
+      "description": "Patient date of birth YYYY-MM-DD"
+    },
+    "AdmissionDate": {
+      "type": "string"
+    },
+    "DischargeDate": {
+      "type": "string"
+    },
+    "DischargeDiagnoses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Each diagnosis as a string"
+      },
+      "description": "List of discharge diagnoses"
+    },
+    "HistoryOfPresentIllness": {
+      "type": "string",
+      "description": "2-4 paragraphs of clinical narrative describing the presenting complaint and history"
+    },
+    "HospitalCourse": {
+      "type": "string",
+      "description": "3-6 paragraphs describing treatment, procedures, and clinical progression during the stay"
+    },
+    "DischargeMedications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "MedicationName",
+          "Dosage",
+          "Frequency"
+        ],
+        "properties": {
+          "MedicationName": {
+            "type": "string"
+          },
+          "Dosage": {
+            "type": "string"
+          },
+          "Frequency": {
+            "type": "string"
+          },
+          "Instructions": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "List of medications at discharge"
+    },
+    "DischargeCondition": {
+      "type": "string",
+      "description": "Patient condition at discharge (e.g., Stable, Improved)"
+    },
+    "FollowUpInstructions": {
+      "type": "string",
+      "description": "1-2 paragraphs of follow-up care instructions"
+    },
+    "AttendingPhysician": {
+      "type": "string",
+      "description": "Full name with credentials (e.g., Dr. Jane Smith, MD)"
+    }
+  }
+}

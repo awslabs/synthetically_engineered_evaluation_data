@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cable-Bill",
+  "description": "A residential cable TV and phone service monthly billing statement.",
+  "type": "object",
+  "required": [
+    "ProviderName",
+    "ProviderAddress",
+    "CustomerName",
+    "CustomerAddress",
+    "AccountNumber",
+    "BillingNumber",
+    "BillingDate",
+    "DueDate",
+    "BillingSummary",
+    "Services",
+    "TotalCharges"
+  ],
+  "properties": {
+    "ProviderName": {
+      "type": "string",
+      "description": "Cable company / provider name"
+    },
+    "ProviderAddress": {
+      "type": "string",
+      "description": "Provider street address, city, state, zip"
+    },
+    "CustomerName": {
+      "type": "string",
+      "description": "Customer full name"
+    },
+    "CustomerAddress": {
+      "type": "string",
+      "description": "Customer mailing address"
+    },
+    "AccountNumber": {
+      "type": "string",
+      "description": "Customer account number (e.g. 32354-078)"
+    },
+    "BillingNumber": {
+      "type": "string",
+      "description": "Unique billing/invoice number"
+    },
+    "BillingDate": {
+      "type": "string",
+      "description": "Date the bill was generated (YYYY-MM-DD)"
+    },
+    "DueDate": {
+      "type": "string",
+      "description": "Payment due date (YYYY-MM-DD)"
+    },
+    "BillingSummary": {
+      "type": "object",
+      "description": "High-level account balance summary",
+      "required": [
+        "PreviousBalance",
+        "PaymentSinceLastBill",
+        "BalanceForward",
+        "CurrentCharges"
+      ],
+      "properties": {
+        "PreviousBalance": {
+          "type": "number",
+          "description": "Previous statement balance"
+        },
+        "PaymentSinceLastBill": {
+          "type": "number",
+          "description": "Payment received since last bill (negative value)"
+        },
+        "BalanceForward": {
+          "type": "number",
+          "description": "Remaining balance carried forward"
+        },
+        "CurrentCharges": {
+          "type": "number",
+          "description": "Total new charges this billing period"
+        },
+        "CustomerNumber": {
+          "type": "string",
+          "description": "Customer reference number shown in summary"
+        },
+        "MailingZipCode": {
+          "type": "string",
+          "description": "Mailing zip code shown in summary"
+        }
+      }
+    },
+    "Services": {
+      "type": "array",
+      "description": "List of service sections (e.g. Cable TV, Phone, Internet)",
+      "items": {
+        "type": "object",
+        "required": [
+          "ServiceName",
+          "PeriodStart",
+          "PeriodEnd",
+          "LineItems",
+          "ServiceTotal"
+        ],
+        "properties": {
+          "ServiceName": {
+            "type": "string",
+            "description": "Name of the service section (e.g. Cable TV Service, Phone Service)"
+          },
+          "PeriodStart": {
+            "type": "string",
+            "description": "Service period start date (YYYY-MM-DD)"
+          },
+          "PeriodEnd": {
+            "type": "string",
+            "description": "Service period end date (YYYY-MM-DD)"
+          },
+          "CustomerReferenceNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-service customer reference number if shown"
+          },
+          "LineItems": {
+            "type": "array",
+            "description": "Individual charges within this service",
+            "items": {
+              "type": "object",
+              "required": [
+                "Description",
+                "Amount"
+              ],
+              "properties": {
+                "Description": {
+                  "type": "string",
+                  "description": "Charge description (e.g. Receiver Fee, Land Line Service)"
+                },
+                "Amount": {
+                  "type": "number",
+                  "description": "Dollar amount for this line item"
+                },
+                "Detail": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional sub-detail (e.g. Minutes Used: 211)"
+                }
+              }
+            }
+          },
+          "Taxes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tax amount for this service section"
+          },
+          "ServiceTotal": {
+            "type": "number",
+            "description": "Total charges for this service section"
+          },
+          "PackageContents": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "PackageName": {
+                      "type": "string"
+                    },
+                    "ChannelCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel package breakdown if applicable (Cable TV only)"
+          }
+        }
+      }
+    },
+    "TotalCharges": {
+      "type": "number",
+      "description": "Grand total of all service charges on this bill"
+    }
+  }
+}

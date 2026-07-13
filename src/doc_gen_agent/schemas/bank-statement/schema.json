@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bank-Statement",
+  "description": "Monthly bank account statement with transactions and running balance.",
+  "type": "object",
+  "required": [
+    "BankName",
+    "AccountHolderName",
+    "AccountNumber",
+    "StatementPeriodStart",
+    "StatementPeriodEnd",
+    "OpeningBalance",
+    "ClosingBalance",
+    "TotalDeposits",
+    "TotalWithdrawals",
+    "Transactions"
+  ],
+  "properties": {
+    "BankName": {
+      "type": "string"
+    },
+    "BranchAddress": {
+      "type": "string"
+    },
+    "AccountHolderName": {
+      "type": "string"
+    },
+    "AccountHolderAddress": {
+      "type": "string"
+    },
+    "AccountNumber": {
+      "type": "string",
+      "description": "Partially masked: ****NNNN"
+    },
+    "AccountType": {
+      "type": "string",
+      "description": "Checking or Savings"
+    },
+    "StatementPeriodStart": {
+      "type": "string"
+    },
+    "StatementPeriodEnd": {
+      "type": "string"
+    },
+    "OpeningBalance": {
+      "type": "number"
+    },
+    "ClosingBalance": {
+      "type": "number"
+    },
+    "TotalDeposits": {
+      "type": "number",
+      "description": "Sum of all credit amounts"
+    },
+    "TotalWithdrawals": {
+      "type": "number",
+      "description": "Sum of all debit amounts"
+    },
+    "Transactions": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "required": [
+          "Date",
+          "Description",
+          "Amount",
+          "Type",
+          "RunningBalance"
+        ],
+        "properties": {
+          "Date": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Realistic transaction description"
+          },
+          "Amount": {
+            "type": "number",
+            "description": "Transaction amount (always positive)"
+          },
+          "Type": {
+            "type": "string",
+            "description": "Credit or Debit"
+          },
+          "RunningBalance": {
+            "type": "number",
+            "description": "Balance after this transaction"
+          }
+        }
+      }
+    },
+    "AccountSummaryNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative summarizing the account activity and balance trend for the period.",
+      "x-probability": 0.7
+    },
+    "DepositPatternNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative describing the deposit pattern (regular payroll, transfers, etc.).",
+      "x-probability": 0.7
+    },
+    "SpendingPatternNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative about notable spending categories or patterns.",
+      "x-probability": 0.7
+    },
+    "AccountNoticesNarrative": {
+      "type": "string",
+      "description": "Optional 1-2 sentence narrative for any account notices, fee waivers, or special conditions.",
+      "x-probability": 0.7
+    }
+  }
+}
