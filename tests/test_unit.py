@@ -18,7 +18,7 @@ import tempfile
 # ---------------------------------------------------------------------------
 
 def test_sha256_file():
-    from doc_gen_agent.utils import sha256_file
+    from seed_data.utils import sha256_file
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
         f.write(b"hello world")
         path = f.name
@@ -33,8 +33,8 @@ def test_sha256_file():
 
 
 def test_load_schema_dir():
-    from doc_gen_agent.utils import load_schema_dir
-    schema_dir = os.path.join("src", "doc_gen_agent", "schemas", "cable-bill")
+    from seed_data.utils import load_schema_dir
+    schema_dir = os.path.join("src", "seed_data", "schemas", "cable-bill")
     if not os.path.isdir(schema_dir):
         print("⊘ load_schema_dir (cable-bill schema not found, skipping)")
         return
@@ -48,7 +48,7 @@ def test_load_schema_dir():
 
 
 def test_load_schema_dir_missing():
-    from doc_gen_agent.utils import load_schema_dir
+    from seed_data.utils import load_schema_dir
     try:
         load_schema_dir("/nonexistent/path")
         assert False, "Should have raised"
@@ -62,7 +62,7 @@ def test_load_schema_dir_missing():
 # ---------------------------------------------------------------------------
 
 def test_critique_result_model():
-    from doc_gen_agent.critique import CritiqueResult, CritiqueIssue
+    from seed_data.critique import CritiqueResult, CritiqueIssue
     result = CritiqueResult(
         score=7,
         issues=[CritiqueIssue(
@@ -81,7 +81,7 @@ def test_critique_result_model():
 
 
 def test_critique_result_validation():
-    from doc_gen_agent.critique import CritiqueResult
+    from seed_data.critique import CritiqueResult
     from pydantic import ValidationError
     try:
         CritiqueResult(score=0, issues=[], summary="bad")
@@ -101,7 +101,7 @@ def test_critique_result_validation():
 # ---------------------------------------------------------------------------
 
 def test_check_verdict():
-    from doc_gen_agent.nodes import _check_verdict
+    from seed_data.nodes import _check_verdict
     from strands.multiagent.base import MultiAgentResult, NodeResult, Status
     from strands.agent.agent_result import AgentResult
     from strands.types.content import ContentBlock, Message
@@ -141,7 +141,7 @@ def test_check_verdict():
 # ---------------------------------------------------------------------------
 
 def test_save_and_read_json():
-    from doc_gen_agent.tools import save_json_file, read_json_file
+    from seed_data.tools import save_json_file, read_json_file
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "test.json")
         data = {"name": "test", "value": 42}
@@ -159,14 +159,14 @@ def test_save_and_read_json():
 
 
 def test_read_json_missing():
-    from doc_gen_agent.tools import read_json_file
+    from seed_data.tools import read_json_file
     result = read_json_file(file_path="/nonexistent/file.json")
     assert result["status"] == "error"
     print("✓ read_json_file handles missing file")
 
 
 def test_save_json_invalid():
-    from doc_gen_agent.tools import save_json_file
+    from seed_data.tools import save_json_file
     result = save_json_file(file_path=os.path.join(tempfile.gettempdir(), "test.json"), json_content="not valid json{{{")
     assert result["status"] == "error"
     print("✓ save_json_file handles invalid JSON")
@@ -177,7 +177,7 @@ def test_save_json_invalid():
 # ---------------------------------------------------------------------------
 
 def test_prompt_render():
-    from doc_gen_agent import prompts
+    from seed_data import prompts
     # All templates should render without error
     templates = [
         ("data_generator", {"schema_json": "{}", "steering": "", "extra": "", "data_json_path": os.path.join(tempfile.gettempdir(), "x.json")}),

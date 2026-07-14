@@ -8,7 +8,7 @@ For evaluation data you want volume and diversity. The batch script (`scripts/ba
 
 ```bash
 BYPASS_TOOL_CONSENT=true python scripts/batch_generate.py \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --count 10 --workers 3 \
   --extra "CPG brands on local TV stations in the American southwest" \
   --augment \
@@ -39,7 +39,7 @@ The scenario generator reads the schema's guidance to understand the document ty
 
 ## CLI Options
 
-Common flags (shared with `python -m doc_gen_agent` and the packet script):
+Common flags (shared with `python -m seed_data` and the packet script):
 
 | Flag | Default | Description |
 |------|---------|-------------|

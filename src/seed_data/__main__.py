@@ -1,4 +1,4 @@
-"""CLI entrypoint: python -m doc_gen_agent"""
+"""CLI entrypoint: python -m seed_data"""
 import argparse
 import json
 import sys
@@ -7,15 +7,40 @@ import time
 from dotenv import load_dotenv
 
 
+def _clone_schema_library(argv):
+    """Handle the `clone-schema-library` subcommand."""
+    from seed_data.utils import clone_schema_library, SCHEMA_LIBRARY_URL
+    parser = argparse.ArgumentParser(
+        prog="seed-data clone-schema-library",
+        description="Copy the bundled schema library to a local, editable directory.",
+    )
+    parser.add_argument("dest", nargs="?", default="./schemas",
+                        help="Destination directory (default: ./schemas)")
+    args = parser.parse_args(argv)
+    try:
+        target = clone_schema_library(args.dest)
+    except (FileExistsError, FileNotFoundError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+    print(f"Copied schema library to {target}")
+    print(f"Edit the schemas there, then run: seed-data --schema-dir {target}/<name>")
+    print(f"Browse the library on GitHub: {SCHEMA_LIBRARY_URL}")
+
+
 def main():
+    # Subcommand dispatch (kept separate so the default generate flow is untouched).
+    if len(sys.argv) > 1 and sys.argv[1] == "clone-schema-library":
+        _clone_schema_library(sys.argv[2:])
+        return
+
     load_dotenv()
 
-    from doc_gen_agent import MODELS
-    from doc_gen_agent.orchestrate import orchestrate
+    from seed_data import MODELS
+    from seed_data.orchestrate import orchestrate
 
     model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
-        prog="doc-gen-agent",
+        prog="seed-data",
         description="AI-powered document generation pipeline",
     )
     parser.add_argument("--schema-dir", required=True, help="Schema directory")
@@ -40,7 +65,7 @@ def main():
 
     if args.count > 1:
         # Batch mode: LLM orchestrator generates diverse documents
-        from doc_gen_agent.batch import run_batch
+        from seed_data.batch import run_batch
         brief = args.extra or "Generate diverse, realistic documents"
         result = run_batch(
             schema_dir=args.schema_dir,

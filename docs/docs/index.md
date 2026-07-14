@@ -8,7 +8,32 @@ title: Synthetically Engineered Evaluation Data
 
 Every document is entirely fictional. Names, addresses, and financial figures are invented, and each PDF is rendered from freshly generated HTML/CSS (or ReportLab) code, so there are no real documents or templates copied into the output.
 
-The pipeline is invoked as a Python module (`python -m doc_gen_agent`) or through the batch and packet scripts. It is built on the [Strands Agents SDK](https://strandsagents.com/) and calls foundation models through Amazon Bedrock.
+The pipeline is built on the [Strands Agents SDK](https://strandsagents.com/) and calls foundation models through Amazon Bedrock.
+
+## Quickstart
+
+Install from PyPI — the default renderer is pure Python, so there is nothing else to set up:
+
+```bash
+pip install seed-data
+```
+
+Configure AWS Bedrock credentials, copy the schema library locally, and generate:
+
+```bash
+export AWS_PROFILE=your-profile-name
+
+# Copy the built-in schemas into a local, editable folder
+seed-data clone-schema-library ./schemas
+
+# Generate an invoice PDF + ground-truth JSON into ./output
+seed-data --schema-dir ./schemas/invoice --output ./output
+```
+
+Browse the schema library on GitHub:
+[awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
+
+[:octicons-arrow-right-24: Full quickstart](Getting-Started/quick-start.md)
 
 ### Key Use Case: Evaluation Data for IDP and KIE
 

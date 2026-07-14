@@ -67,7 +67,7 @@ Leave this variable unset when running schemas or briefs you do not fully trust,
 ## Verify Installation
 
 ```bash
-python -m doc_gen_agent --help
+python -m seed_data --help
 ```
 
 You can also run the tests that do not require AWS credentials:

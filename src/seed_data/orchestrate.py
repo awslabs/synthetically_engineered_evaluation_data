@@ -16,24 +16,29 @@ from strands.agent.conversation_manager.null_conversation_manager import NullCon
 from strands.multiagent import GraphBuilder
 from strands_tools import file_write, file_read, shell, editor
 
-from doc_gen_agent.critique import critique_document, critique_data
-from doc_gen_agent.tools import save_json_file, read_json_file, random_roll
-from doc_gen_agent.nodes import (
+from seed_data.critique import critique_document, critique_data
+from seed_data.tools import save_json_file, read_json_file, random_roll
+from seed_data.nodes import (
     FunctionNode, was_rejected_visual, was_rejected_data,
     data_accepted, aug_rejected,
 )
-from doc_gen_agent.utils import sha256_file, make_model, load_schema_dir
-from doc_gen_agent import prompts, MODELS
+from seed_data.utils import sha256_file, make_model, load_schema_dir
+from seed_data import prompts, MODELS
+
+# Renderers that consume an HTML file (via the render_html_to_pdf tool). Anything
+# else (e.g. "reportlab") is a Python-script renderer run through shell.
+HTML_RENDERERS = ("xhtml2pdf", "weasyprint")
 
 
 def _build_doc_loop(
     output_path, data_json_path, script_path, schema_json, steering, extra,
     doc_model, critic_model, threshold, timeout, sample_pdfs=None, critic_samples=True,
-    enable_preview=False, renderer="weasyprint",
+    enable_preview=False, renderer="xhtml2pdf",
 ):
     """Build the inner doc_generator ↔ doc_critic sub-graph."""
 
-    prompt_template = "doc_generator_html" if renderer == "weasyprint" else "doc_generator"
+    is_html = renderer in HTML_RENDERERS
+    prompt_template = "doc_generator_html" if is_html else "doc_generator"
     doc_gen_prompt = prompts.render(
         prompt_template, schema_json=schema_json, steering=steering,
         extra=extra, output_path=output_path,
@@ -50,13 +55,15 @@ def _build_doc_loop(
                 doc_gen_prompt += f"\n\nReportLab Reference:\n{f.read()}"
 
     tools = [file_write, editor, read_json_file, random_roll]
-    if renderer == "weasyprint":
-        from doc_gen_agent.tools import render_html_to_pdf
+    if is_html:
+        # Tell the render_html_to_pdf tool which backend to use for this run.
+        os.environ["HTML_RENDERER"] = renderer
+        from seed_data.tools import render_html_to_pdf
         tools.append(render_html_to_pdf)
     else:
         tools.append(shell)
     if enable_preview:
-        from doc_gen_agent.tools import preview_pdf
+        from seed_data.tools import preview_pdf
         tools.append(preview_pdf)
 
     # Nova models have 1M context — no need for sliding window, and it breaks
@@ -89,11 +96,9 @@ def _build_doc_loop(
                 raise RuntimeError(
                     f"PDF rendering failed 3 times in a row. "
                     f"The {renderer} renderer could not produce a PDF at {output_path}. "
-                    f"Check that {renderer} and its system libraries are correctly installed. "
-                    f"Run: python -c \"from weasyprint import HTML; HTML(string='<p>test</p>').write_pdf('/tmp/test.pdf'); print('OK')\" "
-                    f"to verify WeasyPrint works in your environment."
+                    f"Check that {renderer} and any required system libraries are correctly installed."
                 )
-            if renderer == "weasyprint":
+            if is_html:
                 fix = (
                     f'Call render_html_to_pdf(html_path="{script_path}", '
                     f'pdf_path="{output_path}") to generate the PDF'
@@ -126,7 +131,7 @@ def _build_doc_loop(
         )
         # Format as clear retry instructions for the generator
         if result["verdict"] == "rejected":
-            if renderer == "weasyprint":
+            if is_html:
                 rerun_instruction = (
                     f"Fix the issues above in the existing HTML at {script_path}. "
                     f"Use editor to make targeted changes, then call "
@@ -150,7 +155,7 @@ def _build_doc_loop(
     # Gateway node rewrites the incoming task (which may contain data-gen instructions
     # from the outer graph) into a clear PDF generation task for the doc_generator.
     def _doc_gateway(task_text):
-        if renderer == "weasyprint":
+        if is_html:
             return (
                 f"Generate the PDF. Read data from {data_json_path} using read_json_file. "
                 f"Write an HTML file to {script_path}, then call "
@@ -192,7 +197,7 @@ def orchestrate(
     timeout: int = 3600,
     augment: bool = False,
     critic_samples: bool = True,
-    renderer: str = "weasyprint",
+    renderer: str = "xhtml2pdf",
     enable_preview: bool = False,
     verbose: bool = True,
 ) -> dict:
@@ -211,7 +216,7 @@ def orchestrate(
 
     output_path = os.path.join(pdfs_dir, f"{doc_id}.pdf")
     data_json_path = os.path.join(data_dir, f"{doc_id}.json")
-    script_ext = ".html" if renderer == "weasyprint" else ".py"
+    script_ext = ".html" if renderer in HTML_RENDERERS else ".py"
     script_path = os.path.join(scripts_dir, f"{doc_id}{script_ext}")
 
     os.environ["CRITIC_MODEL"] = critic_model
@@ -296,8 +301,8 @@ def orchestrate(
 
     # --- Optional augmentation ---
     if augment:
-        from doc_gen_agent.augment import apply_augmentation as aug_apply_tool
-        from doc_gen_agent.augment import critique_augmented_document
+        from seed_data.augment import apply_augmentation as aug_apply_tool
+        from seed_data.augment import critique_augmented_document
 
         aug_dir = os.path.join(output_dir, "augmented")
         os.makedirs(aug_dir, exist_ok=True)

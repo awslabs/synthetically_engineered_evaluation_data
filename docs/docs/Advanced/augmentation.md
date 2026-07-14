@@ -7,8 +7,8 @@ title: Augmentation
 Real documents in an IDP pipeline are rarely pristine: they are scanned, faxed, photocopied, folded, and stained. To make evaluation data realistic, SEED can apply image augmentation that simulates these effects. Enable it with `--augment`:
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+BYPASS_TOOL_CONSENT=true python -m seed_data \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --extra "Local TV station in Portland, Oregon" \
   --augment
 ```

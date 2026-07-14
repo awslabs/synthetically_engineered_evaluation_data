@@ -7,8 +7,8 @@ from typing import List
 from pydantic import BaseModel, Field
 from strands import Agent
 
-from doc_gen_agent import prompts, MODELS
-from doc_gen_agent.utils import make_model
+from seed_data import prompts, MODELS
+from seed_data.utils import make_model
 
 
 class CritiqueIssue(BaseModel):

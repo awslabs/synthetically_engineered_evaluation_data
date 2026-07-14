@@ -9,8 +9,8 @@ from datetime import datetime
 
 from strands import Agent, tool
 
-from doc_gen_agent.orchestrate import orchestrate
-from doc_gen_agent.utils import make_model
+from seed_data.orchestrate import orchestrate
+from seed_data.utils import make_model
 
 _pipeline_config = {}
 _batch_results = []

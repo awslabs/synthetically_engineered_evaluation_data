@@ -222,9 +222,9 @@ def apply_augmentation(pdf_path: str, augmentation_config: str) -> dict:
 
 def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: int = 7) -> dict:
     """Critique an augmented PDF using structured_output."""
-    from doc_gen_agent import prompts as p
-    from doc_gen_agent.critique import CritiqueResult
-    from doc_gen_agent.utils import make_model as _make_model
+    from seed_data import prompts as p
+    from seed_data.critique import CritiqueResult
+    from seed_data.utils import make_model as _make_model
     from strands import Agent
 
     with open(pdf_path, "rb") as f:
