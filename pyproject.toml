@@ -1,6 +1,6 @@
 [project]
 name = "seed-data"
-version = "0.0.1"
+version = "0.0.2"
 description = "AI-powered synthetic document generation pipeline for benchmarking document extraction (IDP/KIE) systems"
 readme = "README.md"
 license = "Apache-2.0"
