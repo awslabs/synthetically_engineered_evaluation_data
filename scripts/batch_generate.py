@@ -5,7 +5,7 @@ No LLM orchestrator — just concurrent orchestrate() calls.
 
 Usage:
   AWS_PROFILE=your-profile-name BYPASS_TOOL_CONSENT=true python scripts/batch_generate.py \
-    --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+    --schema-dir src/seed_data/schemas/fcc-invoice \
     --count 5 --workers 3 --threshold 6 --augment
 """
 import json
@@ -21,8 +21,8 @@ from dotenv import load_dotenv
 def main():
     load_dotenv()
 
-    from doc_gen_agent.cli import base_parser
-    from doc_gen_agent.orchestrate import orchestrate
+    from seed_data.cli import base_parser
+    from seed_data.orchestrate import orchestrate
 
     parser = base_parser("Parallel batch document generation")
     parser.add_argument("--count", type=int, default=5, help="Number of docs to generate")
@@ -57,7 +57,7 @@ def main():
     # --- Step 0: Generate diverse scenarios using LLM ---
     from pydantic import BaseModel, Field
     from typing import List
-    from doc_gen_agent.utils import make_model, load_schema_dir
+    from seed_data.utils import make_model, load_schema_dir
     from strands import Agent
 
     _, steering, _ = load_schema_dir(args.schema_dir)

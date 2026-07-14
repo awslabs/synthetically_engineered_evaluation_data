@@ -3,12 +3,49 @@ import glob
 import hashlib
 import json
 import os
+import shutil
 
 from strands.models import BedrockModel
 from botocore.config import Config
 
-from doc_gen_agent import MODELS
-from doc_gen_agent.session import get_boto_session
+from seed_data import MODELS
+from seed_data.session import get_boto_session
+
+# GitHub location of the schema library, for docs and CLI messaging.
+SCHEMA_LIBRARY_URL = (
+    "https://github.com/awslabs/synthetically_engineered_evaluation_data"
+    "/tree/main/src/seed_data/schemas"
+)
+
+
+def bundled_schemas_dir() -> str:
+    """Path to the schemas/ directory shipped inside the installed package."""
+    return os.path.join(os.path.dirname(__file__), "schemas")
+
+
+def clone_schema_library(dest: str) -> str:
+    """Copy the bundled schema library out to a local, editable directory.
+
+    Users install seed-data from PyPI, so the built-in schemas live inside
+    site-packages where they cannot be edited comfortably. This copies the whole
+    library to ``dest`` so users can tweak schemas and point --schema-dir at them.
+
+    Returns the path the schemas were copied to. Raises if ``dest`` already exists.
+    """
+    src = bundled_schemas_dir()
+    if not os.path.isdir(src):
+        raise FileNotFoundError(f"Bundled schema library not found at {src}")
+    if os.path.exists(dest):
+        raise FileExistsError(
+            f"Destination already exists: {dest}\n"
+            f"Choose a different path or remove it first."
+        )
+    # ignore samples/ (local-only reference PDFs, gitignored) and caches
+    shutil.copytree(
+        src, dest,
+        ignore=shutil.ignore_patterns("samples", "__pycache__", ".DS_Store"),
+    )
+    return dest
 
 # Shared boto client config for adaptive retries and long timeouts
 BOTO_CONFIG = Config(

@@ -18,8 +18,8 @@ import tempfile
 # ---------------------------------------------------------------------------
 
 def test_load_packet_config():
-    from doc_gen_agent.packet import load_packet_config
-    config = load_packet_config("src/doc_gen_agent/packets/insurance-claim-packet")
+    from seed_data.packet import load_packet_config
+    config = load_packet_config("src/seed_data/packets/insurance-claim-packet")
     assert config.name == "insurance-claim-packet"
     assert len(config.documents) == 3
     assert config.documents[0].document_class == "Insurance Claim"
@@ -31,7 +31,7 @@ def test_load_packet_config():
 
 
 def test_load_packet_config_missing():
-    from doc_gen_agent.packet import load_packet_config
+    from seed_data.packet import load_packet_config
     try:
         load_packet_config("/nonexistent/path")
         assert False, "Should have raised"
@@ -45,7 +45,7 @@ def test_load_packet_config_missing():
 # ---------------------------------------------------------------------------
 
 def test_resolve_schema_dir():
-    from doc_gen_agent.packet import _resolve_schema_dir
+    from seed_data.packet import _resolve_schema_dir
     resolved = _resolve_schema_dir("insurance-claim")
     assert os.path.isdir(resolved)
     assert resolved.endswith("schemas/insurance-claim")
@@ -53,15 +53,15 @@ def test_resolve_schema_dir():
 
 
 def test_resolve_schema_dir_absolute():
-    from doc_gen_agent.packet import _resolve_schema_dir
-    abs_path = os.path.abspath("src/doc_gen_agent/schemas/invoice")
+    from seed_data.packet import _resolve_schema_dir
+    abs_path = os.path.abspath("src/seed_data/schemas/invoice")
     resolved = _resolve_schema_dir(abs_path)
     assert resolved == abs_path
     print("✓ _resolve_schema_dir absolute path")
 
 
 def test_resolve_schema_dir_missing():
-    from doc_gen_agent.packet import _resolve_schema_dir
+    from seed_data.packet import _resolve_schema_dir
     try:
         _resolve_schema_dir("nonexistent-schema")
         assert False, "Should have raised"
@@ -71,8 +71,8 @@ def test_resolve_schema_dir_missing():
 
 
 def test_all_schemas_resolve():
-    from doc_gen_agent.packet import load_packet_config
-    config = load_packet_config("src/doc_gen_agent/packets/insurance-claim-packet")
+    from seed_data.packet import load_packet_config
+    config = load_packet_config("src/seed_data/packets/insurance-claim-packet")
     for doc in config.documents:
         assert os.path.isdir(doc.schema_dir), f"{doc.document_class}: {doc.schema_dir} not found"
         assert os.path.exists(os.path.join(doc.schema_dir, "schema.json"))
@@ -84,7 +84,7 @@ def test_all_schemas_resolve():
 # ---------------------------------------------------------------------------
 
 def test_build_document_plan_fixed_counts():
-    from doc_gen_agent.packet import _build_document_plan, PacketConfig, DocumentSpec
+    from seed_data.packet import _build_document_plan, PacketConfig, DocumentSpec
     config = PacketConfig(
         name="test", description="",
         documents=[
@@ -102,7 +102,7 @@ def test_build_document_plan_fixed_counts():
 
 
 def test_build_document_plan_range():
-    from doc_gen_agent.packet import _build_document_plan, PacketConfig, DocumentSpec
+    from seed_data.packet import _build_document_plan, PacketConfig, DocumentSpec
     config = PacketConfig(
         name="test", description="",
         documents=[
@@ -122,7 +122,7 @@ def test_build_document_plan_range():
 
 
 def test_build_document_plan_optional_skip():
-    from doc_gen_agent.packet import _build_document_plan, PacketConfig, DocumentSpec
+    from seed_data.packet import _build_document_plan, PacketConfig, DocumentSpec
     config = PacketConfig(
         name="test", description="",
         documents=[
@@ -148,27 +148,27 @@ def test_build_document_plan_optional_skip():
 # ---------------------------------------------------------------------------
 
 def test_parse_json_plain():
-    from doc_gen_agent.packet import _parse_json_from_response
+    from seed_data.packet import _parse_json_from_response
     assert _parse_json_from_response('{"a": 1}') == {"a": 1}
     print("✓ _parse_json_from_response plain JSON")
 
 
 def test_parse_json_markdown_fences():
-    from doc_gen_agent.packet import _parse_json_from_response
+    from seed_data.packet import _parse_json_from_response
     text = '```json\n{"a": 1}\n```'
     assert _parse_json_from_response(text) == {"a": 1}
     print("✓ _parse_json_from_response markdown fences")
 
 
 def test_parse_json_surrounded_by_text():
-    from doc_gen_agent.packet import _parse_json_from_response
+    from seed_data.packet import _parse_json_from_response
     text = 'Here is the result: {"name": "Jane"} as requested.'
     assert _parse_json_from_response(text) == {"name": "Jane"}
     print("✓ _parse_json_from_response surrounded by text")
 
 
 def test_parse_json_garbage():
-    from doc_gen_agent.packet import _parse_json_from_response
+    from seed_data.packet import _parse_json_from_response
     assert _parse_json_from_response("no json here at all") == {}
     print("✓ _parse_json_from_response returns {} on garbage")
 
@@ -178,7 +178,7 @@ def test_parse_json_garbage():
 # ---------------------------------------------------------------------------
 
 def test_format_shared_context_instructions():
-    from doc_gen_agent.packet import _format_shared_context_instructions
+    from seed_data.packet import _format_shared_context_instructions
     ctx = {"applicant_name": "Jane Doe", "address": "123 Oak St"}
     text = _format_shared_context_instructions(ctx, "Invoice")
     assert "Jane Doe" in text
@@ -188,7 +188,7 @@ def test_format_shared_context_instructions():
 
 
 def test_format_shared_context_empty():
-    from doc_gen_agent.packet import _format_shared_context_instructions
+    from seed_data.packet import _format_shared_context_instructions
     assert _format_shared_context_instructions({}, "Invoice") == ""
     print("✓ _format_shared_context_instructions empty")
 
@@ -213,7 +213,7 @@ def _make_test_pdf(path: str, text: str = "test", pages: int = 1):
 
 
 def test_merge_pdfs():
-    from doc_gen_agent.packet import _merge_pdfs, _count_pdf_pages
+    from seed_data.packet import _merge_pdfs, _count_pdf_pages
     with tempfile.TemporaryDirectory() as tmpdir:
         pdf1 = os.path.join(tmpdir, "a.pdf")
         pdf2 = os.path.join(tmpdir, "b.pdf")
@@ -227,7 +227,7 @@ def test_merge_pdfs():
 
 
 def test_count_pdf_pages():
-    from doc_gen_agent.packet import _count_pdf_pages
+    from seed_data.packet import _count_pdf_pages
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "test.pdf")
         _make_test_pdf(path, pages=4)
@@ -240,7 +240,7 @@ def test_count_pdf_pages():
 # ---------------------------------------------------------------------------
 
 def test_emit_baseline_labels():
-    from doc_gen_agent.packet import _emit_baseline_labels, SectionResult
+    from seed_data.packet import _emit_baseline_labels, SectionResult
     with tempfile.TemporaryDirectory() as tmpdir:
         sections = [
             SectionResult(
@@ -275,7 +275,7 @@ def test_emit_baseline_labels():
 
 
 def test_emit_classes_yaml():
-    from doc_gen_agent.packet import emit_classes_yaml, PacketConfig, DocumentSpec
+    from seed_data.packet import emit_classes_yaml, PacketConfig, DocumentSpec
     config = PacketConfig(
         name="test", description="",
         documents=[
@@ -299,7 +299,7 @@ def test_emit_classes_yaml():
 # ---------------------------------------------------------------------------
 
 def test_load_inference_result():
-    from doc_gen_agent.packet import _load_inference_result
+    from seed_data.packet import _load_inference_result
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "data.json")
         with open(path, "w") as f:
@@ -310,7 +310,7 @@ def test_load_inference_result():
 
 
 def test_load_inference_result_missing():
-    from doc_gen_agent.packet import _load_inference_result
+    from seed_data.packet import _load_inference_result
     assert _load_inference_result(None) == {}
     assert _load_inference_result("/nonexistent/file.json") == {}
     print("✓ _load_inference_result handles missing files")
@@ -321,7 +321,7 @@ def test_load_inference_result_missing():
 # ---------------------------------------------------------------------------
 
 def test_write_packet_manifest():
-    from doc_gen_agent.packet import write_packet_manifest, PacketConfig, DocumentSpec, PacketResult, SectionResult
+    from seed_data.packet import write_packet_manifest, PacketConfig, DocumentSpec, PacketResult, SectionResult
     config = PacketConfig(
         name="test-packet", description="Test",
         documents=[DocumentSpec(document_class="Invoice", schema_dir=tempfile.gettempdir())],

@@ -1,6 +1,6 @@
 # Packet
 
-::: doc_gen_agent.packet
+::: seed_data.packet
     options:
       heading_level: 1
       show_root_heading: true

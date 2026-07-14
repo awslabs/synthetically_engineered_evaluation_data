@@ -1,6 +1,6 @@
 """Shared CLI argument parser for doc-gen-agent scripts."""
 import argparse
-from doc_gen_agent import MODELS
+from seed_data import MODELS
 
 
 def base_parser(description="doc-gen-agent"):
@@ -17,8 +17,10 @@ def base_parser(description="doc-gen-agent"):
     parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
     parser.add_argument("--no-critic-samples", action="store_true",
                         help="Disable reference sample PDFs in doc critic")
-    parser.add_argument("--renderer", default="weasyprint", choices=["reportlab", "weasyprint"],
-                        help="PDF rendering engine (default: weasyprint)")
+    parser.add_argument("--renderer", default="xhtml2pdf",
+                        choices=["xhtml2pdf", "weasyprint", "reportlab"],
+                        help="PDF rendering engine (default: xhtml2pdf, pure Python — "
+                             "no system libraries required)")
     parser.add_argument("--preview", action="store_true",
                         help="Enable preview_pdf tool for visual self-inspection (requires VL model)")
     parser.add_argument("--threshold", type=int, default=5)

@@ -1,6 +1,6 @@
 # Critique
 
-::: doc_gen_agent.critique
+::: seed_data.critique
     options:
       heading_level: 1
       show_root_heading: true
