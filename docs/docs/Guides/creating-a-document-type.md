@@ -4,7 +4,7 @@ title: Creating a Document Type
 
 # Creating a Document Type
 
-Every document type lives in its own directory under `src/doc_gen_agent/schemas/`, with at least a `schema.json`. This guide walks through creating one and generating your first document from it.
+Every document type lives in its own directory under `src/seed_data/schemas/`, with at least a `schema.json`. This guide walks through creating one and generating your first document from it.
 
 ## Schema Directory Layout
 
@@ -20,12 +20,12 @@ schemas/purchase-order/
 ## Step 1: Create the Directory
 
 ```bash
-mkdir -p src/doc_gen_agent/schemas/purchase-order
+mkdir -p src/seed_data/schemas/purchase-order
 ```
 
 ## Step 2: Write the Schema
 
-Create `src/doc_gen_agent/schemas/purchase-order/schema.json`:
+Create `src/seed_data/schemas/purchase-order/schema.json`:
 
 ```json
 {
@@ -61,7 +61,7 @@ The `title` field becomes the document type name used in output directories.
 
 ## Step 3: Add Steering Docs (Optional but Recommended)
 
-Create `src/doc_gen_agent/schemas/purchase-order/generation_guidance.md`:
+Create `src/seed_data/schemas/purchase-order/generation_guidance.md`:
 
 ```markdown
 # Purchase Order, Generation Guidance
@@ -118,8 +118,8 @@ Sample PDFs are local-only and git-ignored. Do not commit them: real documents m
 ## Step 5: Generate a Single Document
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/purchase-order \
+BYPASS_TOOL_CONSENT=true python -m seed_data \
+  --schema-dir src/seed_data/schemas/purchase-order \
   --extra "Industrial plumbing supplies for a construction project in Denver"
 ```
 
@@ -143,7 +143,7 @@ You can also raise or lower the acceptance threshold:
 --threshold 5    # lenient (faster, lower quality)
 ```
 
-For deeper customization, edit the Jinja2 prompt templates in `src/doc_gen_agent/prompts/`:
+For deeper customization, edit the Jinja2 prompt templates in `src/seed_data/prompts/`:
 
 | Template | Controls |
 |----------|----------|

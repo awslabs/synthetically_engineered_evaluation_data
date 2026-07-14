@@ -24,8 +24,8 @@ from dotenv import load_dotenv
 def main():
     load_dotenv()
 
-    from doc_gen_agent.orchestrate import _build_doc_loop
-    from doc_gen_agent.utils import load_schema_dir
+    from seed_data.orchestrate import _build_doc_loop
+    from seed_data.utils import load_schema_dir
 
     # --- Args ---
     parser = argparse.ArgumentParser()
@@ -41,7 +41,7 @@ def main():
     args = parser.parse_args()
 
     # --- Resolve paths ---
-    schema_dir = os.path.join("src/doc_gen_agent/schemas", args.schema)
+    schema_dir = os.path.join("src/seed_data/schemas", args.schema)
     if not os.path.isdir(schema_dir):
         print(f"Schema dir not found: {schema_dir}")
         sys.exit(1)

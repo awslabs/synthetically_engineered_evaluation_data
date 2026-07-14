@@ -94,32 +94,57 @@ def preview_pdf(pdf_path: str) -> dict:
         return {"status": "error", "content": [{"text": f"Preview failed: {e}"}]}
 
 
+def _render_with_xhtml2pdf(html_path: str, pdf_path: str) -> None:
+    """Render HTML to PDF with xhtml2pdf (pure Python, no system libraries)."""
+    from xhtml2pdf import pisa
+    with open(html_path, encoding="utf-8") as src, open(pdf_path, "wb") as dest:
+        status = pisa.CreatePDF(src.read(), dest=dest, encoding="utf-8")
+    if status.err:
+        raise RuntimeError(f"xhtml2pdf reported {status.err} error(s) while rendering")
+
+
+def _render_with_weasyprint(html_path: str, pdf_path: str) -> None:
+    """Render HTML to PDF with WeasyPrint (requires Pango/Cairo system libraries)."""
+    # Ensure system libraries are findable (macOS homebrew — Intel: /usr/local/lib, Apple Silicon: /opt/homebrew/lib)
+    import platform
+    if platform.system() == "Darwin":
+        existing = os.environ.get("DYLD_FALLBACK_LIBRARY_PATH", "")
+        paths = {p for p in existing.split(":") if p}
+        paths.update(["/usr/local/lib", "/opt/homebrew/lib"])
+        os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(paths)
+    from weasyprint import HTML
+    HTML(filename=html_path).write_pdf(pdf_path)
+
+
+# Backend dispatch for render_html_to_pdf. The orchestrator selects one by setting
+# the HTML_RENDERER env var; xhtml2pdf is the default because it is pure Python and
+# needs no system libraries, so a fresh `pip install seed-data` renders out of the box.
+_HTML_RENDERERS = {
+    "xhtml2pdf": _render_with_xhtml2pdf,
+    "weasyprint": _render_with_weasyprint,
+}
+
+
 @tool
 def render_html_to_pdf(html_path: str, pdf_path: str) -> dict:
-    """Render an HTML file to PDF using WeasyPrint.
+    """Render an HTML file to PDF.
 
     Args:
         html_path: Path to the HTML file to render.
         pdf_path: Path where the PDF should be saved.
     """
+    backend = os.environ.get("HTML_RENDERER", "xhtml2pdf")
+    render = _HTML_RENDERERS.get(backend, _render_with_xhtml2pdf)
     try:
-        # Ensure system libraries are findable (macOS homebrew — Intel: /usr/local/lib, Apple Silicon: /opt/homebrew/lib)
-        import platform
-        if platform.system() == "Darwin":
-            existing = os.environ.get("DYLD_FALLBACK_LIBRARY_PATH", "")
-            paths = {p for p in existing.split(":") if p}
-            paths.update(["/usr/local/lib", "/opt/homebrew/lib"])
-            os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(paths)
-        from weasyprint import HTML
         os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-        HTML(filename=html_path).write_pdf(pdf_path)
+        render(html_path, pdf_path)
         if os.path.exists(pdf_path):
             size = os.path.getsize(pdf_path)
             return {"status": "success", "content": [
                 {"text": f"PDF rendered: {pdf_path} ({size:,} bytes)"}
             ]}
         return {"status": "error", "content": [
-            {"text": "WeasyPrint completed but PDF was not created."}
+            {"text": f"{backend} completed but PDF was not created."}
         ]}
     except Exception as e:
         return {"status": "error", "content": [

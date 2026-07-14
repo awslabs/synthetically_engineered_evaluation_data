@@ -11,7 +11,7 @@ Output follows the evaluation dataset format:
 
 Usage:
   BYPASS_TOOL_CONSENT=true python scripts/packet_generate.py \
-    --packet src/doc_gen_agent/packets/loan-application \
+    --packet src/seed_data/packets/loan-application \
     --count 3 --workers 2 --augment \
     --extra "First-time homebuyers in the Pacific Northwest"
 """
@@ -29,8 +29,8 @@ from dotenv import load_dotenv
 def main():
     load_dotenv()
 
-    from doc_gen_agent.cli import base_parser
-    from doc_gen_agent.packet import (
+    from seed_data.cli import base_parser
+    from seed_data.packet import (
         load_packet_config,
         generate_packet,
         emit_classes_yaml,
@@ -137,7 +137,7 @@ def main():
                 except Exception as e:
                     i = futures[future]
                     print(f"  ✗ packet_{i + 1:03d}: EXCEPTION: {e}")
-                    from doc_gen_agent.packet import PacketResult
+                    from seed_data.packet import PacketResult
                     results.append(PacketResult(
                         packet_id=f"packet_{i + 1:03d}",
                         success=False,

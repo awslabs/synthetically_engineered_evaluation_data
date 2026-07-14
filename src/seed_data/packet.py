@@ -22,8 +22,8 @@ from typing import Any
 
 import pypdf
 
-from doc_gen_agent.orchestrate import orchestrate
-from doc_gen_agent.utils import load_schema_dir, make_model
+from seed_data.orchestrate import orchestrate
+from seed_data.utils import load_schema_dir, make_model
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ def generate_packet(
     timeout: int = 3600,
     augment: bool = False,
     critic_samples: bool = True,
-    renderer: str = "weasyprint",
+    renderer: str = "xhtml2pdf",
     enable_preview: bool = False,
 ) -> PacketResult:
     """Generate a single packet: resolve context, generate docs, merge, emit labels.

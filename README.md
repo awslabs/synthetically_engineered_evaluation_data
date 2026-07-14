@@ -2,7 +2,7 @@
 
 AI-powered synthetic document generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set.
 
-Designed for building evaluation datasets for document understanding systems: OCR, Key Information Extraction (KIE), and document classification. The pipeline is invoked as a Python module (`python -m doc_gen_agent`) or through the batch and packet scripts.
+Designed for building evaluation datasets for document understanding systems: OCR, Key Information Extraction (KIE), and document classification. The pipeline is invoked as a Python module (`python -m seed_data`) or through the batch and packet scripts.
 
 > **Not a production-ready solution.** This asset represents a proof-of-value
 > for the services included and is not intended as a production-ready solution.
@@ -16,27 +16,49 @@ Designed for building evaluation datasets for document understanding systems: OC
 > practices in the repository documentation and a secure baseline, but Amazon
 > holds no responsibility for the security of applications built from this tool.
 
-> **New here?** Start with the [Getting Started Guide](GETTING_STARTED.md) — create a new document type and generate your first batch in under 10 minutes.
+> **⚡ New here?** Read the [Quickstart](docs/docs/Getting-Started/quick-start.md) — install from PyPI and generate your first document in a few minutes.
 
 ## Quick Start
+
+Install from PyPI (the default renderer is pure Python — nothing else to set up):
+
+```bash
+pip install seed-data
+
+# Configure AWS credentials with Bedrock access
+export AWS_PROFILE=your-profile-name
+
+# Copy the built-in schema library into a local, editable folder
+seed-data clone-schema-library ./schemas
+
+# Generate a single document (PDF + ground-truth JSON) into ./output
+seed-data --schema-dir ./schemas/fcc-invoice --output ./output
+```
+
+Browse the schema library on GitHub:
+[awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
+See the [full Quickstart](docs/docs/Getting-Started/quick-start.md) for batches, augmentation, and model selection.
+
+<details>
+<summary>Working from a repo clone (uv)?</summary>
 
 ```bash
 # Install (creates the venv and installs from uv.lock)
 uv sync
 
-# Configure AWS credentials with Bedrock access
 export AWS_PROFILE=your-profile-name
 
 # Generate a single FCC invoice
-BYPASS_TOOL_CONSENT=true uv run python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice
+BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
+  --schema-dir src/seed_data/schemas/fcc-invoice
 
 # Generate a diverse batch of 4 invoices with augmentation
 BYPASS_TOOL_CONSENT=true uv run python scripts/batch_generate.py \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --count 4 --workers 2 --augment \
   --extra "FCC broadcast invoices for packaged food companies in the midwest"
 ```
+</details>
 
 ## Architecture
 
@@ -98,7 +120,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 
 # Run any command inside the managed environment with `uv run`, e.g.
-uv run python -m doc_gen_agent --help
+uv run python -m seed_data --help
 ```
 
 `uv sync` installs the `dev` dependency group by default (configured via
@@ -120,7 +142,18 @@ pip install -e ".[dev]"
 Note: pip resolves dependencies fresh and does not use `uv.lock`.
 </details>
 
-WeasyPrint (default renderer) requires system libraries:
+### PDF renderers
+
+The default renderer is **xhtml2pdf** (pure Python, no system libraries) — a fresh
+`pip install seed-data` renders PDFs out of the box. Select a renderer with `--renderer`:
+
+| `--renderer` | Backend | System libraries | Notes |
+|---|---|---|---|
+| `xhtml2pdf` (default) | ReportLab | none | Pure Python; works everywhere |
+| `weasyprint` | WeasyPrint | Pango, Cairo, GDK-PixBuf | Richer CSS; needs the libraries below |
+| `reportlab` | ReportLab (Python script) | none | LLM writes a ReportLab script instead of HTML |
+
+WeasyPrint only — install its system libraries first:
 ```bash
 # macOS
 brew install pango gdk-pixbuf libffi
@@ -138,7 +171,7 @@ export AWS_PROFILE=your-profile-name
 
 ```bash
 BYPASS_TOOL_CONSENT=true uv run python scripts/packet_generate.py \
-  --packet src/doc_gen_agent/packets/lending-package \
+  --packet src/seed_data/packets/lending-package \
   --count 3 --workers 2 --augment \
   --extra "First-time homebuyers in the Pacific Northwest applying for a 30-year fixed mortgage"
 ```
@@ -189,16 +222,16 @@ See [Packet Configuration](#packet-configuration) for how to define packet types
 ### Single document
 
 ```bash
-BYPASS_TOOL_CONSENT=true uv run python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --extra "Local TV station in Portland, Oregon"
 ```
 
 ### Single document with augmentation
 
 ```bash
-BYPASS_TOOL_CONSENT=true uv run python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --extra "Local TV station in Portland, Oregon" \
   --augment
 ```
@@ -207,7 +240,7 @@ BYPASS_TOOL_CONSENT=true uv run python -m doc_gen_agent \
 
 ```bash
 BYPASS_TOOL_CONSENT=true uv run python scripts/batch_generate.py \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
+  --schema-dir src/seed_data/schemas/fcc-invoice \
   --count 10 --workers 3 \
   --extra "CPG brands on local TV stations in the American southwest" \
   --augment \
@@ -290,7 +323,7 @@ schemas/fcc-invoice/
 The optional `samples/` directory holds real example PDFs used **only** by the
 document critic as a **visual style reference** — they are never seen by the
 generation stages and no content from them is reproduced in the output. See
-[critique.py](src/doc_gen_agent/critique.py) and any
+[critique.py](src/seed_data/critique.py) and any
 `schemas/<type>/samples/README.md` for the full explanation.
 
 **Sample PDFs are local-only and git-ignored.** Do not commit them: real
@@ -355,7 +388,7 @@ BYPASS_TOOL_CONSENT=true uv run python tests/integration/test_doc_gen.py \
 
 ## Packet Configuration
 
-Packet configs live in `src/doc_gen_agent/packets/<packet-name>/packet.json`.
+Packet configs live in `src/seed_data/packets/<packet-name>/packet.json`.
 See [docs/packets.md](docs/packets.md) for the full guide including config fields,
 shared context modes, label format, and architecture.
 
@@ -439,7 +472,7 @@ run inside the isolated environment described above.
 ### AWS credentials
 
 Model calls go to Amazon Bedrock using the credentials resolved from your
-`AWS_PROFILE` (see [session.py](src/doc_gen_agent/session.py)). Any code the agent
+`AWS_PROFILE` (see [session.py](src/seed_data/session.py)). Any code the agent
 executes inherits that environment, so those credentials — and whatever they can
 access — are reachable by agent-run code. Use a scoped, Bedrock-only profile and
 avoid broad/admin credentials.

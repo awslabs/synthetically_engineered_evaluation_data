@@ -4,91 +4,91 @@ title: Quick Start
 
 # Quick Start
 
-This page gets you from an installed environment to your first generated documents. It assumes you have completed [Installation](installation.md), including AWS Bedrock credentials.
+From zero to your first generated document.
 
-The repository ships with example schemas under `src/doc_gen_agent/schemas/`. The examples below use `fcc-invoice`.
+## 1. Install
 
-## Configure Your Environment
+```bash
+pip install seed-data
+```
+
+The default renderer (**xhtml2pdf**) is pure Python — there are no system libraries
+to install. For the richer-CSS WeasyPrint renderer, see [Renderers](../Advanced/renderers.md).
+
+## 2. Configure AWS Bedrock
+
+seed-data generates content with Amazon Bedrock models, so you need AWS credentials
+with Bedrock access.
 
 ```bash
 export AWS_PROFILE=your-profile-name
-export BYPASS_TOOL_CONSENT=true
+export AWS_REGION=us-east-1
 ```
 
-## Generate a Single Document
+## 3. Get the schemas
+
+A **schema** defines a document type — its fields, data rules, and visual style.
+The built-in library ships inside the package; copy it into a local, editable folder:
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
-  --extra "Local TV station in Portland, Oregon"
+seed-data clone-schema-library ./schemas
 ```
 
-This runs the full single-document pipeline: data generation, data validation, PDF rendering, and visual critique. Each stage prints its output to the terminal, and the final PDF lands under `output/`.
+Browse the library on GitHub before you start:
+👉 [awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas)
 
-## Generate a Single Document with Augmentation
+Built-in types include `invoice`, `fcc-invoice`, `bank-statement`, `w2`, `pay-stub`,
+`credit-report`, `loan-application`, `police-report`, and more.
 
-Add `--augment` to simulate scanning and faxing artifacts. This adds two more stages: an augmentor picks degradation effects, then an aug critic checks the result is still legible.
+## 4. Generate a document
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
-  --extra "Local TV station in Portland, Oregon" \
-  --augment
+seed-data --schema-dir ./schemas/invoice --output ./output
 ```
 
-## Generate a Batch
+This runs the full single-document pipeline — data generation, data validation,
+PDF rendering, and visual critique. Output lands in `./output/`:
 
-For evaluation data, you want volume and diversity. The batch script runs the pipeline N times in parallel, each with a unique scenario generated from your `--extra` brief.
+```
+output/
+├── pdfs/                 # the generated PDF
+├── data/                 # ground-truth JSON, paired with the PDF (for IDP/KIE eval)
+└── generation_scripts/   # the HTML used to render the PDF
+```
+
+## 5. Customize
 
 ```bash
-BYPASS_TOOL_CONSENT=true python scripts/batch_generate.py \
-  --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
-  --count 10 --workers 3 \
-  --extra "CPG brands on local TV stations in the American southwest" \
-  --augment \
-  --batch-name southwest_cpg
+# Several documents
+seed-data --schema-dir ./schemas/invoice --count 5
+
+# Steer the content with a brief
+seed-data --schema-dir ./schemas/invoice \
+  --extra "Invoices for midwest food distributors, 20-40 line items"
+
+# Add scanning/faxing artifacts for realism
+seed-data --schema-dir ./schemas/invoice --augment
+
+# Pick models and renderer
+seed-data --schema-dir ./schemas/invoice --doc-model sonnet --renderer weasyprint
 ```
 
-### What to Expect
+Run `seed-data --help` to see every option.
 
-- A single document takes roughly 60 to 100 seconds end-to-end.
-- With `--count 10 --workers 3`, expect about 5 to 7 minutes wall-clock.
-- Do not push `--workers` above 4 or 5, or you will hit Bedrock rate limits.
-- Partial failures are normal. If one document fails, the others still complete, and the manifest records which succeeded.
-- Use a specific `--extra` brief. Vague briefs produce same-y output.
+## Edit or create a schema
 
-## Output Structure
-
-A batch writes to `output/<batch-name>/`:
+Because you cloned the library locally, editing a document type is just editing files:
 
 ```
-output/southwest_cpg/
-├── pdfs/                    # Clean PDFs
-├── data/                    # Source data JSON per document (ground truth)
-├── generation_scripts/      # HTML files used to render PDFs
-├── augmented/               # Augmented PDFs (when --augment)
-├── config/                  # Copy of schema + guidance for reproducibility
-│   └── batch_manifest.json  # Full run metadata, scenarios, timing
+schemas/invoice/
+├── schema.json              # fields and types
+└── generation_guidance.md   # data-realism rules and visual style
 ```
 
-## Command Reference
+Point `--schema-dir` at any folder with that structure — your own custom types work
+exactly the same way.
 
-```bash
-# Single doc, defaults
-python -m doc_gen_agent --schema-dir src/doc_gen_agent/schemas/fcc-invoice --extra "context"
-
-# Batch of 20 with augmentation
-python scripts/batch_generate.py --schema-dir src/doc_gen_agent/schemas/fcc-invoice \
-  --extra "brief for diversity" --count 20 --workers 3 \
-  --batch-name my-batch --augment
-
-# See all options
-python -m doc_gen_agent --help
-python scripts/batch_generate.py --help
-python scripts/packet_generate.py --help
-```
-
-## Next Steps
+## Next steps
 
 - [Create a Document Type](../Guides/creating-a-document-type.md): define your own schema and steering docs.
 - [Batch Generation](../Guides/batch-generation.md): control diversity, workers, and output.

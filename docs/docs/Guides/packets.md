@@ -12,7 +12,7 @@ The output is a ready-to-use evaluation dataset for document splitting and class
 
 ```bash
 BYPASS_TOOL_CONSENT=true python scripts/packet_generate.py \
-  --packet src/doc_gen_agent/packets/insurance-claim-packet \
+  --packet src/seed_data/packets/insurance-claim-packet \
   --count 3 --workers 2 \
   --data-model gpt-oss --doc-model gpt-oss --critic-model haiku \
   --extra "Water damage claims from burst pipes in suburban Portland homes"
@@ -115,7 +115,7 @@ Sections are numbered sequentially (1-indexed) in the order they appear in the m
 
 ## Packet Configuration
 
-Packet configs live in `src/doc_gen_agent/packets/<name>/packet.json`.
+Packet configs live in `src/seed_data/packets/<name>/packet.json`.
 
 ```json
 {

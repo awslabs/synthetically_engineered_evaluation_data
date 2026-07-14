@@ -14,7 +14,7 @@ Usage:
 import os
 import tempfile
 
-from doc_gen_agent.nodes import FunctionNode, was_rejected_visual
+from seed_data.nodes import FunctionNode, was_rejected_visual
 from strands.multiagent import GraphBuilder
 
 
@@ -119,7 +119,7 @@ def test_nested_graph_as_node():
 
 def test_edge_conditions():
     """Test that verdict parsing in edge conditions works correctly."""
-    from doc_gen_agent.nodes import _check_verdict
+    from seed_data.nodes import _check_verdict
     from strands.multiagent.base import MultiAgentResult, NodeResult, Status
     from strands.agent.agent_result import AgentResult
     from strands.types.content import ContentBlock, Message

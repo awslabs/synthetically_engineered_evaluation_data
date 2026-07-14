@@ -4,7 +4,7 @@ title: Overview
 
 # API Reference
 
-Module-level documentation for the `doc_gen_agent` package, generated from the source with mkdocstrings.
+Module-level documentation for the `seed_data` package, generated from the source with mkdocstrings.
 
 ## Sections
 

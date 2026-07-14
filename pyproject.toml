@@ -1,6 +1,6 @@
 [project]
-name = "synthetically-engineered-evaluation-data"
-version = "0.1.0"
+name = "seed-data"
+version = "0.0.1"
 description = "AI-powered synthetic document generation pipeline for benchmarking document extraction (IDP/KIE) systems"
 readme = "README.md"
 license = "Apache-2.0"
@@ -17,6 +17,7 @@ dependencies = [
     "strands-agents",
     "strands-agents-tools",
     "reportlab",
+    "xhtml2pdf",
     "weasyprint",
     "pillow",
     "python-dotenv",
@@ -42,10 +43,13 @@ dev = [
     "pymdown-extensions",
 ]
 
+[project.scripts]
+seed-data = "seed_data.__main__:main"
+
 [project.urls]
 Homepage = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
 Repository = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
-Documentation = "https://awslabs.github.io/synthetically-engineered-evaluation-data/"
+Documentation = "https://awslabs.github.io/synthetically_engineered_evaluation_data/"
 Issues = "https://github.com/awslabs/synthetically-engineered-evaluation-data/issues"
 
 [build-system]
@@ -53,7 +57,7 @@ requires = ["setuptools >= 61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-# Put src/ on the import path so tests can `import doc_gen_agent` without an
+# Put src/ on the import path so tests can `import seed_data` without an
 # editable install or per-file sys.path hacks.
 pythonpath = ["src"]
 testpaths = ["tests"]
@@ -65,7 +69,7 @@ addopts = "--ignore=tests/integration"
 where = ["src"]
 
 [tool.setuptools.package-data]
-doc_gen_agent = ["schemas/**/*.json", "schemas/**/*.md", "prompts/*.j2", "packets/**/*.json"]
+seed_data = ["schemas/**/*.json", "schemas/**/*.md", "prompts/*.j2", "packets/**/*.json"]
 
 # uv-native dependency groups (for `uv sync`)
 # Keep in sync with [project.optional-dependencies] above

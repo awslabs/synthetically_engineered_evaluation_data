@@ -35,12 +35,12 @@ This is safe — the agents only execute code they generate for PDF rendering, a
 Every document type lives in its own directory with at least a `schema.json`. Create one:
 
 ```bash
-mkdir -p src/doc_gen_agent/schemas/purchase-order
+mkdir -p src/seed_data/schemas/purchase-order
 ```
 
 ### Write the schema
 
-Create `src/doc_gen_agent/schemas/purchase-order/schema.json`:
+Create `src/seed_data/schemas/purchase-order/schema.json`:
 
 ```json
 {
@@ -76,7 +76,7 @@ The `title` field becomes the document type name used in output directories.
 
 ### Add steering docs (optional but recommended)
 
-Create `src/doc_gen_agent/schemas/purchase-order/generation_guidance.md`:
+Create `src/seed_data/schemas/purchase-order/generation_guidance.md`:
 
 ```markdown
 # Purchase Order — Generation Guidance
@@ -124,8 +124,8 @@ The doc critic loads these as visual benchmarks and compares generated documents
 ## Step 2: Generate a Single Document
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/purchase-order \
+BYPASS_TOOL_CONSENT=true python -m seed_data \
+  --schema-dir src/seed_data/schemas/purchase-order \
   --extra "Industrial plumbing supplies for a construction project in Denver"
 ```
 
@@ -136,8 +136,8 @@ This runs the full pipeline: data generation → data validation → PDF renderi
 Add `--augment` to simulate scanning/faxing artifacts:
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/purchase-order \
+BYPASS_TOOL_CONSENT=true python -m seed_data \
+  --schema-dir src/seed_data/schemas/purchase-order \
   --extra "Industrial plumbing supplies" \
   --augment
 ```
@@ -151,7 +151,7 @@ runs the pipeline N times in parallel, each with a unique scenario:
 
 ```bash
 BYPASS_TOOL_CONSENT=true python scripts/batch_generate.py \
-  --schema-dir src/doc_gen_agent/schemas/purchase-order \
+  --schema-dir src/seed_data/schemas/purchase-order \
   --extra "Diverse industries ordering from various suppliers across the US" \
   --count 10 --workers 3 \
   --batch-name po-training-set \
@@ -190,8 +190,8 @@ Tips:
 By default, the pipeline uses DeepSeek V3.2 for generation and Haiku for critics. Override per stage:
 
 ```bash
-python -m doc_gen_agent \
-  --schema-dir src/doc_gen_agent/schemas/purchase-order \
+python -m seed_data \
+  --schema-dir src/seed_data/schemas/purchase-order \
   --extra "Office supplies" \
   --data-model qwen3-vl \
   --doc-model deepseek-v3 \
@@ -221,7 +221,7 @@ The fastest way to improve output quality is editing the `*.md` steering files. 
 
 ### Edit prompt templates
 
-For deeper customization, edit the Jinja2 templates in `src/doc_gen_agent/prompts/`:
+For deeper customization, edit the Jinja2 templates in `src/seed_data/prompts/`:
 
 | Template | Controls |
 |----------|----------|
@@ -236,7 +236,7 @@ For deeper customization, edit the Jinja2 templates in `src/doc_gen_agent/prompt
 
 ```bash
 # Single doc, defaults
-python -m doc_gen_agent --schema-dir schemas/my-type --extra "context"
+python -m seed_data --schema-dir schemas/my-type --extra "context"
 
 # Batch of 20 with augmentation
 python scripts/batch_generate.py --schema-dir schemas/my-type \
@@ -244,11 +244,11 @@ python scripts/batch_generate.py --schema-dir schemas/my-type \
   --batch-name my-batch --augment
 
 # Use specific models (single-doc; same flags work for batch)
-python -m doc_gen_agent --schema-dir schemas/my-type \
+python -m seed_data --schema-dir schemas/my-type \
   --data-model nova2-lite --doc-model gpt-oss --critic-model sonnet
 
 # See all options
-python -m doc_gen_agent --help
+python -m seed_data --help
 python scripts/batch_generate.py --help
 python scripts/packet_generate.py --help
 ```
