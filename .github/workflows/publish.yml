@@ -1,7 +1,7 @@
 name: Publish to PyPI
 
 # Publishes to PyPI when a GitHub Release is published. The package version is
-# whatever is set in pyproject.toml at that commit — bump it before releasing.
+# derived from the release tag (vX.Y.Z) by setuptools-scm — no manual bump.
 on:
   release:
     types: [published]
@@ -29,6 +29,24 @@ jobs:
 
       - name: Build sdist and wheel
         run: uv build
+
+      # Fail fast on a bad release before touching PyPI: the tag-derived version
+      # must be a clean X.Y.Z (not a .devN build from an untagged commit) and must
+      # not already exist on PyPI (versions can never be reused).
+      - name: Verify version is releasable
+        run: |
+          set -euo pipefail
+          version="$(ls dist/*.whl | sed -E 's/.*seed_data-([^-]+)-.*/\1/')"
+          echo "Built version: $version"
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$version' is not a clean X.Y.Z release. Is the release tagged 'vX.Y.Z' on the target commit?"
+            exit 1
+          fi
+          if curl -sf "https://pypi.org/pypi/seed-data/$version/json" > /dev/null; then
+            echo "::error::Version $version already exists on PyPI. Bump to a new, unused version."
+            exit 1
+          fi
+          echo "Version $version is well-formed and not yet on PyPI."
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0

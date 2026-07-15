@@ -27,3 +27,31 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  # Verify the package actually builds and the built wheel installs and imports
+  # in a clean environment — catches packaging breakage (missing package data,
+  # bad entry points, broken version) that the unit tests do not.
+  build-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0   # setuptools-scm needs full history and tags to derive the version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Install the built wheel in a clean environment
+        run: |
+          python3 -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install dist/*.whl
+
+      - name: Smoke-test the installed package
+        run: |
+          /tmp/smoke/bin/python -c "import seed_data; print('import OK')"
+          /tmp/smoke/bin/python -c "import importlib.metadata as m; print('version', m.version('seed-data'))"
+          /tmp/smoke/bin/seed-data --help > /dev/null && echo "CLI OK"
