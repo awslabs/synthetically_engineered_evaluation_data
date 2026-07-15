@@ -217,6 +217,37 @@ architecture, and design decisions.
 
 See [Packet Configuration](#packet-configuration) for how to define packet types.
 
+## Programmatic API
+
+Besides the CLI, the batch and packet pipelines are available as a stable Python
+API for embedding SEED in other tools (a document-processing accelerator, an
+evaluation harness, etc.). The entry points are re-exported at the package top
+level and resolve lazily, so `import seed_data` stays lightweight and only pulls
+in the Strands/Bedrock stack when you actually call a pipeline:
+
+```python
+import seed_data
+
+# Parallel batch of single documents; returns the batch manifest dict.
+manifest = seed_data.run_batch(
+    schema_dir="src/seed_data/schemas/fcc-invoice",
+    count=5,
+    brief="Local TV stations in the Pacific Northwest",
+    output_dir="./output",
+    augment=True,
+)
+docs = [d for d in manifest["documents"] if d["success"]]
+# each doc: {"success", "pdf", "data_json", "augmented", ...}
+
+# Multi-document packet; returns a PacketResult.
+from seed_data.packet import load_packet_config
+config = load_packet_config("src/seed_data/packets/lending-package")
+result = seed_data.generate_packet(config, output_dir="./output")
+```
+
+Model calls use the AWS credentials resolved from your environment
+(`AWS_PROFILE`), same as the CLI.
+
 ## Usage
 
 ### Single document
