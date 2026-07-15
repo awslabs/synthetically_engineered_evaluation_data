@@ -1,4 +1,51 @@
-"""doc-gen-agent — AI-powered document generation pipeline."""
+"""seed_data — Synthetically Engineered Evaluation Data.
+
+AI-powered synthetic document generation pipeline. In addition to the CLI
+(``seed-data`` / ``python -m seed_data``), the batch and packet pipelines are
+available as a stable programmatic API for embedding in other tools:
+
+    import seed_data
+
+    manifest = seed_data.run_batch(
+        schema_dir="src/seed_data/schemas/fcc-invoice",
+        count=5,
+        brief="Local TV stations in the Pacific Northwest",
+        output_dir="./output",
+    )
+
+    result = seed_data.generate_packet(config, output_dir="./output")
+
+These names are re-exported lazily (PEP 562 ``__getattr__``): importing
+``seed_data`` — or ``from seed_data import MODELS`` — stays lightweight and does
+NOT import the Strands/Bedrock stack; that happens only on first access to
+``run_batch`` / ``generate_packet``.
+"""
+
+from typing import TYPE_CHECKING, Any
+
+__all__ = ["MODELS", "run_batch", "generate_packet"]
+
+if TYPE_CHECKING:  # import-time only for type checkers, not at runtime
+    from seed_data.batch import run_batch
+    from seed_data.packet import generate_packet
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve the public programmatic API (PEP 562).
+
+    Keeps ``import seed_data`` cheap while exposing the pipeline entry points as
+    documented top-level attributes.
+    """
+    if name == "run_batch":
+        from seed_data.batch import run_batch
+
+        return run_batch
+    if name == "generate_packet":
+        from seed_data.packet import generate_packet
+
+        return generate_packet
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 MODELS = {
     "haiku": {"model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "max_tokens": 63999},
