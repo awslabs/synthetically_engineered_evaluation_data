@@ -22,3 +22,30 @@ MODELS = {
     "nemotron-super": {"model_id": "nvidia.nemotron-super-3-120b", "max_tokens": 16383, "streaming": False},
     "nemotron-nano-30b": {"model_id": "nvidia.nemotron-nano-3-30b", "max_tokens": 16383, "streaming": False},
 }
+
+# Public API. Exposed lazily so `import seed_data` stays light — the heavy
+# imports (strands, boto3) only load when you touch the API.
+__all__ = [
+    "Generator",
+    "Schema",
+    "ModelConfig",
+    "GeneratedDoc",
+    "BatchResult",
+    "MODELS",
+]
+
+
+def __getattr__(name):
+    if name in ("Generator", "BatchResult"):
+        from seed_data.api import Generator, BatchResult
+        return {"Generator": Generator, "BatchResult": BatchResult}[name]
+    if name == "Schema":
+        from seed_data.schema import Schema
+        return Schema
+    if name == "ModelConfig":
+        from seed_data.stages.base import ModelConfig
+        return ModelConfig
+    if name == "GeneratedDoc":
+        from seed_data.stages.pipeline import GeneratedDoc
+        return GeneratedDoc
+    raise AttributeError(f"module 'seed_data' has no attribute {name!r}")

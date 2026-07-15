@@ -220,7 +220,7 @@ def apply_augmentation(pdf_path: str, augmentation_config: str) -> dict:
         }
 
 
-def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: int = 7) -> dict:
+def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: int = 7, session=None) -> dict:
     """Critique an augmented PDF using structured_output."""
     from seed_data import prompts as p
     from seed_data.critique import CritiqueResult
@@ -231,7 +231,7 @@ def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: 
         pdf_bytes = f.read()
 
     system_prompt = p.render("aug_critic", threshold=threshold)
-    agent = Agent(model=_make_model(model), system_prompt=system_prompt)
+    agent = Agent(model=_make_model(model, session=session), system_prompt=system_prompt)
 
     user_message = [
         {"document": {"format": "pdf", "name": "augmented_doc",

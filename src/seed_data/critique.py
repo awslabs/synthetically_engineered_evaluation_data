@@ -33,6 +33,7 @@ def critique_document(
     steering: str = "",
     sample_pdfs: list[str] = None,
     data_json: str = None,
+    session=None,
 ) -> dict:
     """Critique a PDF document using free-text output for natural language feedback.
 
@@ -48,7 +49,7 @@ def critique_document(
         "critic_vision", threshold=threshold, steering=steering,
         has_samples=bool(sample_pdfs), data_json=data_json or "",
     )
-    agent = Agent(model=make_model(model), system_prompt=system_prompt)
+    agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
 
     user_message = []
 

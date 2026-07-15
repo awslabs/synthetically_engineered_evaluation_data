@@ -1,5 +1,6 @@
 nav:
   - README.md
+  - architecture.md
   - models.md
   - renderers.md
   - augmentation.md
