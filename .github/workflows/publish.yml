@@ -1,0 +1,34 @@
+name: Publish to PyPI
+
+# Publishes to PyPI when a GitHub Release is published. The package version is
+# whatever is set in pyproject.toml at that commit — bump it before releasing.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Uses PyPI Trusted Publishing (OIDC) — no API token secret is stored.
+    # Requires a one-time setup on PyPI: project -> Manage -> Publishing ->
+    # add a GitHub publisher for this repo, workflow "publish.yml",
+    # and environment "pypi" (see README / release docs).
+    environment: pypi
+    permissions:
+      id-token: write   # required for Trusted Publishing OIDC
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0   # setuptools-scm needs full history and tags to derive the version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
