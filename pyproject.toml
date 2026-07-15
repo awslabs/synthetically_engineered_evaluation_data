@@ -1,6 +1,6 @@
 [project]
 name = "seed-data"
-version = "0.0.1"
+dynamic = ["version"]
 description = "AI-powered synthetic document generation pipeline for benchmarking document extraction (IDP/KIE) systems"
 readme = "README.md"
 license = "Apache-2.0"
@@ -53,8 +53,13 @@ Documentation = "https://awslabs.github.io/synthetically_engineered_evaluation_d
 Issues = "https://github.com/awslabs/synthetically-engineered-evaluation-data/issues"
 
 [build-system]
-requires = ["setuptools >= 61.0", "wheel"]
+requires = ["setuptools >= 61.0", "wheel", "setuptools-scm >= 8"]
 build-backend = "setuptools.build_meta"
+
+# Version is derived from the git tag by setuptools-scm — do not hard-code it.
+# Tag a release `vX.Y.Z` (via a GitHub Release) and the build picks up X.Y.Z.
+# Untagged/dev builds get a version like 0.0.3.dev2+g<sha>.
+[tool.setuptools_scm]
 
 [tool.pytest.ini_options]
 # Put src/ on the import path so tests can `import seed_data` without an
