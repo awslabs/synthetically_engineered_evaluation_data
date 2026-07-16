@@ -33,7 +33,7 @@ Example, overriding models per stage:
 ```bash
 python -m seed_data \
   --schema-dir src/seed_data/schemas/fcc-invoice \
-  --extra "Office supplies" \
+  --scenario "Office supplies" \
   --data-model nova2-lite \
   --doc-model gpt-oss \
   --critic-model sonnet

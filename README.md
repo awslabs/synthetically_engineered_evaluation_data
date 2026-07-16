@@ -2,7 +2,7 @@
 
 AI-powered synthetic document generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set.
 
-Designed for building evaluation datasets for document understanding systems: OCR, Key Information Extraction (KIE), and document classification. The pipeline is invoked as a Python module (`python -m seed_data`) or through the batch and packet scripts.
+Designed for building evaluation datasets for document understanding systems: OCR, Key Information Extraction (KIE), and document classification. Use it from the command line (`seed-data`) or the typed Python API (`seed_data.Generator`).
 
 > **Not a production-ready solution.** This asset represents a proof-of-value
 > for the services included and is not intended as a production-ready solution.
@@ -32,8 +32,11 @@ export AWS_PROFILE=your-profile-name
 seed-data clone-schema-library ./schemas
 
 # Generate a single document (PDF + ground-truth JSON) into ./output
-seed-data --schema-dir ./schemas/fcc-invoice --output ./output
+seed-data --schema-dir fcc-invoice --output ./output
 ```
+
+`--schema-dir` accepts a **bundled schema name** (like `fcc-invoice`) or a **path**
+to a schema directory, so the command above works with or without the clone step.
 
 Browse the schema library on GitHub:
 [awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
@@ -49,62 +52,91 @@ uv sync
 export AWS_PROFILE=your-profile-name
 
 # Generate a single FCC invoice
-BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
-  --schema-dir src/seed_data/schemas/fcc-invoice
+uv run seed-data --schema-dir fcc-invoice
 
 # Generate a diverse batch of 4 invoices with augmentation
-BYPASS_TOOL_CONSENT=true uv run python scripts/batch_generate.py \
-  --schema-dir src/seed_data/schemas/fcc-invoice \
-  --count 4 --workers 2 --augment \
-  --extra "FCC broadcast invoices for packaged food companies in the midwest"
+uv run seed-data --schema-dir fcc-invoice \
+  --count 4 --augment \
+  --scenario "FCC broadcast invoices for packaged food companies in the midwest"
 ```
 </details>
 
-## Architecture
+## Two ways to use it
 
-### Single Document Pipeline
+Everything is available from both the command line and Python; they run the same pipeline and produce the same artifacts.
 
-```
-data_generator → data_critic → doc_generator → doc_critic → [augmentor → aug_critic]
-                 ↑ (reject)                     ↑ (reject)
-                 └─────────┘                     └──────────┘
-```
-
-### Batch Pipeline (Parallel)
+**Command line:**
 
 ```bash
-uv run python scripts/batch_generate.py --count 10 --workers 3 --extra "your brief here"
+seed-data --schema-dir invoice --scenario "Midwest food-distributor invoice"   # single
+seed-data --schema-dir fcc-invoice --count 10 --scenario "Local TV stations"    # batch
+seed-data packet lending-package --scenario "First-time homebuyer in Portland"  # packet
 ```
 
-1. **Scenario Generation**: An LLM reads your `--extra` brief + the schema's generation guidance and produces N unique, diverse scenario descriptions
-2. **Parallel Execution**: Each scenario runs through the full single-doc pipeline in parallel via ThreadPoolExecutor
-3. **Output**: PDFs, data JSON, augmented versions, and a batch manifest
+**Python:**
 
-The `--extra` flag is the key to diversity. It accepts a high-level brief that the scenario generator uses to create varied documents:
+```python
+from seed_data import Generator, ModelConfig
+
+gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
+
+doc    = gen.generate("invoice", scenario="Midwest food-distributor invoice")
+batch  = gen.generate_batch("fcc-invoice", count=10, scenario="Local TV stations")
+packet = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland")
+```
+
+Full docs: [CLI Usage](docs/docs/CLI-Usage/README.md) · [Python API Usage](docs/docs/Python-API-Usage/README.md).
+
+## Architecture
+
+### Single-document pipeline
+
+```
+data_generator → data_critic → [doc_generator → doc_critic loop] → (augmentor → aug_critic)
+                 ↑ (reject)                      ↑ (reject)              ↑ (reject)
+                 └─────────┘                     └──────────┘            └──────────┘
+```
+
+The data generator invents schema-conforming JSON; the data critic validates it
+(deterministic JSON-Schema check + LLM domain review); the doc generator writes
+HTML/CSS and renders a PDF; the vision doc critic reviews the render and loops
+until it passes the threshold. With `--augment`, an augmentor applies aging
+effects and an aug critic checks legibility.
+
+### Batch (concurrent fan-out)
+
+A batch turns one high-level `--scenario` into N distinct scenarios, then runs a
+self-contained pipeline graph for each **as sibling nodes** — the Strands graph
+executes them concurrently (no thread pools or worker flags). A specific scenario
+produces far more varied output than a generic one:
 
 ```bash
 # Generic — less diverse
---extra "Generate diverse FCC invoices"
+--scenario "Generate diverse FCC invoices"
 
 # Specific — much more diverse
---extra "FCC broadcast invoices for packaged food companies advertising in the midwest"
---extra "Local car dealership TV ads across small-market stations in the southeast"
---extra "Political campaign advertising during election season on major metro stations"
+--scenario "FCC broadcast invoices for packaged food companies advertising in the midwest"
+--scenario "Local car dealership TV ads across small-market stations in the southeast"
 ```
 
-The scenario generator reads the schema's `generation_guidance.md` to understand the document type, then creates scenarios that vary advertisers, agencies, stations, regions, time periods, line item counts, and amounts.
+### Packet (coordinated multi-document)
+
+A packet is a set of different document types that share context — like a loan
+application with a credit report, pay stubs, and bank statements, all for the
+same applicant — merged into one multi-page PDF. See the
+[Packets guide](docs/docs/Guides/packets.md).
 
 ## Agent Descriptions
 
-| Agent | Role | Default Model |
-|-------|------|---------------|
-| Scenario Generator | Creates diverse scenarios from brief + guidance | `gpt-oss` |
-| Data Generator | Produces JSON data from schema. Has calculator tool for math verification. | `nova2-lite` |
-| Data Critic | Validates data against schema and domain rules. Has calculator tool. Structured output. | `sonnet` |
-| Doc Generator | Writes HTML/CSS and renders to PDF via WeasyPrint. Has editor for targeted fixes. | `gpt-oss` |
-| Doc Critic | Vision model evaluates PDF quality — layout, typography, truncation, math. Free-text output. | `sonnet` |
-| Augmentor | Picks augraphy augmentation config and applies document aging effects. | `gpt-oss` |
-| Aug Critic | Evaluates augmented doc for legibility and realism. Structured output. | `sonnet` |
+| Agent | Role | CLI default model |
+|-------|------|-------------------|
+| Scenario Planner | Creates diverse scenarios from a scenario brief + guidance (batch) | `nova2-lite` |
+| Data Generator | Produces JSON data from schema. Has a calculator tool for math. | `gpt-oss` |
+| Data Critic | Validates data against schema and domain rules. Structured output. | `sonnet` |
+| Doc Generator | Writes HTML/CSS and renders to PDF. Has an editor for targeted fixes. | `gpt-oss` |
+| Doc Critic | Vision model evaluates PDF quality — layout, typography, truncation, math. | `sonnet` |
+| Augmentor | Picks an augraphy config and applies document aging effects. | `gpt-oss` |
+| Aug Critic | Evaluates the augmented doc for legibility and realism. Structured output. | `sonnet` |
 
 ## Setup
 
@@ -120,7 +152,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 
 # Run any command inside the managed environment with `uv run`, e.g.
-uv run python -m seed_data --help
+uv run seed-data --help
 ```
 
 `uv sync` installs the `dev` dependency group by default (configured via
@@ -162,148 +194,105 @@ brew install pango gdk-pixbuf libffi
 apt-get install libpango-1.0-0 libgdk-pixbuf2.0-0
 ```
 
-Configure AWS credentials with Bedrock access:
-```bash
-export AWS_PROFILE=your-profile-name
-```
-
-### Packet Pipeline (Multi-Document)
-
-```bash
-BYPASS_TOOL_CONSENT=true uv run python scripts/packet_generate.py \
-  --packet src/seed_data/packets/lending-package \
-  --count 3 --workers 2 --augment \
-  --extra "First-time homebuyers in the Pacific Northwest applying for a 30-year fixed mortgage"
-```
-
-A packet is a set of different document types that share context — like a loan
-application containing a credit report, pay stubs, and a statement of intent, all
-for the same applicant. The pipeline:
-
-1. **Shared Context Resolution**: An LLM reads all schemas in the packet and generates
-   consistent shared values (names, addresses, dates). If the packet config defines
-   explicit `shared_context` fields, those are used directly; otherwise the agent infers
-   them from the schemas.
-2. **Sub-Document Generation**: Each document type runs through the full single-doc
-   pipeline with shared context injected as extra instructions.
-3. **PDF Merging**: Individual PDFs are merged into a single multi-document PDF per packet.
-4. **Label Emission**: Per-section `result.json` files with `document_class`,
-   `page_indices`, and `inference_result` (KIE ground truth labels).
-
-Output follows the evaluation dataset format for document splitting / classification:
-
-```
-output/packet_<name>_<timestamp>/
-├── classes.yaml                    # Document type list
-├── input/
-│   ├── packet_001.pdf              # Merged multi-doc PDF
-│   └── packet_002.pdf
-├── baseline/
-│   ├── packet_001.pdf/
-│   │   └── sections/
-│   │       ├── 1/result.json       # Sub-doc 1 labels
-│   │       └── 2/result.json       # Sub-doc 2 labels
-│   └── packet_002.pdf/
-├── config/
-│   ├── packet.json                 # Copy of packet config
-│   └── packet_manifest.json        # Full run metadata
-└── artifacts/                      # Intermediate files (individual PDFs, data JSONs)
-    ├── packet_001/
-    └── packet_002/
-```
-
-See [docs/packets.md](docs/packets.md) for the full guide — configuration, label format,
-architecture, and design decisions.
-
-See [Packet Configuration](#packet-configuration) for how to define packet types.
-
 ## Usage
 
 ### Single document
 
 ```bash
-BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
-  --schema-dir src/seed_data/schemas/fcc-invoice \
-  --extra "Local TV station in Portland, Oregon"
+seed-data --schema-dir fcc-invoice \
+  --scenario "Local TV station in Portland, Oregon"
 ```
 
 ### Single document with augmentation
 
 ```bash
-BYPASS_TOOL_CONSENT=true uv run python -m seed_data \
-  --schema-dir src/seed_data/schemas/fcc-invoice \
-  --extra "Local TV station in Portland, Oregon" \
+seed-data --schema-dir fcc-invoice \
+  --scenario "Local TV station in Portland, Oregon" \
   --augment
 ```
 
-### Parallel batch generation (recommended)
+### Batch generation
+
+`--count > 1` switches into batch mode and fans out concurrent pipeline graphs:
 
 ```bash
-BYPASS_TOOL_CONSENT=true uv run python scripts/batch_generate.py \
-  --schema-dir src/seed_data/schemas/fcc-invoice \
-  --count 10 --workers 3 \
-  --extra "CPG brands on local TV stations in the American southwest" \
-  --augment \
-  --batch-name southwest_cpg
+seed-data --schema-dir fcc-invoice \
+  --count 10 \
+  --scenario "CPG brands on local TV stations in the American southwest" \
+  --augment
+```
+
+### Packet generation
+
+```bash
+seed-data packet lending-package \
+  --count 3 --doc-workers 2 --augment \
+  --scenario "First-time homebuyers in the Pacific Northwest, 30-year fixed mortgage"
 ```
 
 ### CLI Options
 
-Common flags (work for `__main__`, `batch_generate.py`, and `packet_generate.py` unless noted):
+Common flags (single-document and batch):
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--schema-dir` | required | Directory with `schema.json` + optional `*.md` steering docs |
+| `--schema-dir` | required | Bundled schema name, or a directory with `schema.json` |
 | `--output` | `./output` | Output root directory |
-| `--extra` | | Diversity brief — describes the theme/scenario for generation |
-| `--data-model` | `nova2-lite` | Model for data generation |
+| `--scenario` | | What to generate this run (for `--count > 1`, the theme to diversify) |
+| `--count` | `1` | Number of documents; `> 1` enables batch mode |
+| `--data-model` | `gpt-oss` | Model for data generation |
 | `--doc-model` | `gpt-oss` | Model for PDF generation |
 | `--critic-model` | `sonnet` | Model for all critics |
+| `--batch-model` | `nova2-lite` | Model for batch scenario planning |
 | `--aug-model` | `gpt-oss` | Model for augmentation decisions |
-| `--renderer` | `weasyprint` | PDF engine: `weasyprint` (HTML/CSS) or `reportlab` (Python) |
+| `--renderer` | `xhtml2pdf` | `xhtml2pdf` (pure Python), `weasyprint`, or `reportlab` |
 | `--augment` | off | Enable augraphy image augmentation |
-| `--preview` | off | Enable visual self-inspection (requires VL model for doc-model) |
-| `--threshold` | `7` | Acceptance score 1-10 (7 recommended, 8 requires edit cycles) |
-| `--max-attempts` | `5` | Max feedback cycles per loop |
+| `--no-critic-samples` | off | Disable reference sample PDFs in the doc critic |
+| `--threshold` | `5` | Acceptance score, 1–10 |
+| `--max-attempts` | `5` | Max critic-retry cycles |
+| `--seed` | | Seed for batch scenario planning (regression-stable sets) |
 | `--timeout` | `3600` | Safety timeout in seconds |
+| `--quiet` | off | Suppress stage progress output |
 
-Batch-only flags (`batch_generate.py`):
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--count` | `5` | Number of documents to generate |
-| `--workers` | `3` | Max parallel workers (don't exceed 4-5 to avoid Bedrock rate limits) |
-| `--batch-name` | timestamp | Name for the batch output directory |
-
-Packet-only flags (`packet_generate.py`):
+Packet subcommand (`seed-data packet <name|path>`):
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--packet` | required | Path to packet config directory |
+| `packet` | required | Bundled packet name, or a packet directory path |
 | `--count` | `1` | Number of packets to generate |
-| `--workers` | `2` | Parallel packets within the batch |
-| `--doc-workers` | `1` | Parallel sub-documents within each packet |
-| `--shuffle` | off | Randomize sub-document order in merged PDF |
-| `--context-model` | `gpt-oss` | Model for shared context resolution |
+| `--doc-workers` | `3` | Parallel sub-documents within each packet |
+| `--shuffle` | off | Randomize sub-document order in the merged PDF |
+| `--context-model` | `nova2-lite` | Model for shared-context resolution |
+
+Utility subcommand — copy the bundled schema library out to edit locally:
+
+```bash
+seed-data clone-schema-library ./schemas
+```
+
+Run `seed-data --help` and `seed-data packet --help` for the complete list.
 
 ### What to expect from a batch
 
-- A single document takes roughly 60-100 seconds end-to-end.
-- With `--count 10 --workers 3` expect ~5-7 minutes wall-clock.
-- Don't push `--workers` above 4-5 — you'll hit Bedrock rate limits.
-- Partial failures are normal. If one doc fails, the others still complete and the
-  manifest records which succeeded.
-- Use a specific `--extra` brief. Vague briefs produce same-y output.
+- A single document takes roughly 30–100 seconds end-to-end.
+- All workers launch concurrently. The Python Strands graph has no built-in
+  concurrency cap, so large counts may hit Bedrock rate limits (adaptive retries
+  absorb this, but wall-clock grows). Start with modest counts.
+- Partial failures are normal. Failed documents come back with `success=False`
+  and `verdict="error"`; the rest still complete.
+- Use a specific `--scenario`. Vague scenarios produce same-y output.
 
 ### Available Models
 
 | Key | Model | Best For |
 |-----|-------|----------|
-| `gpt-oss` | GPT-OSS 120B | Doc generation, augmentation (fast tool calling) |
-| `sonnet` | Claude Sonnet 4.6 | Critics (respects scope rules, good at evaluation) |
-| `nova2-lite` | Amazon Nova 2 Lite | Data generation (fast, cheap, works with calculator) |
+| `gpt-oss` | GPT-OSS 120B | Doc/data generation, augmentation (fast tool calling) |
+| `sonnet` | Claude Sonnet | Critics (respects scope rules, good at evaluation) |
+| `haiku` | Claude Haiku 4.5 | Fast critic (cheaper; less strict than sonnet) |
+| `nova2-lite` | Amazon Nova 2 Lite | Scenario/context planning (fast, cheap) |
 | `nemotron-super` | Nemotron Super 120B | Doc generation (slow but high first-pass quality) |
-| `haiku` | Claude Haiku 4.5 | Fast critic (but less reliable at scope enforcement than sonnet) |
+
+`seed-data --help` lists every available model key.
 
 ## Schema Directories
 
@@ -342,7 +331,7 @@ This is the key file for controlling document quality and diversity. It tells ag
 - **Common issues to avoid**: known pitfalls for this document type
 - **Generation Choices**: optional fields with `x-probability` and table presentation variations (see below)
 
-The scenario generator also reads this file to create diverse scenarios that respect the document type's constraints.
+The scenario planner also reads this file to create diverse scenarios that respect the document type's constraints.
 
 ## Generation Choices
 
@@ -354,21 +343,25 @@ Document diversity comes from two sources of per-run variation:
 2. **Table presentation variations** — sections that can render either as tables
    or inline fields, declared in `generation_guidance.md` with ~50/50 probabilities.
 
-See [docs/generation_choices.md](docs/generation_choices.md) for the full guide:
+See [docs/docs/Guides/generation-choices.md](docs/docs/Guides/generation-choices.md) for the full guide:
 conventions, examples for nested and array fields, and how to add it to a new
 document type.
 
 ## Output Structure
 
+Single-document and batch runs write:
+
 ```
-output/<batch-name>/
+output/
 ├── pdfs/                    # Clean PDFs
-├── data/                    # Source data JSON per document
+├── data/                    # Ground-truth JSON label per document
 ├── generation_scripts/      # HTML files used to render PDFs
 ├── augmented/               # Augmented PDFs (when --augment)
-├── config/                  # Copy of schema + guidance for reproducibility
-│   └── batch_manifest.json  # Full run metadata, scenarios, timing
+└── config/                  # Copy of schema + guidance for reproducibility
 ```
+
+Packet runs use the evaluation-dataset layout (merged PDFs in `input/`,
+per-section labels in `baseline/`); see the [Packets guide](docs/docs/Guides/packets.md).
 
 ## Tests
 
@@ -380,16 +373,14 @@ uv run pytest
 # Or run a single module
 uv run pytest tests/test_unit.py -v
 
-# Integration: isolated doc loop test (requires AWS credentials). Lives under
-# tests/integration/ and is skipped by the default pytest run above.
-BYPASS_TOOL_CONSENT=true uv run python tests/integration/test_doc_gen.py \
-  --schema fcc-invoice --model gpt-oss --threshold 7
+# CLI smoke tests (no Bedrock) — verify the command works out of the box
+uv run pytest tests/test_cli_smoke.py -v
 ```
 
 ## Packet Configuration
 
 Packet configs live in `src/seed_data/packets/<packet-name>/packet.json`.
-See [docs/packets.md](docs/packets.md) for the full guide including config fields,
+See the [Packets guide](docs/docs/Guides/packets.md) for the full guide including config fields,
 shared context modes, label format, and architecture.
 
 ### Packet config example
@@ -422,11 +413,9 @@ shared context modes, label format, and architecture.
 }
 ```
 
-See the CLI Options section above for packet-specific flags.
-
 ## Security
 
-doc-gen-agent runs AI agents that **write and execute code** and **read/write
+seed-data runs AI agents that **write and execute code** and **read/write
 files** on the host in order to render documents. Read this section before
 running it on anything you don't fully trust. See also the disclaimer at the top
 of this README — you are responsible for the security of anything you build with
@@ -448,23 +437,25 @@ The document-generation agent uses tools that act on the host with the
 privileges of the user running the CLI:
 
 - **Code execution** — with the `reportlab` renderer the agent runs Python via a
-  `shell` tool; with the default `weasyprint` renderer it renders agent-authored
-  HTML. Treat all agent-generated code in `output/generation_scripts/` as
-  **untrusted model output** — do not blindly re-run it later.
+  `shell` tool; with the HTML renderers (`xhtml2pdf`/`weasyprint`) it renders
+  agent-authored HTML. Treat all agent-generated code in
+  `output/generation_scripts/` as **untrusted model output** — do not blindly
+  re-run it later.
 - **Filesystem access** — file read/write tools operate on model-supplied paths
   with no built-in sandbox or path allowlist.
-- **Tool consent** — the documented run commands set `BYPASS_TOOL_CONSENT=true`,
-  which disables the per-tool human-approval prompt. Leave it **unset** when
-  running on untrusted input so you can approve tool calls.
+- **Tool consent** — the Strands Agents SDK can prompt for human approval before
+  executing tools. Setting `BYPASS_TOOL_CONSENT=true` disables that prompt for
+  autonomous runs; leave it **unset** when running on untrusted input so you can
+  approve tool calls.
 
 **Recommendation:** run the pipeline in an isolated environment (container or VM)
 with no sensitive data on disk, restricted network egress, and dedicated,
 least-privilege AWS credentials — not your personal developer profile.
 
-### Untrusted schemas, guidance, and briefs
+### Untrusted schemas, guidance, and scenarios
 
-`schema.json`, `generation_guidance.md`, sample PDFs, and the `--extra` brief are
-all injected into agent prompts. Treat content from untrusted sources as a
+`schema.json`, `generation_guidance.md`, sample PDFs, and the `--scenario` text
+are all injected into agent prompts. Treat content from untrusted sources as a
 **prompt-injection** vector: a malicious schema or guidance file could attempt to
 steer an agent into misusing the code/file tools. Only run schemas you trust, or
 run inside the isolated environment described above.
@@ -472,10 +463,10 @@ run inside the isolated environment described above.
 ### AWS credentials
 
 Model calls go to Amazon Bedrock using the credentials resolved from your
-`AWS_PROFILE` (see [session.py](src/seed_data/session.py)). Any code the agent
-executes inherits that environment, so those credentials — and whatever they can
-access — are reachable by agent-run code. Use a scoped, Bedrock-only profile and
-avoid broad/admin credentials.
+`AWS_PROFILE` (or an explicit boto3 session passed to `Generator`). Any code the
+agent executes inherits that environment, so those credentials — and whatever
+they can access — are reachable by agent-run code. Use a scoped, Bedrock-only
+profile and avoid broad/admin credentials.
 
 ### Cost
 

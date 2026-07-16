@@ -1,6 +1,8 @@
 nav:
   - index.md
   - Getting-Started
+  - CLI-Usage
+  - Python-API-Usage
   - Guides
   - Advanced
   - API-Reference

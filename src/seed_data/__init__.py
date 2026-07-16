@@ -1,4 +1,8 @@
-"""doc-gen-agent — AI-powered document generation pipeline."""
+"""seed_data — AI-powered synthetic document generation pipeline.
+
+Public API (lazy-loaded): ``Generator``, ``Schema``, ``ModelConfig``,
+``GeneratedDoc``, ``BatchResult``. See ``seed_data.api.Generator``.
+"""
 
 MODELS = {
     "haiku": {"model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "max_tokens": 63999},
@@ -22,3 +26,30 @@ MODELS = {
     "nemotron-super": {"model_id": "nvidia.nemotron-super-3-120b", "max_tokens": 16383, "streaming": False},
     "nemotron-nano-30b": {"model_id": "nvidia.nemotron-nano-3-30b", "max_tokens": 16383, "streaming": False},
 }
+
+# Public API. Exposed lazily so `import seed_data` stays light — the heavy
+# imports (strands, boto3) only load when you touch the API.
+__all__ = [
+    "Generator",
+    "Schema",
+    "ModelConfig",
+    "GeneratedDoc",
+    "BatchResult",
+    "MODELS",
+]
+
+
+def __getattr__(name):
+    if name in ("Generator", "BatchResult"):
+        from seed_data.api import Generator, BatchResult
+        return {"Generator": Generator, "BatchResult": BatchResult}[name]
+    if name == "Schema":
+        from seed_data.schema import Schema
+        return Schema
+    if name == "ModelConfig":
+        from seed_data.stages.base import ModelConfig
+        return ModelConfig
+    if name == "GeneratedDoc":
+        from seed_data.stages.pipeline import GeneratedDoc
+        return GeneratedDoc
+    raise AttributeError(f"module 'seed_data' has no attribute {name!r}")

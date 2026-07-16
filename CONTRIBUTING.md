@@ -38,13 +38,13 @@ uv sync
 pip install -e ".[dev]"
 ```
 
-> **Using pip + venv?** If you installed with `pip install -e ".[dev]"`, run the tools directly (e.g., `python scripts/test_unit.py`). If you use uv, prefix commands with `uv run` (e.g., `uv run python scripts/test_unit.py`).
+> **Using pip + venv?** If you installed with `pip install -e ".[dev]"`, run the tools directly (e.g., `pytest`). If you use uv, prefix commands with `uv run` (e.g., `uv run pytest`).
 
 ### Development Workflow
 
 1. Create a branch from `develop`: `git checkout -b feature/your-feature develop`
 2. Make your changes
-3. Run the unit tests: `python scripts/test_unit.py`
+3. Run the unit tests: `pytest`
 4. Run linting: `ruff check .`
 5. Commit with conventional format: `feat: add new feature`
 6. Submit PR to `develop` branch
@@ -55,8 +55,8 @@ pip install -e ".[dev]"
 
 | Task | Command |
 |------|---------|
-| Run unit tests | `python scripts/test_unit.py` |
-| Run the document generation smoke test | `python scripts/test_doc_gen.py` |
+| Run unit tests | `pytest` |
+| Run the CLI smoke test (no Bedrock) | `pytest tests/test_cli_smoke.py` |
 | Lint check | `ruff check .` |
 | Lint fix | `ruff check --fix .` |
 
