@@ -7,7 +7,8 @@ statement of intent — all for the same applicant).
 This module handles:
   - Loading and validating packet configuration
   - Resolving shared context (explicit or LLM-inferred)
-  - Generating individual sub-documents via the existing orchestrate pipeline
+  - Generating individual sub-documents via the v2 staged pipeline
+    (``seed_data.stages.pipeline.generate``)
   - Merging sub-document PDFs into a single packet PDF
   - Emitting evaluation labels (document_class, page_indices, inference_result)
 """
@@ -22,7 +23,6 @@ from typing import Any
 
 import pypdf
 
-from seed_data.orchestrate import orchestrate
 from seed_data.utils import load_schema_dir, make_model
 
 
@@ -347,7 +347,8 @@ def generate_packet(
         augment: Enable per-document augmentation.
         critic_samples: Use reference samples in critic.
         renderer: PDF rendering engine.
-        enable_preview: Enable preview tool.
+        enable_preview: Accepted for CLI compatibility; not used by the v2
+            pipeline (no preview stage yet).
 
     Returns:
         PacketResult with merged PDF path, section results, and metadata.
@@ -369,24 +370,25 @@ def generate_packet(
     # Step 2: Build the document plan (resolve instance counts)
     doc_plan = _build_document_plan(config, shared_context)
 
-    # Step 3: Generate each sub-document
+    # Step 3: Generate each sub-document through the v2 staged pipeline
+    from seed_data.stages.base import ModelConfig
+    models = ModelConfig(
+        data=data_model, doc=doc_model, critic=critic_model,
+        aug=aug_model, batch=context_model,
+    )
     section_results = _generate_subdocuments(
         doc_plan=doc_plan,
         shared_context=shared_context,
         workspace_dir=workspace_dir,
         extra=extra,
         doc_workers=doc_workers,
-        data_model=data_model,
-        doc_model=doc_model,
-        critic_model=critic_model,
-        aug_model=aug_model,
+        models=models,
         threshold=threshold,
         max_attempts=max_attempts,
         timeout=timeout,
         augment=augment,
         critic_samples=critic_samples,
         renderer=renderer,
-        enable_preview=enable_preview,
     )
 
     # Step 4: Optionally shuffle order
@@ -496,9 +498,9 @@ def _generate_subdocuments(
     workspace_dir: str,
     extra: str,
     doc_workers: int = 1,
-    **orchestrate_kwargs,
+    **generate_kwargs,
 ) -> list[SectionResult]:
-    """Generate each sub-document using the existing orchestrate pipeline.
+    """Generate each sub-document through the v2 staged pipeline.
 
     Args:
         doc_plan: List of documents to generate.
@@ -507,12 +509,14 @@ def _generate_subdocuments(
         extra: Extra instructions / scenario brief.
         doc_workers: Number of parallel workers for sub-document generation.
             1 = sequential (default), >1 = parallel via ThreadPoolExecutor.
-        **orchestrate_kwargs: Passed through to orchestrate().
+        **generate_kwargs: Passed through to ``stages.pipeline.generate`` (models,
+            threshold, renderer, timeout, augment, critic_samples, ...).
 
     Returns:
         List of SectionResult in the same order as doc_plan.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    from seed_data.stages.pipeline import generate as _generate
 
     def _generate_one(index: int, planned_doc: PlannedDocument) -> tuple[int, SectionResult]:
         instance_label = (
@@ -533,12 +537,12 @@ def _generate_subdocuments(
         os.makedirs(doc_output_dir, exist_ok=True)
 
         try:
-            result = orchestrate(
+            doc = _generate(
                 schema_dir=planned_doc.schema_dir,
                 output_dir=doc_output_dir,
-                extra_instructions=combined_extra,
+                extra=combined_extra,
                 verbose=False,
-                **orchestrate_kwargs,
+                **generate_kwargs,
             )
         except Exception as e:
             print(f"    ✗ {planned_doc.document_class}{instance_label}: {e}")
@@ -549,18 +553,18 @@ def _generate_subdocuments(
                 success=False,
             )
 
-        inference_result = _load_inference_result(result.get("data_json"))
-        status = "✓" if result["success"] else "✗"
+        inference_result = doc.data or {}
+        status = "✓" if doc.success else "✗"
         print(f"    {status} {planned_doc.document_class}{instance_label}")
 
         return index, SectionResult(
             document_class=planned_doc.document_class,
             page_indices=[],  # filled in during merge step
             inference_result=inference_result,
-            pdf_path=result.get("path"),
-            data_json_path=result.get("data_json"),
-            doc_id=result.get("doc_id", ""),
-            success=result["success"],
+            pdf_path=doc.pdf_path,
+            data_json_path=doc.data_json_path,
+            doc_id=doc.doc_id,
+            success=doc.success,
         )
 
     # Sequential when doc_workers=1, parallel otherwise

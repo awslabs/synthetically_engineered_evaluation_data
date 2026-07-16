@@ -1,7 +1,6 @@
 nav:
   - README.md
-  - orchestrate.md
-  - batch.md
+  - generator.md
   - packet.md
   - critique.md
   - tools.md

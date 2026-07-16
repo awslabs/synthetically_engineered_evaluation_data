@@ -8,11 +8,24 @@ title: Installation
 
 - Python 3.12+
 - An AWS account with Amazon Bedrock model access enabled
-- System libraries for WeasyPrint (the default PDF renderer), see below
+
+The default PDF renderer (`xhtml2pdf`) is pure Python and needs no system libraries. System libraries are only required if you opt into the WeasyPrint renderer (see [Optional: WeasyPrint renderer](#optional-weasyprint-renderer)).
 
 ## Install the package
 
-### Option 1: pip
+Install from PyPI:
+
+```bash
+pip install seed-data
+```
+
+This works out of the box: the default `xhtml2pdf` renderer requires no additional system libraries.
+
+Verify with `seed-data --help` (see [Verify Installation](#verify-installation)).
+
+### From source (contributors)
+
+If you are working from a clone of the repository, install the package in editable mode with the `dev` extras:
 
 ```bash
 python -m venv .venv
@@ -20,17 +33,15 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### Option 2: uv
+Or with `uv`, which handles the Python version, virtual environment, and dependencies in one step:
 
 ```bash
 uv sync
 ```
 
-`uv` handles the Python version, virtual environment, and dependency installation in one step.
+## Optional: WeasyPrint renderer
 
-## WeasyPrint System Libraries
-
-WeasyPrint is the default renderer and depends on native libraries that pip cannot install. Install them with your system package manager:
+The default `xhtml2pdf` renderer needs nothing extra. If you instead choose `--renderer weasyprint` (see [Renderers](../Advanced/renderers.md)), WeasyPrint depends on native libraries that pip cannot install. Install them with your system package manager:
 
 ```bash
 # macOS
@@ -39,8 +50,6 @@ brew install pango gdk-pixbuf libffi
 # Ubuntu/Debian
 apt-get install libpango-1.0-0 libgdk-pixbuf2.0-0
 ```
-
-If you use the `reportlab` renderer instead (see [Renderers](../Advanced/renderers.md)), these libraries are not required.
 
 ## AWS Bedrock Credentials
 
@@ -67,12 +76,11 @@ Leave this variable unset when running schemas or briefs you do not fully trust,
 ## Verify Installation
 
 ```bash
-python -m seed_data --help
+seed-data --help          # or: python -m seed_data --help
 ```
 
-You can also run the tests that do not require AWS credentials:
+You can also run the test suite (no AWS credentials required):
 
 ```bash
-python scripts/test_unit.py      # Unit tests (no LLM calls)
-python scripts/test_subgraph.py  # Graph wiring tests (no LLM calls)
+make test                 # or: uv run pytest
 ```

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field
 
@@ -78,7 +79,7 @@ class Generator:
         timeout: int = 3600,
         critic_samples: bool = True,
         augment: bool = False,
-        session=None,
+        session: Any = None,
     ):
         self.models = models or ModelConfig()
         self.threshold = threshold
@@ -144,7 +145,7 @@ class Generator:
         brief: str,
         augment: bool | None = None,
         seed: int | None = None,
-        on_document=None,
+        on_document: Callable[[int, int, GeneratedDoc], None] | None = None,
         verbose: bool = True,
     ) -> BatchResult:
         """Generate a diverse batch of documents from one brief.

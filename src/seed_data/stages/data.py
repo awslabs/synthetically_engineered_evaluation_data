@@ -100,10 +100,13 @@ def critique(ctx: StageContext) -> Verdict:
         steering=ctx.steering,
         data_json=json.dumps(data, indent=2),
     )
-    agent = Agent(model=make_model(ctx.models.critic, session=ctx.session), system_prompt=system_prompt)
+    agent = Agent(
+        model=make_model(ctx.models.critic, session=ctx.session),
+        system_prompt=system_prompt,
+        tools=[calculator],
+    )
     result = agent(
         "Validate this data. Use the calculator tool to verify all arithmetic.",
-        tools=[calculator],
         structured_output_model=_LLMDataCritique,
     )
     llm: _LLMDataCritique = result.structured_output

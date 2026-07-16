@@ -124,11 +124,10 @@ def critique_data(
         steering=steering,
         data_json=json.dumps(data, indent=2),
     )
-    agent = Agent(model=make_model(model), system_prompt=system_prompt)
-
     from strands_tools.calculator import calculator
+    agent = Agent(model=make_model(model), system_prompt=system_prompt, tools=[calculator])
     result = agent("Validate this data. Use the calculator tool to verify all arithmetic.",
-                   tools=[calculator], structured_output_model=CritiqueResult)
+                   structured_output_model=CritiqueResult)
     critique = result.structured_output
 
     verdict = "accepted" if critique.score >= threshold else "rejected"

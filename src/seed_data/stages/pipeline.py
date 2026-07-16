@@ -1,11 +1,9 @@
-"""v2 pipeline orchestration — wires stages into a graph and runs one document.
+"""Pipeline orchestration — wires stages into a graph and runs one document.
 
 This is the thin orchestrator the stage refactor was aiming for: it builds a
 ``StageContext``, assembles a self-contained graph from stage builders (each node
-holds its own ctx), invokes it, and returns a typed ``GeneratedDoc``.
-
-Coexists with the legacy ``seed_data.orchestrate.orchestrate`` (v1). The CLI
-still uses v1 until we rewire it after verification.
+holds its own ctx), invokes it, and returns a typed ``GeneratedDoc``. Batch and
+packet generation compose this same graph.
 """
 from __future__ import annotations
 

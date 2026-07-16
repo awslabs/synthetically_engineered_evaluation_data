@@ -1,4 +1,8 @@
-"""doc-gen-agent — AI-powered document generation pipeline."""
+"""seed_data — AI-powered synthetic document generation pipeline.
+
+Public API (lazy-loaded): ``Generator``, ``Schema``, ``ModelConfig``,
+``GeneratedDoc``, ``BatchResult``. See ``seed_data.api.Generator``.
+"""
 
 MODELS = {
     "haiku": {"model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "max_tokens": 63999},
