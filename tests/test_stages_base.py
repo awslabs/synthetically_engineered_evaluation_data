@@ -14,9 +14,12 @@ from seed_data.stages.base import (
 def make_ctx(**overrides) -> StageContext:
     base = dict(
         schema_dict={"title": "invoice", "type": "object"},
-        output_path="/tmp/x/pdfs/doc.pdf",
-        data_json_path="/tmp/x/data/doc.json",
-        script_path="/tmp/x/scripts/doc.html",
+        # Placeholder paths only — these tests never touch the filesystem, so any
+        # non-empty strings work. Kept relative (not /tmp) to avoid a hardcoded
+        # world-writable temp path (bandit B108).
+        output_path="_fake/pdfs/doc.pdf",
+        data_json_path="_fake/data/doc.json",
+        script_path="_fake/scripts/doc.html",
     )
     base.update(overrides)
     return StageContext(**base)
