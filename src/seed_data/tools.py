@@ -116,37 +116,52 @@ def _render_with_weasyprint(html_path: str, pdf_path: str) -> None:
     HTML(filename=html_path).write_pdf(pdf_path)
 
 
-# Backend dispatch for render_html_to_pdf. The orchestrator selects one by setting
-# the HTML_RENDERER env var; xhtml2pdf is the default because it is pure Python and
-# needs no system libraries, so a fresh `pip install seed-data` renders out of the box.
+# Backend dispatch for the render tool. xhtml2pdf is the default because it is
+# pure Python and needs no system libraries, so a fresh `pip install seed-data`
+# renders out of the box.
 _HTML_RENDERERS = {
     "xhtml2pdf": _render_with_xhtml2pdf,
     "weasyprint": _render_with_weasyprint,
 }
 
 
-@tool
-def render_html_to_pdf(html_path: str, pdf_path: str) -> dict:
-    """Render an HTML file to PDF.
+def make_render_tool(backend: str = "xhtml2pdf"):
+    """Build a ``render_html_to_pdf`` tool with its backend bound in.
 
-    Args:
-        html_path: Path to the HTML file to render.
-        pdf_path: Path where the PDF should be saved.
+    The backend is captured in the closure rather than read from a global env
+    var, so each doc-generator gets its own correctly-configured render tool and
+    concurrent workers with different renderers never collide. The tool keeps the
+    name ``render_html_to_pdf`` so the generator prompt can reference it.
     """
-    backend = os.environ.get("HTML_RENDERER", "xhtml2pdf")
     render = _HTML_RENDERERS.get(backend, _render_with_xhtml2pdf)
-    try:
-        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-        render(html_path, pdf_path)
-        if os.path.exists(pdf_path):
-            size = os.path.getsize(pdf_path)
-            return {"status": "success", "content": [
-                {"text": f"PDF rendered: {pdf_path} ({size:,} bytes)"}
+
+    @tool
+    def render_html_to_pdf(html_path: str, pdf_path: str) -> dict:
+        """Render an HTML file to PDF.
+
+        Args:
+            html_path: Path to the HTML file to render.
+            pdf_path: Path where the PDF should be saved.
+        """
+        try:
+            os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+            render(html_path, pdf_path)
+            if os.path.exists(pdf_path):
+                size = os.path.getsize(pdf_path)
+                return {"status": "success", "content": [
+                    {"text": f"PDF rendered: {pdf_path} ({size:,} bytes)"}
+                ]}
+            return {"status": "error", "content": [
+                {"text": f"{backend} completed but PDF was not created."}
             ]}
-        return {"status": "error", "content": [
-            {"text": f"{backend} completed but PDF was not created."}
-        ]}
-    except Exception as e:
-        return {"status": "error", "content": [
-            {"text": f"Render failed: {e}"}
-        ]}
+        except Exception as e:
+            # Surface the real traceback to stdout — otherwise only the LLM sees
+            # the (paraphrased) error and the true cause never reaches the user.
+            import traceback
+            print(f"\n!!! render_html_to_pdf ({backend}) FAILED for {html_path}:")
+            traceback.print_exc()
+            return {"status": "error", "content": [
+                {"text": f"Render failed ({backend}): {type(e).__name__}: {e}"}
+            ]}
+
+    return render_html_to_pdf

@@ -33,6 +33,7 @@ def critique_document(
     steering: str = "",
     sample_pdfs: list[str] = None,
     data_json: str = None,
+    session=None,
 ) -> dict:
     """Critique a PDF document using free-text output for natural language feedback.
 
@@ -48,7 +49,7 @@ def critique_document(
         "critic_vision", threshold=threshold, steering=steering,
         has_samples=bool(sample_pdfs), data_json=data_json or "",
     )
-    agent = Agent(model=make_model(model), system_prompt=system_prompt)
+    agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
 
     user_message = []
 
@@ -123,11 +124,10 @@ def critique_data(
         steering=steering,
         data_json=json.dumps(data, indent=2),
     )
-    agent = Agent(model=make_model(model), system_prompt=system_prompt)
-
     from strands_tools.calculator import calculator
+    agent = Agent(model=make_model(model), system_prompt=system_prompt, tools=[calculator])
     result = agent("Validate this data. Use the calculator tool to verify all arithmetic.",
-                   tools=[calculator], structured_output_model=CritiqueResult)
+                   structured_output_model=CritiqueResult)
     critique = result.structured_output
 
     verdict = "accepted" if critique.score >= threshold else "rejected"

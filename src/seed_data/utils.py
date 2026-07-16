@@ -63,8 +63,15 @@ def sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
-def make_model(model_key: str, thinking_budget: int = 0, role: str = "") -> BedrockModel:
-    """Create a BedrockModel from a MODELS key or raw model ID."""
+def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
+               session=None) -> BedrockModel:
+    """Create a BedrockModel from a MODELS key or raw model ID.
+
+    ``model_key`` may be a key in ``MODELS`` or a raw Bedrock model ID (for region
+    portability, e.g. an EU/GovCloud inference profile). ``session`` is an optional
+    boto3 Session for in-process use (containers, Lambda, AgentCore); if omitted,
+    one is resolved from the environment via ``get_boto_session``.
+    """
     import warnings
 
     entry = MODELS.get(model_key)
@@ -86,7 +93,7 @@ def make_model(model_key: str, thinking_budget: int = 0, role: str = "") -> Bedr
 
     kwargs = {
         "model_id": model_id,
-        "boto_session": get_boto_session(),
+        "boto_session": session or get_boto_session(),
         "boto_client_config": BOTO_CONFIG,
         "max_tokens": max_tokens,
     }

@@ -17,7 +17,10 @@ dependencies = [
     "strands-agents",
     "strands-agents-tools",
     "reportlab",
-    "xhtml2pdf",
+    # xhtml2pdf 0.2.14 imports ShowBoundaryValue from reportlab.platypus.frames,
+    # which current reportlab (4.5.x) does not provide -> ImportError in the render
+    # tool. 0.2.17 fixed that import; require it. See seed_data/tools.py.
+    "xhtml2pdf>=0.2.17",
     "weasyprint",
     "pillow",
     "python-dotenv",

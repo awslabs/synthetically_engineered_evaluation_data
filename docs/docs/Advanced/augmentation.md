@@ -9,7 +9,7 @@ Real documents in an IDP pipeline are rarely pristine: they are scanned, faxed, 
 ```bash
 BYPASS_TOOL_CONSENT=true python -m seed_data \
   --schema-dir src/seed_data/schemas/fcc-invoice \
-  --extra "Local TV station in Portland, Oregon" \
+  --scenario "Local TV station in Portland, Oregon" \
   --augment
 ```
 

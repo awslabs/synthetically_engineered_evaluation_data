@@ -1,13 +1,17 @@
-# Getting Started with doc-gen-agent
+# Getting Started with seed-data
 
 This guide walks you through creating a new document type and generating your first synthetic documents in under 10 minutes.
 
 ## Install
 
 ```bash
-conda create -n doc-gen-agent python=3.12 -y
-conda activate doc-gen-agent
-pip install -e .
+pip install seed-data
+```
+
+Or, working from a repo clone with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync
 ```
 
 ## Prerequisites: AWS Access
@@ -18,29 +22,34 @@ Configure your credentials using any method supported by [boto3](https://boto3.a
 
 ```bash
 export AWS_PROFILE=your-profile-name
+export AWS_REGION=us-east-1
 ```
 
 ### About BYPASS_TOOL_CONSENT
 
-The Strands Agents SDK prompts for user confirmation before executing tools (like `python_repl`). Since this pipeline runs many tool calls autonomously, set this environment variable to skip those prompts:
+The Strands Agents SDK prompts for user confirmation before executing tools. Since this pipeline runs many tool calls autonomously, you can set this environment variable to skip those prompts:
 
 ```bash
 export BYPASS_TOOL_CONSENT=true
 ```
 
-This is safe — the agents only execute code they generate for PDF rendering, and all output is validated by the critic agents. You can omit this flag if you want to manually approve each tool call.
+Leave it **unset** when running untrusted schemas so you can approve each tool call. See the Security section of the [README](README.md#security).
 
 ## Step 1: Create a Document Type
 
-Every document type lives in its own directory with at least a `schema.json`. Create one:
+Every document type lives in its own directory with at least a `schema.json`. Start from the bundled library, or create your own:
 
 ```bash
-mkdir -p src/seed_data/schemas/purchase-order
+# Copy the built-in schemas into a local, editable folder
+seed-data clone-schema-library ./schemas
+
+# ...then create a new type alongside them
+mkdir -p ./schemas/purchase-order
 ```
 
 ### Write the schema
 
-Create `src/seed_data/schemas/purchase-order/schema.json`:
+Create `./schemas/purchase-order/schema.json`:
 
 ```json
 {
@@ -76,7 +85,7 @@ The `title` field becomes the document type name used in output directories.
 
 ### Add steering docs (optional but recommended)
 
-Create `src/seed_data/schemas/purchase-order/generation_guidance.md`:
+Create `./schemas/purchase-order/generation_guidance.md`:
 
 ```markdown
 # Purchase Order — Generation Guidance
@@ -104,7 +113,7 @@ The pipeline reads all `*.md` files in the directory and injects them into every
 
 **Want diversity across runs?** Add optional fields with `x-probability` to your
 schema and a `## Layout Variations` section to your guidance. See
-[docs/generation_choices.md](docs/generation_choices.md) for the full guide.
+[docs/docs/Guides/generation-choices.md](docs/docs/Guides/generation-choices.md) for the full guide.
 
 ### Add reference samples (optional)
 
@@ -119,26 +128,26 @@ schemas/purchase-order/
     └── real_po_002.pdf
 ```
 
-The doc critic loads these as visual benchmarks and compares generated documents against them.
+The doc critic loads these as visual benchmarks and compares generated documents against them. Sample PDFs are local-only and git-ignored — see the [README](README.md#samples-reference-documents--important).
 
 ## Step 2: Generate a Single Document
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m seed_data \
-  --schema-dir src/seed_data/schemas/purchase-order \
-  --extra "Industrial plumbing supplies for a construction project in Denver"
+seed-data \
+  --schema-dir ./schemas/purchase-order \
+  --scenario "Industrial plumbing supplies for a construction project in Denver"
 ```
 
-This runs the full pipeline: data generation → data validation → PDF rendering → visual critique. You'll see each stage's output in the terminal. The final PDF lands in `output/purchase-order/`.
+This runs the full pipeline: data generation → data validation → PDF rendering → visual critique. You'll see each stage's output in the terminal. The final PDF lands in `./output/pdfs/`, with the ground-truth label in `./output/data/`.
 
 ### With image augmentation
 
 Add `--augment` to simulate scanning/faxing artifacts:
 
 ```bash
-BYPASS_TOOL_CONSENT=true python -m seed_data \
-  --schema-dir src/seed_data/schemas/purchase-order \
-  --extra "Industrial plumbing supplies" \
+seed-data \
+  --schema-dir ./schemas/purchase-order \
+  --scenario "Industrial plumbing supplies" \
   --augment
 ```
 
@@ -146,60 +155,54 @@ This adds two more stages: an augmentor agent picks degradation effects, then an
 
 ## Step 3: Generate a Batch
 
-For training data, you want volume and diversity. The batch script (`scripts/batch_generate.py`)
-runs the pipeline N times in parallel, each with a unique scenario:
+For evaluation data, you want volume and diversity. Setting `--count > 1` switches
+into batch mode: a scenario planner turns your brief into N distinct scenarios,
+and each runs its own self-contained pipeline graph as a sibling node — the
+Strands graph executes them concurrently (no worker flags to tune):
 
 ```bash
-BYPASS_TOOL_CONSENT=true python scripts/batch_generate.py \
-  --schema-dir src/seed_data/schemas/purchase-order \
-  --extra "Diverse industries ordering from various suppliers across the US" \
-  --count 10 --workers 3 \
-  --batch-name po-training-set \
+seed-data \
+  --schema-dir ./schemas/purchase-order \
+  --scenario "Diverse industries ordering from various suppliers across the US" \
+  --count 10 \
   --augment
 ```
 
-A scenario generator agent reads your brief and crafts a unique scenario for each
-document — different buyers, suppliers, industries, regions, and order types. Then
-each scenario runs through the full pipeline in parallel via `ThreadPoolExecutor`
-(controlled by `--workers`).
-
-Output goes to `output/po-training-set/`:
+Output goes to `./output/`:
 
 ```
-output/po-training-set/
-├── pdfs/              # 10 clean PDFs
-├── augmented/         # 10 augmented versions
-├── data/              # 10 JSON data files (ground truth)
-├── generation_scripts/  # The HTML used to render each PDF
-├── config/            # Copy of your schema + guidance for reproducibility
-└── config/batch_manifest.json   # CLI command, git hash, model config, per-doc results
+output/
+├── pdfs/                 # 10 clean PDFs
+├── augmented/            # 10 augmented versions
+├── data/                 # 10 ground-truth JSON labels
+├── generation_scripts/   # The HTML used to render each PDF
+└── config/               # Copy of your schema + guidance for reproducibility
 ```
 
 Tips:
-- **Workers vs count**: a single doc takes ~60-100s. With `--count 10 --workers 3`
-  expect ~5-7 minutes wall-clock. Don't set `--workers` higher than 4-5; you'll hit
-  Bedrock rate limits.
-- **Brief specificity matters**: a vague brief produces same-y documents. A specific
-  brief ("CPG brands on local TV stations in the southwest") produces real diversity.
+- **A single doc takes ~30-100s.** All scenarios run concurrently, so a batch is
+  bounded by the slowest document plus Bedrock rate limiting, not the sum. Start
+  with modest counts.
+- **Scenario specificity matters**: a vague scenario produces same-y documents. A specific
+  one ("CPG brands on local TV stations in the southwest") produces real diversity.
 - **Partial failures are OK**: if 1 of 10 docs fails, the other 9 are still saved.
-  The manifest shows which succeeded.
-
+- **Regression-stable sets**: pass `--seed <n>` to make scenario planning deterministic.
 
 ## Step 4: Customize Models
 
-By default, the pipeline uses DeepSeek V3.2 for generation and Haiku for critics. Override per stage:
+Override the model used at each stage:
 
 ```bash
-python -m seed_data \
-  --schema-dir src/seed_data/schemas/purchase-order \
-  --extra "Office supplies" \
-  --data-model qwen3-vl \
-  --doc-model deepseek-v3 \
+seed-data \
+  --schema-dir ./schemas/purchase-order \
+  --scenario "Office supplies" \
+  --data-model gpt-oss \
+  --doc-model gpt-oss \
   --critic-model haiku \
-  --count 5 --batch-name office-supplies
+  --count 5
 ```
 
-**Constraint:** `--critic-model` must support document/PDF input (currently only Anthropic models: haiku, sonnet, opus). All other model flags can use any available model.
+**Constraint:** `--critic-model` must support document/PDF input (currently only Anthropic models: `haiku`, `sonnet`, `opus`). All other model flags can use any available model. Run `seed-data --help` for the full list of model keys.
 
 ## Step 5: Tune Quality
 
@@ -207,8 +210,10 @@ python -m seed_data \
 
 ```bash
 --threshold 8    # stricter (more retries, higher quality)
---threshold 5    # lenient (faster, lower quality)
+--threshold 3    # lenient (faster, lower quality)
 ```
+
+The default is `5`.
 
 ### Edit steering docs
 
@@ -227,28 +232,45 @@ For deeper customization, edit the Jinja2 templates in `src/seed_data/prompts/`:
 |----------|----------|
 | `data_generator.j2` | How the LLM generates JSON data |
 | `data_critic.j2` | What the data critic checks for |
-| `doc_generator.j2` | How the LLM writes PDF rendering code |
+| `doc_generator.j2` / `doc_generator_html.j2` | How the LLM writes PDF rendering code |
 | `critic_vision.j2` | What the vision critic evaluates |
 | `augmentor.j2` | Available augmentations and selection rules |
 | `aug_critic.j2` | Augmentation quality criteria |
+
+## Prefer Python?
+
+Everything above is available through the typed `Generator` API:
+
+```python
+from seed_data import Generator, ModelConfig
+
+gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
+
+doc   = gen.generate("./schemas/purchase-order", scenario="Office supplies, net-30")
+batch = gen.generate_batch("./schemas/purchase-order", count=10,
+                           scenario="Diverse industries across the US")
+```
+
+See [Python API Usage](docs/docs/Python-API-Usage/README.md) for the full surface.
 
 ## Quick Reference
 
 ```bash
 # Single doc, defaults
-python -m seed_data --schema-dir schemas/my-type --extra "context"
+seed-data --schema-dir ./schemas/my-type --scenario "context"
 
 # Batch of 20 with augmentation
-python scripts/batch_generate.py --schema-dir schemas/my-type \
-  --extra "brief for diversity" --count 20 --workers 3 \
-  --batch-name my-batch --augment
+seed-data --schema-dir ./schemas/my-type \
+  --scenario "brief for diversity" --count 20 --augment
 
-# Use specific models (single-doc; same flags work for batch)
-python -m seed_data --schema-dir schemas/my-type \
-  --data-model nova2-lite --doc-model gpt-oss --critic-model sonnet
+# Use specific models
+seed-data --schema-dir ./schemas/my-type \
+  --data-model gpt-oss --doc-model gpt-oss --critic-model sonnet
+
+# A coordinated multi-document packet
+seed-data packet lending-package --scenario "First-time homebuyer in Portland, OR"
 
 # See all options
-python -m seed_data --help
-python scripts/batch_generate.py --help
-python scripts/packet_generate.py --help
+seed-data --help
+seed-data packet --help
 ```
