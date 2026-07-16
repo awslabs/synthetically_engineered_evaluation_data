@@ -8,8 +8,8 @@ its three verbs:
 
     gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
 
-    doc    = gen.generate("invoice", extra="Midwest food distributors")
-    docs   = gen.generate_batch("invoice", count=10, brief="...")
+    doc    = gen.generate("invoice", scenario="Midwest food distributors")
+    docs   = gen.generate_batch("invoice", count=10, scenario="...")
     packet = gen.generate_packet("lending-package", count=3)
 
 Configuration lives on the ``Generator``; per-call arguments describe only *what*
@@ -103,7 +103,7 @@ class Generator:
         self,
         schema: "str | Schema",
         *,
-        extra: str = "",
+        scenario: str = "",
         augment: bool | None = None,
         verbose: bool = True,
     ) -> GeneratedDoc:
@@ -115,13 +115,14 @@ class Generator:
                 - a path to a schema directory, or
                 - a :class:`Schema` object defined in code (JSON schema or a
                   pydantic model, plus generation guidance).
-            extra: Free-text brief steering the content.
+            scenario: Free-text describing what to generate this run (the vendor,
+                industry, region, size, etc.) — steers the content.
             augment: Override the instance's augment setting for this call.
             verbose: Print stage progress.
         """
         common = dict(
             output_dir=self.output_dir,
-            extra=extra,
+            extra=scenario,
             models=self.models,
             threshold=self.threshold,
             max_attempts=self.max_attempts,
@@ -142,21 +143,24 @@ class Generator:
         schema: "str | Schema",
         *,
         count: int,
-        brief: str,
+        scenario: str,
         augment: bool | None = None,
         seed: int | None = None,
         on_document: Callable[[int, int, GeneratedDoc], None] | None = None,
         verbose: bool = True,
     ) -> BatchResult:
-        """Generate a diverse batch of documents from one brief.
+        """Generate a diverse batch of documents from one high-level scenario.
 
-        A planner turns ``brief`` into ``count`` distinct scenarios; each runs its
-        own self-contained pipeline graph as a sibling node, and Strands executes
-        them concurrently.
+        A planner turns ``scenario`` into ``count`` distinct, specific scenarios;
+        each runs its own self-contained pipeline graph as a sibling node, and
+        Strands executes them concurrently.
 
         ``schema`` accepts a bundled name, a directory path, or a ``Schema``.
 
         Args:
+            scenario: The high-level theme the planner diversifies into ``count``
+                specific documents. A specific scenario yields far more varied
+                output than a generic one.
             seed: optional seed for scenario planning (regression-stable sets).
             on_document: optional ``callback(index, total, GeneratedDoc)`` fired as
                 each document's result is collected — for host-side progress UIs.
@@ -165,7 +169,7 @@ class Generator:
         from seed_data.schema import Schema
 
         common = dict(
-            count=count, brief=brief, output_dir=self.output_dir,
+            count=count, brief=scenario, output_dir=self.output_dir,
             models=self.models, threshold=self.threshold,
             max_attempts=self.max_attempts, timeout=self.timeout,
             renderer=self.renderer, critic_samples=self.critic_samples,
@@ -191,7 +195,7 @@ class Generator:
         packet: str,
         *,
         count: int = 1,
-        extra: str = "",
+        scenario: str = "",
         shuffle: bool = False,
         doc_workers: int = 1,
         augment: bool | None = None,
@@ -202,7 +206,8 @@ class Generator:
             packet: Path to a packet directory (containing a packet config), or a
                 bundled packet name.
             count: Number of packets to generate.
-            extra: Scenario brief shared across the packet's documents.
+            scenario: Free-text scenario shared across the packet's documents
+                (the same applicant, situation, etc.).
             shuffle: Randomize sub-document order in the merged PDF.
             doc_workers: Parallel workers for sub-documents within a packet.
 
@@ -213,7 +218,7 @@ class Generator:
         config = load_packet_config(self._resolve_packet(packet))
         common = dict(
             output_dir=self.output_dir,
-            extra=extra,
+            extra=scenario,
             shuffle=shuffle,
             doc_workers=doc_workers,
             data_model=self.models.data,

@@ -38,7 +38,7 @@ def _packet(argv):
     )
     parser.add_argument("packet", help="Packet directory path, or a bundled packet name")
     parser.add_argument("--output", default="./output", help="Output directory")
-    parser.add_argument("--extra", default="", help="Scenario brief shared across the packet")
+    parser.add_argument("--scenario", default="", help="Scenario shared across the packet's documents")
     parser.add_argument("--count", type=int, default=1, help="Number of packets to generate")
     parser.add_argument("--doc-workers", type=int, default=3,
                         help="Parallel workers for sub-documents within a packet")
@@ -69,7 +69,7 @@ def _packet(argv):
         augment=args.augment,
     )
     result = gen.generate_packet(
-        args.packet, count=args.count, extra=args.extra,
+        args.packet, count=args.count, scenario=args.scenario,
         shuffle=args.shuffle, doc_workers=args.doc_workers,
     )
     results = result if isinstance(result, list) else [result]
@@ -102,7 +102,8 @@ def main():
     parser.add_argument("--schema-dir", required=True,
                         help="Schema directory path, or a bundled schema name")
     parser.add_argument("--output", default="./output", help="Output directory")
-    parser.add_argument("--extra", default=None, help="Extra instructions / brief")
+    parser.add_argument("--scenario", default=None,
+                        help="What to generate this run (>1 count: the theme to diversify)")
     parser.add_argument("--count", type=int, default=1,
                         help="Number of docs (>1 plans diverse scenarios and fans out)")
     parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
@@ -141,9 +142,9 @@ def main():
 
     if args.count > 1:
         # Batch mode: plan diverse scenarios, fan out concurrent pipeline graphs.
-        brief = args.extra or "Generate diverse, realistic documents"
+        scenario = args.scenario or "Generate diverse, realistic documents"
         batch = gen.generate_batch(
-            args.schema_dir, count=args.count, brief=brief,
+            args.schema_dir, count=args.count, scenario=scenario,
             seed=args.seed, verbose=not args.quiet,
         )
         print(f"\n{'=' * 60}")
@@ -157,7 +158,7 @@ def main():
     else:
         # Single-document mode.
         start = time.time()
-        doc = gen.generate(args.schema_dir, extra=args.extra or "", verbose=not args.quiet)
+        doc = gen.generate(args.schema_dir, scenario=args.scenario or "", verbose=not args.quiet)
         elapsed = time.time() - start
 
         print(f"\n{'=' * 60}")

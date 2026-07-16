@@ -7,7 +7,7 @@ statement of intent — all for the same applicant).
 This module handles:
   - Loading and validating packet configuration
   - Resolving shared context (explicit or LLM-inferred)
-  - Generating individual sub-documents via the v2 staged pipeline
+  - Generating individual sub-documents via the staged pipeline
     (``seed_data.stages.pipeline.generate``)
   - Merging sub-document PDFs into a single packet PDF
   - Emitting evaluation labels (document_class, page_indices, inference_result)
@@ -347,7 +347,7 @@ def generate_packet(
         augment: Enable per-document augmentation.
         critic_samples: Use reference samples in critic.
         renderer: PDF rendering engine.
-        enable_preview: Accepted for CLI compatibility; not used by the v2
+        enable_preview: Accepted for CLI compatibility; not used by the
             pipeline (no preview stage yet).
 
     Returns:
@@ -370,7 +370,7 @@ def generate_packet(
     # Step 2: Build the document plan (resolve instance counts)
     doc_plan = _build_document_plan(config, shared_context)
 
-    # Step 3: Generate each sub-document through the v2 staged pipeline
+    # Step 3: Generate each sub-document through the staged pipeline
     from seed_data.stages.base import ModelConfig
     models = ModelConfig(
         data=data_model, doc=doc_model, critic=critic_model,
@@ -500,7 +500,7 @@ def _generate_subdocuments(
     doc_workers: int = 1,
     **generate_kwargs,
 ) -> list[SectionResult]:
-    """Generate each sub-document through the v2 staged pipeline.
+    """Generate each sub-document through the staged pipeline.
 
     Args:
         doc_plan: List of documents to generate.

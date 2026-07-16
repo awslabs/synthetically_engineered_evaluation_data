@@ -1,6 +1,6 @@
 """Pipeline orchestration — wires stages into a graph and runs one document.
 
-This is the thin orchestrator the stage refactor was aiming for: it builds a
+This is the thin orchestrator at the heart of the package: it builds a
 ``StageContext``, assembles a self-contained graph from stage builders (each node
 holds its own ctx), invokes it, and returns a typed ``GeneratedDoc``. Batch and
 packet generation compose this same graph.

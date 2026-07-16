@@ -120,7 +120,7 @@ Sample PDFs are local-only and git-ignored. Do not commit them: real documents m
 ```bash
 BYPASS_TOOL_CONSENT=true python -m seed_data \
   --schema-dir src/seed_data/schemas/purchase-order \
-  --extra "Industrial plumbing supplies for a construction project in Denver"
+  --scenario "Industrial plumbing supplies for a construction project in Denver"
 ```
 
 This runs the full pipeline: data generation, data validation, PDF rendering, and visual critique. The final PDF lands in `output/purchase-order/`.

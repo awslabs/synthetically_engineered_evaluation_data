@@ -38,7 +38,7 @@ seed-data --schema-dir ./schemas/invoice --output ./output
 from seed_data import Generator, ModelConfig
 
 gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
-doc = gen.generate("invoice", extra="Midwest food-distributor invoice")
+doc = gen.generate("invoice", scenario="Midwest food-distributor invoice")
 
 print(doc.pdf_path)   # the rendered PDF
 print(doc.data)       # ground-truth JSON label (dict)

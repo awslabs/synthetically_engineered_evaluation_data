@@ -38,7 +38,7 @@ containing a `schema.json` is equally valid.
 The base command generates one PDF and its paired ground-truth JSON label:
 
 ```bash
-seed-data --schema-dir invoice --extra "Midwest food-distributor invoice"
+seed-data --schema-dir invoice --scenario "Midwest food-distributor invoice"
 ```
 
 Select models, lower the critic threshold for faster iteration, enable
@@ -53,7 +53,7 @@ seed-data --schema-dir fcc-invoice \
 seed-data --schema-dir w2 --augment --renderer weasyprint --output ./out
 
 # Generate from a custom schema directory
-seed-data --schema-dir ./my-schemas/purchase-order --extra "Office supplies, net-30"
+seed-data --schema-dir ./my-schemas/purchase-order --scenario "Office supplies, net-30"
 ```
 
 Each run executes the full single-document pipeline — data generation, schema
@@ -71,7 +71,7 @@ output/
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--schema-dir` | required | Bundled schema name, or a directory containing `schema.json` |
-| `--extra` | | Free-text brief that steers the content |
+| `--scenario` | | Free-text describing what to generate this run |
 | `--data-model` | `gpt-oss` | Model for data generation |
 | `--doc-model` | `gpt-oss` | Model for PDF generation |
 | `--critic-model` | `sonnet` | Model for critics |
@@ -92,7 +92,7 @@ expanded into N distinct scenarios, and each scenario is generated concurrently:
 ```bash
 seed-data --schema-dir fcc-invoice \
   --count 10 \
-  --extra "CPG brands on local TV stations in the American southwest" \
+  --scenario "CPG brands on local TV stations in the American southwest" \
   --threshold 4 --augment
 ```
 
@@ -102,7 +102,7 @@ and output directory:
 ```bash
 # A larger set with a specific brief, selected models, and a fixed seed
 seed-data --schema-dir invoice --count 20 \
-  --extra "Regional food-distributor invoices across the US midwest" \
+  --scenario "Regional food-distributor invoices across the US midwest" \
   --data-model gpt-oss --doc-model gpt-oss --critic-model haiku \
   --seed 42
 
@@ -115,11 +115,11 @@ output than a generic one:
 
 ```bash
 # Generic — produces similar documents
---extra "Generate diverse FCC invoices"
+--scenario "Generate diverse FCC invoices"
 
 # Specific — produces genuinely varied documents
---extra "FCC broadcast invoices for packaged-food companies advertising in the midwest"
---extra "Local car-dealership TV ads across small-market stations in the southeast"
+--scenario "FCC broadcast invoices for packaged-food companies advertising in the midwest"
+--scenario "Local car-dealership TV ads across small-market stations in the southeast"
 ```
 
 ### Flags
@@ -128,7 +128,7 @@ output than a generic one:
 |------|---------|-------------|
 | `--schema-dir` | required | Bundled schema name, or a directory containing `schema.json` |
 | `--count` | `1` | Number of documents; a value greater than 1 enables batch mode |
-| `--extra` | | Diversity brief describing the theme or scenario |
+| `--scenario` | | The high-level theme the planner diversifies into `--count` documents |
 | `--data-model` | `gpt-oss` | Model for data generation |
 | `--doc-model` | `gpt-oss` | Model for PDF generation |
 | `--critic-model` | `sonnet` | Model for critics |
@@ -150,7 +150,7 @@ multi-page PDF. It accepts a bundled packet name or a path to a packet directory
 
 ```bash
 seed-data packet lending-package \
-  --extra "First-time homebuyer in Portland, OR, 30-year fixed mortgage" \
+  --scenario "First-time homebuyer in Portland, OR, 30-year fixed mortgage" \
   --doc-model gpt-oss --critic-model haiku --threshold 3
 ```
 
@@ -160,7 +160,7 @@ custom packet directory:
 ```bash
 # Multiple packets with more parallel sub-documents each
 seed-data packet insurance-claim-packet --count 3 --doc-workers 4 \
-  --extra "Water-damage claims from burst pipes in suburban Portland homes"
+  --scenario "Water-damage claims from burst pipes in suburban Portland homes"
 
 # A custom packet directory, with augmentation
 seed-data packet ./my-packets/onboarding --augment --output ./eval-set
@@ -172,7 +172,7 @@ seed-data packet ./my-packets/onboarding --augment --output ./eval-set
 |------|---------|-------------|
 | `packet` | required | Bundled packet name, or a path to a packet directory |
 | `--count` | `1` | Number of packets to generate |
-| `--extra` | | Scenario brief shared across the packet |
+| `--scenario` | | Scenario shared across the packet's documents |
 | `--doc-workers` | `3` | Parallel sub-documents within each packet |
 | `--shuffle` | off | Randomize sub-document order in the merged PDF |
 | `--data-model` | `gpt-oss` | Model for data generation |

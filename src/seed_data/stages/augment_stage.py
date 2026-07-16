@@ -5,8 +5,8 @@ Pairs the augmentor agent (which picks an augraphy config and calls the
 into the ``augmented/`` directory (deterministic file plumbing) and then judges
 legibility with a vision model, returning a structured ``Verdict``.
 
-Named ``augment_stage`` (not ``augment``) to avoid colliding with the existing
-top-level ``seed_data.augment`` module during the v1/v2 coexistence period.
+Named ``augment_stage`` (not ``augment``) to avoid colliding with the top-level
+``seed_data.augment`` module.
 """
 from __future__ import annotations
 

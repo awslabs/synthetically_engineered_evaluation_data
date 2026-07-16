@@ -143,8 +143,8 @@ from seed_data import Generator, ModelConfig, Schema
 
 gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
 
-gen.generate("invoice", extra="Midwest distributors")   # -> GeneratedDoc
-gen.generate_batch("invoice", count=10, brief="...")     # -> BatchResult
+gen.generate("invoice", scenario="Midwest distributors")   # -> GeneratedDoc
+gen.generate_batch("invoice", count=10, scenario="...")     # -> BatchResult
 ```
 
 `generate()` accepts a **bundled schema name**, a **directory path**, or an in-code
@@ -169,8 +169,9 @@ schema = Schema(name="invoice", model=Invoice,
 gen.generate(schema)
 ```
 
-## Where the legacy engine lives
+## One pipeline, three entry points
 
-The original single-file orchestrator (`orchestrate.py`, `batch.py`, `packet.py`)
-still exists and powers `generate_packet()`. The staged pipeline (`stages/`) is the
-current architecture for single-document and batch generation.
+The staged pipeline (`stages/`) is the single architecture behind all three
+capabilities. Single-document and batch generation call it directly; packet
+generation (`packet.py`) is a thin coordinator that also drives each sub-document
+through the same `seed_data.stages.pipeline.generate`.

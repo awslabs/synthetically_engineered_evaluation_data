@@ -35,7 +35,7 @@ gen = Generator(
 `generate` produces one document and returns a `GeneratedDoc`:
 
 ```python
-doc = gen.generate("invoice", extra="Midwest food-distributor invoice, 20 line items")
+doc = gen.generate("invoice", scenario="Midwest food-distributor invoice, 20 line items")
 
 print(doc.success, doc.verdict, doc.score)
 print("PDF:  ", doc.pdf_path)
@@ -82,7 +82,7 @@ concurrently, and returns a `BatchResult`:
 batch = gen.generate_batch(
     "fcc-invoice",
     count=10,
-    brief="CPG brands on local TV stations in the American southwest",
+    scenario="CPG brands on local TV stations in the American southwest",
 )
 
 print(batch.count_succeeded, "of", batch.count_requested)
@@ -98,7 +98,7 @@ def on_doc(index, total, doc):
 
 batch = gen.generate_batch(
     "fcc-invoice", count=10,
-    brief="Political ad invoices during election season on metro-market stations",
+    scenario="Political ad invoices during election season on metro-market stations",
     on_document=on_doc,
 )
 ```
@@ -106,7 +106,7 @@ batch = gen.generate_batch(
 A `seed` makes scenario planning deterministic, producing regression-stable sets:
 
 ```python
-batch = gen.generate_batch("invoice", count=5, brief="...", seed=42)
+batch = gen.generate_batch("invoice", count=5, scenario="...", seed=42)
 ```
 
 A `BatchResult` collects every document and provides aggregate accessors:
@@ -137,7 +137,7 @@ context and are merged into one multi-page PDF, returning a `PacketResult`:
 ```python
 result = gen.generate_packet(
     "lending-package",
-    extra="First-time homebuyer in Portland, OR, 30-year fixed mortgage",
+    scenario="First-time homebuyer in Portland, OR, 30-year fixed mortgage",
     doc_workers=3,
 )
 
@@ -167,7 +167,7 @@ When `count` is greater than 1, `generate_packet` returns a list of `PacketResul
 
 ```python
 results = gen.generate_packet("insurance-claim-packet", count=3,
-                              extra="Storm-damage claims in coastal Florida")
+                              scenario="Storm-damage claims in coastal Florida")
 for r in results:
     print(r.packet_id, r.success, len(r.sections), "sections")
 ```
@@ -201,7 +201,7 @@ schema = Schema(
     model=Invoice,                       # or: json_schema={...}
     generation_guidance="Totals must equal the sum of line items; US vendors.",
 )
-doc = gen.generate(schema, extra="IT consulting services")
+doc = gen.generate(schema, scenario="IT consulting services")
 
 # A raw JSON-Schema dictionary instead of a model:
 schema = Schema(name="wire", json_schema={

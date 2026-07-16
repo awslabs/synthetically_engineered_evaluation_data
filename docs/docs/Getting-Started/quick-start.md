@@ -65,16 +65,16 @@ More CLI examples:
 ```bash
 # Steer the content with a brief; pick faster/cheaper models
 seed-data --schema-dir invoice \
-  --extra "Invoices for midwest food distributors, 20-40 line items" \
+  --scenario "Invoices for midwest food distributors, 20-40 line items" \
   --doc-model gpt-oss --critic-model haiku --threshold 3
 
 # A diverse batch of N documents from one brief
 seed-data --schema-dir fcc-invoice --count 10 \
-  --extra "Local TV stations across different US regions"
+  --scenario "Local TV stations across different US regions"
 
 # A coordinated multi-document packet (merged PDF + shared context)
 seed-data packet lending-package \
-  --extra "First-time homebuyer in Portland, OR"
+  --scenario "First-time homebuyer in Portland, OR"
 
 # Add scanning/aging artifacts, or a different renderer
 seed-data --schema-dir invoice --augment --renderer weasyprint
@@ -103,7 +103,7 @@ gen = Generator(
 **Single document** → `GeneratedDoc`:
 
 ```python
-doc = gen.generate("invoice", extra="Midwest food-distributor invoice")
+doc = gen.generate("invoice", scenario="Midwest food-distributor invoice")
 
 print(doc.success, doc.verdict, doc.score)
 print(doc.pdf_path)          # the rendered PDF
@@ -117,7 +117,7 @@ print(doc.data_json_path)    # ...and its path on disk
 batch = gen.generate_batch(
     "fcc-invoice",
     count=10,
-    brief="Local TV stations across different US regions",
+    scenario="Local TV stations across different US regions",
     on_document=lambda i, n, d: print(f"[{i+1}/{n}] {d.verdict}"),
 )
 print(batch.count_succeeded, "of", batch.count_requested)
@@ -128,7 +128,7 @@ for d in batch.succeeded:
 **Coordinated packet** → `PacketResult`:
 
 ```python
-pkt = gen.generate_packet("lending-package", extra="First-time homebuyer in Portland, OR")
+pkt = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland, OR")
 print(pkt.merged_pdf)
 for s in pkt.sections:
     print(s.document_class, s.page_indices)
@@ -146,7 +146,7 @@ class Invoice(BaseModel):
 
 schema = Schema(name="invoice", model=Invoice,
                 generation_guidance="Totals must equal the sum of line items.")
-doc = gen.generate(schema, extra="IT consulting services")
+doc = gen.generate(schema, scenario="IT consulting services")
 ```
 
 See the [Python API reference](../API-Reference/generator.md) for full signatures.

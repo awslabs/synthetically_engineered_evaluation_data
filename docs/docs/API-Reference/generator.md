@@ -76,7 +76,7 @@ gen = Generator(models=ModelConfig(doc="gpt-oss"), threshold=7)
 
 doc = gen.generate(
     "invoice",                              # bundled name, dir path, or a Schema
-    extra="Midwest food distributor, net-30 terms",  # free-text brief steering content
+    scenario="Midwest food distributor, net-30 terms",  # what to generate this run
     augment=None,                           # None -> use the Generator's default; True/False overrides
     verbose=True,                           # print stage progress
 )
@@ -94,7 +94,7 @@ else:
 
 ## `gen.generate_batch(...)` — N documents from one brief
 
-A planner turns `brief` into `count` distinct scenarios; each runs its own pipeline
+A planner turns `scenario` into `count` distinct scenarios; each runs its own pipeline
 concurrently. Returns a [`BatchResult`](#batchresult).
 
 ```python
@@ -109,7 +109,7 @@ def on_document(index: int, total: int, doc: GeneratedDoc) -> None:
 batch = gen.generate_batch(
     "invoice",                       # bundled name, dir path, or a Schema
     count=10,
-    brief="Distributors across the US Midwest, varied totals and terms",
+    scenario="Distributors across the US Midwest, varied totals and terms",
     augment=None,                    # None -> Generator default; True/False overrides
     seed=42,                         # optional: stable scenario set for regressions
     on_document=on_document,
@@ -139,7 +139,7 @@ gen = Generator(threshold=7)
 result = gen.generate_packet(
     "lending-package",       # packet dir path or bundled packet name
     count=1,                 # >1 returns a list[PacketResult]
-    extra="First-time homebuyer, 720 credit score",  # brief shared across the packet
+    scenario="First-time homebuyer, 720 credit score",  # shared across the packet
     shuffle=False,           # randomize sub-document order in the merged PDF
     doc_workers=1,           # parallel workers for sub-documents within the packet
     augment=None,            # None -> Generator default; True/False overrides
@@ -214,7 +214,7 @@ schema = Schema(
 )
 
 gen = Generator()
-doc = gen.generate(schema, extra="Midwest food distributor")
+doc = gen.generate(schema, scenario="Midwest food distributor")
 ```
 
 ### From a raw JSON Schema dict

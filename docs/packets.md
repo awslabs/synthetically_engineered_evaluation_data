@@ -1,5 +1,8 @@
 # Packet Generation
 
+> **Note:** This is a standalone reference. The canonical, docsite-served version
+> lives at [docs/docs/Guides/packets.md](docs/Guides/packets.md).
+
 Generate coordinated sets of inter-related documents — like a loan application
 containing a credit report, pay stubs, and a statement of intent, all sharing
 consistent context (same applicant, same address, same dates).
@@ -9,12 +12,14 @@ classification models.
 
 ## Quick Start
 
+`packet` is a subcommand of `seed-data`. Pass a bundled packet name or a path to
+a packet directory:
+
 ```bash
-BYPASS_TOOL_CONSENT=true python scripts/packet_generate.py \
-  --packet src/seed_data/packets/insurance-claim-packet \
-  --count 3 --workers 2 \
+seed-data packet insurance-claim-packet \
+  --count 3 --doc-workers 2 \
   --data-model gpt-oss --doc-model gpt-oss --critic-model haiku \
-  --extra "Water damage claims from burst pipes in suburban Portland homes"
+  --scenario "Water damage claims from burst pipes in suburban Portland homes"
 ```
 
 ## How It Works
@@ -27,9 +32,9 @@ BYPASS_TOOL_CONSENT=true python scripts/packet_generate.py \
 5. Emit labels            → result.json per section with class, pages, and extracted fields
 ```
 
-Each sub-document uses the existing single-document pipeline (`orchestrate()`).
-The packet layer only adds coordination — shared context injection, PDF merging,
-and label emission.
+Each sub-document uses the same staged single-document pipeline
+(`seed_data.stages.pipeline`). The packet layer only adds coordination — shared
+context injection, PDF merging, and label emission.
 
 ## Output Structure
 
@@ -38,7 +43,7 @@ models consume) and the **generation artifacts** (intermediate files for debuggi
 and reproducibility).
 
 ```
-output/packet_insurance-claim-packet_20260417/
+output/<batch-name>/
 │
 │   ┌─────────────────────────────────────────────────────┐
 │   │  EVALUATION DATASET                                 │
@@ -53,19 +58,16 @@ output/packet_insurance-claim-packet_20260417/
 │                                        #     - Invoice
 │
 ├── input/                               # Merged multi-document PDFs
-│   ├── packet_001.pdf                   #   6 pages: claim + 2 bank stmts + 3 invoices
-│   └── packet_002.pdf                   #   4 pages: claim + 1 bank stmt + 2 invoices
+│   ├── <packet_id>.pdf                  #   6 pages: claim + 2 bank stmts + 3 invoices
+│   └── <packet_id>.pdf                  #   4 pages: claim + 1 bank stmt + 2 invoices
 │
 ├── baseline/                            # Ground-truth labels per section
-│   ├── packet_001.pdf/
+│   ├── <packet_id>.pdf/
 │   │   └── sections/
 │   │       ├── 1/result.json            #   { document_class, page_indices, inference_result }
 │   │       ├── 2/result.json
-│   │       ├── 3/result.json
-│   │       ├── 4/result.json
-│   │       ├── 5/result.json
-│   │       └── 6/result.json
-│   └── packet_002.pdf/
+│   │       └── ...
+│   └── <packet_id>.pdf/
 │       └── sections/
 │           └── ...
 │
@@ -77,21 +79,17 @@ output/packet_insurance-claim-packet_20260417/
 │   └─────────────────────────────────────────────────────┘
 │
 ├── artifacts/                           # Per-packet generation files
-│   ├── packet_001/
+│   ├── <packet_id>/
 │   │   ├── shared_context.json          #   { "claimant_name": "Jane Doe", ... }
 │   │   ├── insurance-claim/
 │   │   │   ├── pdfs/UUID.pdf            #   Individual sub-document PDF
 │   │   │   ├── data/UUID.json           #   Generated data (= inference_result)
 │   │   │   └── generation_scripts/UUID.html
 │   │   ├── bank-statement/
-│   │   │   ├── pdfs/UUID.pdf
-│   │   │   ├── data/UUID.json
-│   │   │   └── generation_scripts/UUID.html
+│   │   │   └── ...
 │   │   └── invoice/
-│   │       ├── pdfs/UUID.pdf
-│   │       ├── data/UUID.json
-│   │       └── generation_scripts/UUID.html
-│   └── packet_002/
+│   │       └── ...
+│   └── <packet_id>/
 │       └── ...
 │
 └── config/                              # Run metadata
@@ -213,53 +211,56 @@ Optional documents (`required: false`) have a 30% chance of being skipped entire
 ## CLI Reference
 
 ```bash
-python scripts/packet_generate.py \
-  --packet <path>           # Path to packet config directory (required)
+seed-data packet <name|path> \
   --count <N>               # Number of packets to generate (default: 1)
-  --workers <N>             # Max parallel workers (default: 2)
+  --doc-workers <N>         # Parallel sub-documents within each packet (default: 3)
   --shuffle                 # Randomize sub-document order in merged PDF
   --context-model <model>   # Model for shared context resolution (default: nova2-lite)
-  --extra <brief>           # Scenario brief for diversity
-  --data-model <model>      # Model for data generation (default: nova2-lite)
-  --doc-model <model>       # Model for PDF generation (default: nova2-lite)
+  --scenario <text>         # Scenario shared across the packet's documents
+  --data-model <model>      # Model for data generation (default: gpt-oss)
+  --doc-model <model>       # Model for PDF generation (default: gpt-oss)
   --critic-model <model>    # Model for all critics (default: sonnet)
   --augment                 # Enable per-document augmentation
   --aug-model <model>       # Model for augmentation (default: gpt-oss)
-  --threshold <N>           # Quality threshold 1-10 (default: 7)
-  --renderer <engine>       # weasyprint or reportlab (default: weasyprint)
+  --threshold <N>           # Quality threshold 1-10 (default: 5)
+  --renderer <engine>       # xhtml2pdf, weasyprint, or reportlab (default: xhtml2pdf)
   --output <dir>            # Output root directory (default: ./output)
+```
+
+Or from Python:
+
+```python
+from seed_data import Generator, ModelConfig
+
+gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
+result = gen.generate_packet("insurance-claim-packet", count=3, doc_workers=2,
+                             scenario="Water-damage claims in suburban Portland")
 ```
 
 ## Architecture
 
 ```
-packet_generate.py
+generate_packet()  ×N     One per packet
   │
-  ├── load_packet_config()        Load and validate packet.json
+  ├── resolve_shared_context()   LLM generates consistent field values
+  │     ├── explicit mode: generate values for defined fields
+  │     └── inferred mode: analyze schemas → identify shared fields → generate
   │
-  ├── emit_classes_yaml()         Write classes.yaml
+  ├── _build_document_plan()     Decide instance counts per doc type
   │
-  └── generate_packet()  ×N      One per packet, parallel via ThreadPoolExecutor
-        │
-        ├── resolve_shared_context()   LLM generates consistent field values
-        │     ├── explicit mode: generate values for defined fields
-        │     └── inferred mode: analyze schemas → identify shared fields → generate
-        │
-        ├── _build_document_plan()     Decide instance counts per doc type
-        │
-        ├── _generate_subdocuments()   For each planned doc:
-        │     └── orchestrate()          Full single-doc pipeline (existing code)
-        │           data_gen → data_critic → doc_gen → doc_critic → [augment]
-        │
-        ├── _merge_pdfs()              Concatenate individual PDFs, track page indices
-        │
-        └── _emit_baseline_labels()    Write result.json per section
+  ├── _generate_subdocuments()   For each planned doc:
+  │     └── pipeline.generate()    Full single-doc staged pipeline
+  │           data_gen → data_critic → doc_gen → doc_critic → [augment]
+  │
+  ├── _merge_pdfs()              Concatenate individual PDFs, track page indices
+  │
+  └── _emit_baseline_labels()    Write result.json per section
 ```
 
-The packet layer is a thin coordinator on top of the existing single-document
-pipeline. It adds shared context, PDF merging, and label emission — nothing else.
-All document generation, critique, and augmentation logic lives in `orchestrate.py`
-unchanged.
+The packet layer is a thin coordinator on top of the single-document pipeline.
+It adds shared context, PDF merging, and label emission — nothing else. All
+document generation, critique, and augmentation logic lives in
+`seed_data.stages.pipeline` unchanged.
 
 ## Design Decisions
 
