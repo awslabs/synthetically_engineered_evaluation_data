@@ -50,10 +50,10 @@ dev = [
 seed-data = "seed_data.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
-Repository = "https://github.com/awslabs/synthetically-engineered-evaluation-data"
+Homepage = "https://github.com/awslabs/synthetically_engineered_evaluation_data"
+Repository = "https://github.com/awslabs/synthetically_engineered_evaluation_data"
 Documentation = "https://awslabs.github.io/synthetically_engineered_evaluation_data/"
-Issues = "https://github.com/awslabs/synthetically-engineered-evaluation-data/issues"
+Issues = "https://github.com/awslabs/synthetically_engineered_evaluation_data/issues"
 
 [build-system]
 requires = ["setuptools >= 61.0", "wheel", "setuptools-scm >= 8"]

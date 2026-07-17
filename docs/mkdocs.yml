@@ -1,8 +1,8 @@
 site_name: Synthetically Engineered Evaluation Data
 site_description: Synthetically Engineered Evaluation Data
-site_url: https://awslabs.github.io/synthetically-engineered-evaluation-data/
-repo_url: https://github.com/awslabs/synthetically-engineered-evaluation-data
-repo_name: awslabs/synthetically-engineered-evaluation-data
+site_url: https://awslabs.github.io/synthetically_engineered_evaluation_data/
+repo_url: https://github.com/awslabs/synthetically_engineered_evaluation_data
+repo_name: awslabs/synthetically_engineered_evaluation_data
 
 theme:
   name: material

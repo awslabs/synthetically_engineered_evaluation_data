@@ -16,7 +16,7 @@ Designed for building evaluation datasets for document understanding systems: OC
 > practices in the repository documentation and a secure baseline, but Amazon
 > holds no responsibility for the security of applications built from this tool.
 
-> **⚡ New here?** Read the [Quickstart](docs/docs/Getting-Started/quick-start.md) — install from PyPI and generate your first document in a few minutes.
+> **⚡ New here?** Read the [Quickstart](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Getting-Started/quick-start.md) — install from PyPI and generate your first document in a few minutes.
 
 ## Quick Start
 
@@ -40,7 +40,7 @@ to a schema directory, so the command above works with or without the clone step
 
 Browse the schema library on GitHub:
 [awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
-See the [full Quickstart](docs/docs/Getting-Started/quick-start.md) for batches, augmentation, and model selection.
+See the [full Quickstart](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Getting-Started/quick-start.md) for batches, augmentation, and model selection.
 
 <details>
 <summary>Working from a repo clone (uv)?</summary>
@@ -85,7 +85,7 @@ batch  = gen.generate_batch("fcc-invoice", count=10, scenario="Local TV stations
 packet = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland")
 ```
 
-Full docs: [CLI Usage](docs/docs/CLI-Usage/README.md) · [Python API Usage](docs/docs/Python-API-Usage/README.md).
+Full docs: [CLI Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/CLI-Usage/README.md) · [Python API Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Python-API-Usage/README.md).
 
 ## Architecture
 
@@ -124,7 +124,7 @@ produces far more varied output than a generic one:
 A packet is a set of different document types that share context — like a loan
 application with a credit report, pay stubs, and bank statements, all for the
 same applicant — merged into one multi-page PDF. See the
-[Packets guide](docs/docs/Guides/packets.md).
+[Packets guide](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/packets.md).
 
 ## Agent Descriptions
 
@@ -312,7 +312,7 @@ schemas/fcc-invoice/
 The optional `samples/` directory holds real example PDFs used **only** by the
 document critic as a **visual style reference** — they are never seen by the
 generation stages and no content from them is reproduced in the output. See
-[critique.py](src/seed_data/critique.py) and any
+[critique.py](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/src/seed_data/critique.py) and any
 `schemas/<type>/samples/README.md` for the full explanation.
 
 **Sample PDFs are local-only and git-ignored.** Do not commit them: real
@@ -343,7 +343,7 @@ Document diversity comes from two sources of per-run variation:
 2. **Table presentation variations** — sections that can render either as tables
    or inline fields, declared in `generation_guidance.md` with ~50/50 probabilities.
 
-See [docs/docs/Guides/generation-choices.md](docs/docs/Guides/generation-choices.md) for the full guide:
+See [docs/docs/Guides/generation-choices.md](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/generation-choices.md) for the full guide:
 conventions, examples for nested and array fields, and how to add it to a new
 document type.
 
@@ -361,7 +361,7 @@ output/
 ```
 
 Packet runs use the evaluation-dataset layout (merged PDFs in `input/`,
-per-section labels in `baseline/`); see the [Packets guide](docs/docs/Guides/packets.md).
+per-section labels in `baseline/`); see the [Packets guide](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/packets.md).
 
 ## Tests
 
@@ -380,7 +380,7 @@ uv run pytest tests/test_cli_smoke.py -v
 ## Packet Configuration
 
 Packet configs live in `src/seed_data/packets/<packet-name>/packet.json`.
-See the [Packets guide](docs/docs/Guides/packets.md) for the full guide including config fields,
+See the [Packets guide](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/packets.md) for the full guide including config fields,
 shared context modes, label format, and architecture.
 
 ### Packet config example
