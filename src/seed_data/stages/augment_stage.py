@@ -102,7 +102,7 @@ def build_critic(ctx: StageContext) -> FunctionNode:
             issues=[CritiqueIssue(**i) for i in result.get("issues", [])],
         ).as_node_text()
 
-    return FunctionNode(func=_run, name=CRITIC_NAME)
+    return FunctionNode(func=_run, name=CRITIC_NAME, ctx=ctx)
 
 
 def add_to_graph(builder: GraphBuilder, ctx: StageContext, after_node: str) -> None:
