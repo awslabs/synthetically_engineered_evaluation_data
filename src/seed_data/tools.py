@@ -59,6 +59,47 @@ def save_json_file(file_path: str, json_content: dict) -> dict:
         return {"status": "error", "content": [{"text": f"Error saving: {e}"}]}
 
 
+def make_ask_user_tool(on_question):
+    """Build an ``ask_user`` tool that routes questions to a host callback.
+
+    This is our host-pluggable take on Strands' ``handoff_to_user`` (which is
+    stdio-only, as the Strands docs note): the agent calls ``ask_user`` when it
+    is genuinely uncertain, and the ``on_question(question) -> answer`` callback
+    decides how to collect the answer (terminal stdin, a notebook widget, a Slack
+    DM, a web modal). ``on_question`` is bound in the closure — like
+    ``make_render_tool`` — so concurrent agents never share question state.
+
+    The callback may return ``None`` (user declined / skipped) or raise; both are
+    turned into a benign "no answer — use your best judgment" tool result so a
+    dialogue hiccup never aborts inference.
+    """
+    @tool
+    def ask_user(question: str) -> dict:
+        """Ask the human a clarifying question about the document and get their answer.
+
+        Use ONLY for genuinely ambiguous details you cannot determine from the
+        document itself — e.g. whether a field that appears once is always present,
+        the realistic range of a value, or a naming/format convention. Ask concise,
+        specific questions. Do not ask about things visible in the document.
+
+        Args:
+            question: A single, specific clarifying question for the user.
+        """
+        try:
+            answer = on_question(question)
+        except Exception as e:  # a broken UI must not crash inference
+            return {"status": "success", "content": [
+                {"text": f"(no answer available: {e}; use your best judgment)"}
+            ]}
+        if answer is None or str(answer).strip() == "":
+            return {"status": "success", "content": [
+                {"text": "(user did not answer; use your best judgment)"}
+            ]}
+        return {"status": "success", "content": [{"text": str(answer).strip()}]}
+
+    return ask_user
+
+
 @tool
 def preview_pdf(pdf_path: str) -> dict:
     """Render a PDF to images so you can visually inspect the output.

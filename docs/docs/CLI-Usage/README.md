@@ -185,6 +185,42 @@ seed-data packet ./my-packets/onboarding --augment --output ./eval-set
 | `--threshold` | `5` | Critic acceptance score, 1–10 |
 | `--output` | `./output` | Output root directory |
 
+## Infer a schema from documents
+
+The `infer-schema` subcommand reverse-engineers a schema from real example
+documents (the inverse of generation). Inputs may be PDF/PNG/JPEG, local or
+`s3://`. It writes a schema directory for review, then you generate from it.
+
+```bash
+# same-type: example document(s) of one type -> a schema directory
+seed-data infer-schema ./samples/invoice.pdf --name invoice --output ./schemas/invoice
+
+# one-shot: infer, then generate (single, or batch with --count >1)
+seed-data infer-schema ./samples/invoice.pdf --name invoice --output ./schemas/invoice \
+  --then-generate --count 5 --scenario "Regional US food distributors"
+
+# packet: ONE concatenated multi-document PDF -> packet.json + a schema per segment
+seed-data infer-schema ./real/lending_package.pdf \
+  --packet --name lending-package --output ./packets/lending-package
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `inputs` | required | Document path(s)/glob(s)/dir(s) and/or `s3://` URI(s) — PDF/PNG/JPEG |
+| `--name` | required | Document-type name (or packet name with `--packet`) |
+| `--output` | required | Schema directory to write (or packet directory with `--packet`) |
+| `--infer-model` | `sonnet` | Vision-capable model for inference |
+| `--max-docs` | `5` | Max example documents to feed the model |
+| `--packet` | off | Treat the input as one concatenated multi-document PDF; split it |
+| `--boundaries` | | With `--packet`: fixed page ranges, e.g. `1-3,4,5-8` (overrides detection) |
+| `--then-generate` | off | After inferring, generate from the schema (not supported with `--packet`) |
+| `--count` | `1` | With `--then-generate`: `>1` produces a batch |
+| `--scenario` | | With `--then-generate`: scenario / diversity brief |
+
+See [Schema from Documents](../Guides/schema-from-documents.md) for the full guide.
+
 ## Utility commands
 
 Copy the bundled schema library into a writable directory for local editing:
@@ -193,10 +229,12 @@ Copy the bundled schema library into a writable directory for local editing:
 seed-data clone-schema-library ./schemas
 ```
 
-For a complete list of options, run `seed-data --help` and `seed-data packet --help`.
+For a complete list of options, run `seed-data --help`, `seed-data packet --help`,
+and `seed-data infer-schema --help`.
 
 ## See also
 
-- [Python API Usage](../Python-API-Usage/README.md) — the same three capabilities from Python.
+- [Python API Usage](../Python-API-Usage/README.md) — the same capabilities from Python.
+- [Schema from Documents](../Guides/schema-from-documents.md) — infer schemas from real documents.
 - [Creating a Document Type](../Guides/creating-a-document-type.md) — authoring a schema.
 - [Models](../Advanced/models.md) — selecting models per stage.

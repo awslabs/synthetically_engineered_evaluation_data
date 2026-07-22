@@ -237,6 +237,151 @@ class Generator:
             return _gen_packet(config=config, **common)
         return [_gen_packet(config=config, **common) for _ in range(count)]
 
+    # -- schema inference (documents -> Schema) ------------------------------
+
+    def infer_schema(
+        self,
+        inputs: "str | list[str]",
+        *,
+        name: str,
+        model: str | None = None,
+        max_docs: int = 5,
+        output_dir: str | None = None,
+        on_question: "Callable[[str], str] | None" = None,
+        verbose: bool = True,
+    ) -> "Schema":
+        """Infer a document-type ``Schema`` from real sample documents.
+
+        The inverse of ``generate``: reads one or more real examples (PDF, PNG, or
+        JPEG; local paths/globs/dirs and/or ``s3://`` URIs) with a vision model and
+        returns a ``Schema`` (JSON Schema + generation guidance) ready to feed back
+        into ``generate`` / ``generate_batch``.
+
+        Args:
+            inputs: sample document location(s) — mixed local and S3 accepted.
+            name: the document-type name (becomes the schema title / doctype).
+            model: vision-capable model key; defaults to ``sonnet``.
+            max_docs: cap on how many examples to feed the model.
+            output_dir: if given, also write the inferred schema there as
+                ``schema.json`` + ``generation_guidance.md`` for review/reuse.
+            on_question: optional ``callback(question) -> answer`` enabling a
+                clarifying dialogue — the model may ask about ambiguous details
+                (required-vs-optional, value ranges) and the callback collects the
+                answer (stdin, notebook, web). ``None`` runs non-interactively.
+            verbose: print progress.
+
+        Returns:
+            The inferred ``Schema`` (always returned, even when also written).
+        """
+        from seed_data.infer import infer_schema as _infer, write_schema_dir, DEFAULT_INFER_MODEL
+        schema = _infer(
+            inputs, name=name, model=model or DEFAULT_INFER_MODEL,
+            max_docs=max_docs, session=self.session,
+            on_question=on_question, verbose=verbose,
+        )
+        if output_dir:
+            write_schema_dir(schema, output_dir)
+            if verbose:
+                print(f"Wrote inferred schema to {output_dir}/ (schema.json + generation_guidance.md)")
+        return schema
+
+    def infer_packet(
+        self,
+        inputs: "str | list[str]",
+        *,
+        name: str,
+        output_dir: str,
+        model: str | None = None,
+        boundaries: str | None = None,
+        on_question: "Callable[[str], str] | None" = None,
+        verbose: bool = True,
+    ) -> str:
+        """Infer a packet definition from ONE concatenated multi-document PDF.
+
+        The inverse of ``generate_packet``: takes a single file containing several
+        *different* document types concatenated (e.g. a lending package), detects
+        the document boundaries + classes with a vision model (or a ``boundaries``
+        page-range override), infers a schema per segment, and writes a
+        ``packet.json`` + one schema dir per segment to ``output_dir`` — the shape
+        ``generate_packet`` / ``seed-data packet`` consumes.
+
+        Args:
+            inputs: a single concatenated PDF (path or ``s3://`` URI).
+            name: the packet name.
+            output_dir: where to write packet.json + per-segment schema dirs.
+            model: vision-capable model key; defaults to ``sonnet``.
+            boundaries: optional ``"1-2,3,4-5"`` page-range override for splitting.
+            verbose: print progress.
+
+        Returns:
+            The output directory path (containing packet.json + schema dirs).
+        """
+        from seed_data.packet_infer import infer_packet as _infer_packet
+        from seed_data.infer import DEFAULT_INFER_MODEL
+        return _infer_packet(
+            inputs, name=name, output_dir=output_dir,
+            model=model or DEFAULT_INFER_MODEL, boundaries=boundaries,
+            session=self.session, on_question=on_question, verbose=verbose,
+        )
+
+    def generate_from_samples(
+        self,
+        inputs: "str | list[str]",
+        *,
+        name: str,
+        scenario: str = "",
+        infer_model: str | None = None,
+        max_docs: int = 5,
+        output_dir: str | None = None,
+        on_question: "Callable[[str], str] | None" = None,
+        augment: bool | None = None,
+        verbose: bool = True,
+    ) -> GeneratedDoc:
+        """Infer a schema from sample documents, then generate ONE synthetic doc.
+
+        A convenience one-shot: ``infer_schema(...)`` followed by ``generate(...)``
+        against the inferred ``Schema``. If ``output_dir`` is given the inferred
+        schema is also persisted there for review/reuse (recommended), so you keep
+        an editable schema rather than a throwaway. ``on_question`` enables the
+        clarifying dialogue during inference (see ``infer_schema``).
+        """
+        schema = self.infer_schema(
+            inputs, name=name, model=infer_model, max_docs=max_docs,
+            output_dir=output_dir, on_question=on_question, verbose=verbose,
+        )
+        return self.generate(schema, scenario=scenario, augment=augment, verbose=verbose)
+
+    def generate_batch_from_samples(
+        self,
+        inputs: "str | list[str]",
+        *,
+        name: str,
+        count: int,
+        scenario: str,
+        infer_model: str | None = None,
+        max_docs: int = 5,
+        output_dir: str | None = None,
+        on_question: "Callable[[str], str] | None" = None,
+        augment: bool | None = None,
+        seed: int | None = None,
+        on_document: Callable[[int, int, GeneratedDoc], None] | None = None,
+        verbose: bool = True,
+    ) -> BatchResult:
+        """Infer a schema from sample documents, then generate a diverse BATCH.
+
+        A convenience one-shot: ``infer_schema(...)`` followed by
+        ``generate_batch(...)`` against the inferred ``Schema``. ``on_question``
+        enables the clarifying dialogue during inference (see ``infer_schema``).
+        """
+        schema = self.infer_schema(
+            inputs, name=name, model=infer_model, max_docs=max_docs,
+            output_dir=output_dir, on_question=on_question, verbose=verbose,
+        )
+        return self.generate_batch(
+            schema, count=count, scenario=scenario, augment=augment,
+            seed=seed, on_document=on_document, verbose=verbose,
+        )
+
     # -- discovery -----------------------------------------------------------
 
     @staticmethod

@@ -26,6 +26,12 @@ AUGMENTOR_NAME = "augmentor"
 CRITIC_NAME = "aug_critic"
 GATEWAY_NAME = "aug_gateway"
 
+# Max augmentor→critic reject cycles before the critic accepts best-effort. An
+# augmented doc that keeps scoring below threshold should not loop forever
+# (augmentation is cosmetic aging, not the ground-truth data) — after this many
+# rejects we keep the latest augmented PDF rather than spin.
+MAX_AUG_ATTEMPTS = 3
+
 
 def _aug_output_path(ctx: StageContext) -> str:
     """Final resting path for the augmented PDF (in augmented/)."""
@@ -64,8 +70,18 @@ def build_gateway(ctx: StageContext) -> FunctionNode:
 
 
 def build_critic(ctx: StageContext) -> FunctionNode:
-    """Build the aug-critic node: relocate output (guard) → judge → Verdict."""
+    """Build the aug-critic node: relocate output (guard) → judge → Verdict.
+
+    Accepts best-effort after ``MAX_AUG_ATTEMPTS`` reject cycles so the
+    augmentor→critic loop cannot spin indefinitely: augmentation is cosmetic
+    aging, so a persistently-low score keeps the latest augmented PDF rather
+    than looping. Attempt count lives in the closure (this node is rebuilt per
+    document, and ``reset_on_revisit`` does not touch closure state).
+    """
+    attempts = {"n": 0}
+
     def _run(task_text: str, ctx: StageContext) -> str:
+        attempts["n"] += 1
         aug_path = _aug_output_path(ctx)
         tool_path = _tool_output_path(ctx)
         os.makedirs(os.path.dirname(aug_path), exist_ok=True)
@@ -81,6 +97,14 @@ def build_critic(ctx: StageContext) -> FunctionNode:
             shutil.move(tool_config, os.path.join(config_dir, f"{doc_id}_aug_config.json"))
 
         if not os.path.exists(aug_path):
+            # No output yet. Only keep asking for a re-run while we have attempts
+            # left; otherwise accept so the graph exits (the clean PDF stands).
+            if attempts["n"] >= MAX_AUG_ATTEMPTS:
+                return Verdict(
+                    accepted=True, score=0,
+                    summary="Augmentation did not produce a PDF; accepting the clean document.",
+                    feedback="Gave up augmenting after repeated failures.",
+                ).as_node_text()
             return Verdict(
                 accepted=False, score=0,
                 summary="Augmented PDF was not generated.",
@@ -94,8 +118,17 @@ def build_critic(ctx: StageContext) -> FunctionNode:
             pdf_path=aug_path, model=ctx.models.critic, threshold=ctx.threshold,
             session=ctx.session,
         )
+        accepted_now = result["verdict"] == "accepted"
+
+        # Best-effort cap: after MAX_AUG_ATTEMPTS, accept the current augmented
+        # PDF even if under threshold rather than loop back to the augmentor.
+        if not accepted_now and attempts["n"] >= MAX_AUG_ATTEMPTS:
+            print(f"  Aug critic: accepting best-effort after {attempts['n']} attempt(s) "
+                  f"(score {result.get('score', 0)}/10 < {ctx.threshold}).")
+            accepted_now = True
+
         return Verdict(
-            accepted=result["verdict"] == "accepted",
+            accepted=accepted_now,
             score=int(result.get("score", 0)),
             summary=result.get("summary", ""),
             feedback=result.get("summary", ""),
