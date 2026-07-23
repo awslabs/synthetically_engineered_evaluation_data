@@ -1,0 +1,2334 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Synthetically Engineered Evaluation Data">
+      
+      
+      
+        <link rel="canonical" href="https://awslabs.github.io/synthetically_engineered_evaluation_data/CLI-Usage/">
+      
+      
+        <link rel="prev" href="../Getting-Started/quick-start/">
+      
+      
+        <link rel="next" href="../Python-API-Usage/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>CLI Usage - Synthetically Engineered Evaluation Data</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cli-usage" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Synthetically Engineered Evaluation Data" class="md-header__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Synthetically Engineered Evaluation Data
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CLI Usage
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Synthetically Engineered Evaluation Data
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../Getting-Started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  CLI Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../Python-API-Usage/" class="md-tabs__link">
+          
+  
+  
+  Python API Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../Guides/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../Advanced/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../API-Reference/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Synthetically Engineered Evaluation Data" class="md-nav__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Synthetically Engineered Evaluation Data
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Synthetically Engineered Evaluation Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation-and-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation and setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Packet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#infer-a-schema-from-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infer a schema from documents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Infer a schema from documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utility-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Utility commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Python-API-Usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/creating-a-document-type/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a Document Type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/schema-from-documents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema from Documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/single-document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/batch-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/packets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Guides/generation-choices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Choices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Advanced/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Advanced/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Advanced/renderers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renderers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Advanced/augmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Augmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/packet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/critique/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Critique
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API-Reference/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation-and-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation and setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#single-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Single document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Batch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#packet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Packet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#infer-a-schema-from-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infer a schema from documents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Infer a schema from documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flags_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utility-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Utility commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cli-usage">CLI Usage</h1>
+<p>The <code>seed-data</code> command generates synthetic evaluation documents from the command
+line. It operates in three modes: a single document, a diverse batch, or a
+coordinated multi-document packet. This page documents each mode with examples and
+a complete flag reference.</p>
+<h2 id="installation-and-setup">Installation and setup</h2>
+<p>Install the package and configure Amazon Bedrock credentials:</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>seed-data
+<span class="nb">export</span><span class="w"> </span><span class="nv">AWS_PROFILE</span><span class="o">=</span>your-profile-name
+<span class="nb">export</span><span class="w"> </span><span class="nv">AWS_REGION</span><span class="o">=</span>us-east-1
+</code></pre></div>
+<p>The default renderer, xhtml2pdf, is pure Python and requires no additional system
+libraries.</p>
+<p>To edit document types locally, copy the bundled schema library into a writable
+directory:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>clone-schema-library<span class="w"> </span>./schemas
+</code></pre></div>
+<p>Every mode accepts either a bundled schema name (such as <code>invoice</code>) or a path to a
+schema directory. The examples below use bundled names, but any path to a directory
+containing a <code>schema.json</code> is equally valid.</p>
+<h2 id="single-document">Single document</h2>
+<p>The base command generates one PDF and its paired ground-truth JSON label:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>invoice<span class="w"> </span>--scenario<span class="w"> </span><span class="s2">&quot;Midwest food-distributor invoice&quot;</span>
+</code></pre></div>
+<p>Select models, lower the critic threshold for faster iteration, enable
+augmentation, or point at a custom schema directory:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Select models and use a lower acceptance threshold</span>
+seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>fcc-invoice<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-model<span class="w"> </span>gpt-oss<span class="w"> </span>--doc-model<span class="w"> </span>gpt-oss<span class="w"> </span>--critic-model<span class="w"> </span>haiku<span class="w"> </span>--threshold<span class="w"> </span><span class="m">3</span>
+
+<span class="c1"># Apply scanning and aging artifacts, choose a renderer, and set the output directory</span>
+seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>w2<span class="w"> </span>--augment<span class="w"> </span>--renderer<span class="w"> </span>weasyprint<span class="w"> </span>--output<span class="w"> </span>./out
+
+<span class="c1"># Generate from a custom schema directory</span>
+seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>./my-schemas/purchase-order<span class="w"> </span>--scenario<span class="w"> </span><span class="s2">&quot;Office supplies, net-30&quot;</span>
+</code></pre></div>
+<p>Each run executes the full single-document pipeline — data generation, schema
+validation, PDF rendering, and visual critique — and writes three paired artifacts:</p>
+<div class="highlight"><pre><span></span><code>output/
+├── data/&lt;id&gt;.json                 # ground-truth JSON label
+├── generation_scripts/&lt;id&gt;.html   # the HTML used to render the document
+└── pdfs/&lt;id&gt;.pdf                  # the final document
+</code></pre></div>
+<h3 id="flags">Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--schema-dir</code></td>
+<td>required</td>
+<td>Bundled schema name, or a directory containing <code>schema.json</code></td>
+</tr>
+<tr>
+<td><code>--scenario</code></td>
+<td></td>
+<td>Free-text describing what to generate this run</td>
+</tr>
+<tr>
+<td><code>--data-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for data generation</td>
+</tr>
+<tr>
+<td><code>--doc-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for PDF generation</td>
+</tr>
+<tr>
+<td><code>--critic-model</code></td>
+<td><code>sonnet</code></td>
+<td>Model for critics</td>
+</tr>
+<tr>
+<td><code>--aug-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for augmentation decisions</td>
+</tr>
+<tr>
+<td><code>--renderer</code></td>
+<td><code>xhtml2pdf</code></td>
+<td><code>xhtml2pdf</code> (pure Python), <code>weasyprint</code>, or <code>reportlab</code></td>
+</tr>
+<tr>
+<td><code>--augment</code></td>
+<td>off</td>
+<td>Apply augraphy image augmentation</td>
+</tr>
+<tr>
+<td><code>--no-critic-samples</code></td>
+<td>off</td>
+<td>Disable reference sample PDFs in the document critic</td>
+</tr>
+<tr>
+<td><code>--threshold</code></td>
+<td><code>5</code></td>
+<td>Critic acceptance score, 1–10</td>
+</tr>
+<tr>
+<td><code>--max-attempts</code></td>
+<td><code>5</code></td>
+<td>Maximum critic-retry cycles</td>
+</tr>
+<tr>
+<td><code>--timeout</code></td>
+<td><code>3600</code></td>
+<td>Safety timeout in seconds</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>./output</code></td>
+<td>Output root directory</td>
+</tr>
+</tbody>
+</table>
+<h2 id="batch">Batch</h2>
+<p>Setting <code>--count</code> greater than 1 enables batch mode. A single high-level brief is
+expanded into N distinct scenarios, and each scenario is generated concurrently:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>fcc-invoice<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--count<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--scenario<span class="w"> </span><span class="s2">&quot;CPG brands on local TV stations in the American southwest&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--threshold<span class="w"> </span><span class="m">4</span><span class="w"> </span>--augment
+</code></pre></div>
+<p>Add a determinism seed for regression-stable sets, or select a different renderer
+and output directory:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># A larger set with a specific brief, selected models, and a fixed seed</span>
+seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>invoice<span class="w"> </span>--count<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--scenario<span class="w"> </span><span class="s2">&quot;Regional food-distributor invoices across the US midwest&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-model<span class="w"> </span>gpt-oss<span class="w"> </span>--doc-model<span class="w"> </span>gpt-oss<span class="w"> </span>--critic-model<span class="w"> </span>haiku<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--seed<span class="w"> </span><span class="m">42</span>
+
+<span class="c1"># A different renderer, written to a custom output directory</span>
+seed-data<span class="w"> </span>--schema-dir<span class="w"> </span>w2<span class="w"> </span>--count<span class="w"> </span><span class="m">8</span><span class="w"> </span>--renderer<span class="w"> </span>weasyprint<span class="w"> </span>--output<span class="w"> </span>./eval-set
+</code></pre></div>
+<p>Diversity depends on the brief. A specific brief produces substantially more varied
+output than a generic one:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generic — produces similar documents</span>
+--scenario<span class="w"> </span><span class="s2">&quot;Generate diverse FCC invoices&quot;</span>
+
+<span class="c1"># Specific — produces genuinely varied documents</span>
+--scenario<span class="w"> </span><span class="s2">&quot;FCC broadcast invoices for packaged-food companies advertising in the midwest&quot;</span>
+--scenario<span class="w"> </span><span class="s2">&quot;Local car-dealership TV ads across small-market stations in the southeast&quot;</span>
+</code></pre></div>
+<h3 id="flags_1">Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--schema-dir</code></td>
+<td>required</td>
+<td>Bundled schema name, or a directory containing <code>schema.json</code></td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td><code>1</code></td>
+<td>Number of documents; a value greater than 1 enables batch mode</td>
+</tr>
+<tr>
+<td><code>--scenario</code></td>
+<td></td>
+<td>The high-level theme the planner diversifies into <code>--count</code> documents</td>
+</tr>
+<tr>
+<td><code>--data-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for data generation</td>
+</tr>
+<tr>
+<td><code>--doc-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for PDF generation</td>
+</tr>
+<tr>
+<td><code>--critic-model</code></td>
+<td><code>sonnet</code></td>
+<td>Model for critics</td>
+</tr>
+<tr>
+<td><code>--batch-model</code></td>
+<td><code>nova2-lite</code></td>
+<td>Model for scenario planning</td>
+</tr>
+<tr>
+<td><code>--aug-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for augmentation decisions</td>
+</tr>
+<tr>
+<td><code>--renderer</code></td>
+<td><code>xhtml2pdf</code></td>
+<td><code>xhtml2pdf</code> (pure Python), <code>weasyprint</code>, or <code>reportlab</code></td>
+</tr>
+<tr>
+<td><code>--augment</code></td>
+<td>off</td>
+<td>Apply augraphy image augmentation</td>
+</tr>
+<tr>
+<td><code>--threshold</code></td>
+<td><code>5</code></td>
+<td>Critic acceptance score, 1–10</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td></td>
+<td>Seed for scenario planning, for regression-stable sets</td>
+</tr>
+<tr>
+<td><code>--max-attempts</code></td>
+<td><code>5</code></td>
+<td>Maximum critic-retry cycles per document</td>
+</tr>
+<tr>
+<td><code>--timeout</code></td>
+<td><code>3600</code></td>
+<td>Per-document safety timeout in seconds</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>./output</code></td>
+<td>Output root directory</td>
+</tr>
+</tbody>
+</table>
+<h2 id="packet">Packet</h2>
+<p>The <code>packet</code> subcommand generates a coordinated set of related document types that
+share context — the same person, address, and dates — and merges them into a single
+multi-page PDF. It accepts a bundled packet name or a path to a packet directory:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>packet<span class="w"> </span>lending-package<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--scenario<span class="w"> </span><span class="s2">&quot;First-time homebuyer in Portland, OR, 30-year fixed mortgage&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--doc-model<span class="w"> </span>gpt-oss<span class="w"> </span>--critic-model<span class="w"> </span>haiku<span class="w"> </span>--threshold<span class="w"> </span><span class="m">3</span>
+</code></pre></div>
+<p>Generate multiple packets, increase the number of parallel sub-documents, or use a
+custom packet directory:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Multiple packets with more parallel sub-documents each</span>
+seed-data<span class="w"> </span>packet<span class="w"> </span>insurance-claim-packet<span class="w"> </span>--count<span class="w"> </span><span class="m">3</span><span class="w"> </span>--doc-workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--scenario<span class="w"> </span><span class="s2">&quot;Water-damage claims from burst pipes in suburban Portland homes&quot;</span>
+
+<span class="c1"># A custom packet directory, with augmentation</span>
+seed-data<span class="w"> </span>packet<span class="w"> </span>./my-packets/onboarding<span class="w"> </span>--augment<span class="w"> </span>--output<span class="w"> </span>./eval-set
+</code></pre></div>
+<h3 id="flags_2">Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>packet</code></td>
+<td>required</td>
+<td>Bundled packet name, or a path to a packet directory</td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td><code>1</code></td>
+<td>Number of packets to generate</td>
+</tr>
+<tr>
+<td><code>--scenario</code></td>
+<td></td>
+<td>Scenario shared across the packet's documents</td>
+</tr>
+<tr>
+<td><code>--doc-workers</code></td>
+<td><code>3</code></td>
+<td>Parallel sub-documents within each packet</td>
+</tr>
+<tr>
+<td><code>--shuffle</code></td>
+<td>off</td>
+<td>Randomize sub-document order in the merged PDF</td>
+</tr>
+<tr>
+<td><code>--data-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for data generation</td>
+</tr>
+<tr>
+<td><code>--doc-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for PDF generation</td>
+</tr>
+<tr>
+<td><code>--critic-model</code></td>
+<td><code>sonnet</code></td>
+<td>Model for critics</td>
+</tr>
+<tr>
+<td><code>--context-model</code></td>
+<td><code>nova2-lite</code></td>
+<td>Model for shared-context resolution</td>
+</tr>
+<tr>
+<td><code>--aug-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for augmentation decisions</td>
+</tr>
+<tr>
+<td><code>--renderer</code></td>
+<td><code>xhtml2pdf</code></td>
+<td>PDF backend</td>
+</tr>
+<tr>
+<td><code>--augment</code></td>
+<td>off</td>
+<td>Apply image augmentation to each sub-document</td>
+</tr>
+<tr>
+<td><code>--threshold</code></td>
+<td><code>5</code></td>
+<td>Critic acceptance score, 1–10</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>./output</code></td>
+<td>Output root directory</td>
+</tr>
+</tbody>
+</table>
+<h2 id="infer-a-schema-from-documents">Infer a schema from documents</h2>
+<p>The <code>infer-schema</code> subcommand reverse-engineers a schema from real example
+documents (the inverse of generation). Inputs may be PDF/PNG/JPEG, local or
+<code>s3://</code>. It writes a schema directory for review, then you generate from it.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># same-type: example document(s) of one type -&gt; a schema directory</span>
+seed-data<span class="w"> </span>infer-schema<span class="w"> </span>./samples/invoice.pdf<span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span>--output<span class="w"> </span>./schemas/invoice
+
+<span class="c1"># one-shot: infer, then generate (single, or batch with --count &gt;1)</span>
+seed-data<span class="w"> </span>infer-schema<span class="w"> </span>./samples/invoice.pdf<span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span>--output<span class="w"> </span>./schemas/invoice<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--then-generate<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--scenario<span class="w"> </span><span class="s2">&quot;Regional US food distributors&quot;</span>
+
+<span class="c1"># packet: ONE concatenated multi-document PDF -&gt; packet.json + a schema per segment</span>
+seed-data<span class="w"> </span>infer-schema<span class="w"> </span>./real/lending_package.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--packet<span class="w"> </span>--name<span class="w"> </span>lending-package<span class="w"> </span>--output<span class="w"> </span>./packets/lending-package
+</code></pre></div>
+<h3 id="flags_3">Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inputs</code></td>
+<td>required</td>
+<td>Document path(s)/glob(s)/dir(s) and/or <code>s3://</code> URI(s) — PDF/PNG/JPEG</td>
+</tr>
+<tr>
+<td><code>--name</code></td>
+<td>required</td>
+<td>Document-type name (or packet name with <code>--packet</code>)</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td>required</td>
+<td>Schema directory to write (or packet directory with <code>--packet</code>)</td>
+</tr>
+<tr>
+<td><code>--infer-model</code></td>
+<td><code>sonnet</code></td>
+<td>Vision-capable model for inference</td>
+</tr>
+<tr>
+<td><code>--max-docs</code></td>
+<td><code>5</code></td>
+<td>Max example documents to feed the model</td>
+</tr>
+<tr>
+<td><code>--packet</code></td>
+<td>off</td>
+<td>Treat the input as one concatenated multi-document PDF; split it</td>
+</tr>
+<tr>
+<td><code>--boundaries</code></td>
+<td></td>
+<td>With <code>--packet</code>: fixed page ranges, e.g. <code>1-3,4,5-8</code> (overrides detection)</td>
+</tr>
+<tr>
+<td><code>--allow-questions</code></td>
+<td>off</td>
+<td>Let the model ask clarifying questions during inference (interactive terminals only)</td>
+</tr>
+<tr>
+<td><code>--then-generate</code></td>
+<td>off</td>
+<td>After inferring, generate from the schema (not supported with <code>--packet</code>)</td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td><code>1</code></td>
+<td>With <code>--then-generate</code>: <code>&gt;1</code> produces a batch</td>
+</tr>
+<tr>
+<td><code>--scenario</code></td>
+<td></td>
+<td>With <code>--then-generate</code>: scenario / diversity brief</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>--allow-questions</code>, the model may ask you to clarify details it can't
+determine from the document alone (whether a field is always present, a value
+range, an ID format), and your answers shape the inferred schema:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>infer-schema<span class="w"> </span>./samples/invoice.pdf<span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>./schemas/invoice<span class="w"> </span>--allow-questions
+</code></pre></div>
+<p>It only prompts on an interactive terminal — in a non-interactive shell
+(CI, pipe, background job) the flag is safely ignored so nothing hangs.</p>
+<p>See <a href="../Guides/schema-from-documents/">Schema from Documents</a> for the full guide.</p>
+<h2 id="utility-commands">Utility commands</h2>
+<p>Copy the bundled schema library into a writable directory for local editing:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>clone-schema-library<span class="w"> </span>./schemas
+</code></pre></div>
+<p>For a complete list of options, run <code>seed-data --help</code>, <code>seed-data packet --help</code>,
+and <code>seed-data infer-schema --help</code>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../Python-API-Usage/">Python API Usage</a> — the same capabilities from Python.</li>
+<li><a href="../Guides/schema-from-documents/">Schema from Documents</a> — infer schemas from real documents.</li>
+<li><a href="../Guides/creating-a-document-type/">Creating a Document Type</a> — authoring a schema.</li>
+<li><a href="../Advanced/models/">Models</a> — selecting models per stage.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.select", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid@11/dist/mermaid.min.js"></script>
+      
+    
+  </body>
+</html>
