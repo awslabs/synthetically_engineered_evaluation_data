@@ -215,9 +215,22 @@ seed-data infer-schema ./real/lending_package.pdf \
 | `--max-docs` | `5` | Max example documents to feed the model |
 | `--packet` | off | Treat the input as one concatenated multi-document PDF; split it |
 | `--boundaries` | | With `--packet`: fixed page ranges, e.g. `1-3,4,5-8` (overrides detection) |
+| `--allow-questions` | off | Let the model ask clarifying questions during inference (interactive terminals only) |
 | `--then-generate` | off | After inferring, generate from the schema (not supported with `--packet`) |
 | `--count` | `1` | With `--then-generate`: `>1` produces a batch |
 | `--scenario` | | With `--then-generate`: scenario / diversity brief |
+
+With `--allow-questions`, the model may ask you to clarify details it can't
+determine from the document alone (whether a field is always present, a value
+range, an ID format), and your answers shape the inferred schema:
+
+```bash
+seed-data infer-schema ./samples/invoice.pdf --name invoice \
+  --output ./schemas/invoice --allow-questions
+```
+
+It only prompts on an interactive terminal — in a non-interactive shell
+(CI, pipe, background job) the flag is safely ignored so nothing hangs.
 
 See [Schema from Documents](../Guides/schema-from-documents.md) for the full guide.
 

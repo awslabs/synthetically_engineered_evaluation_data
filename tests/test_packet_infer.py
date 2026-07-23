@@ -140,7 +140,31 @@ def test_validate_segments_rejects_gap():
 def test_validate_segments_rejects_incomplete_cover():
     segs = [_Segment(document_class="A", schema_dir_name="a", start_page=1, end_page=2)]
     with pytest.raises(ValueError):
-        _validate_segments(segs, n_pages=4)   # only covers 1-2 of 4
+        _validate_segments(segs, n_pages=4)   # model path: only covers 1-2 of 4
+
+
+def test_validate_segments_allows_partial_cover_when_user_declared():
+    """--boundaries path: partial coverage (pages 1-2 of a 4-page file) is the
+    user's explicit choice and must be allowed."""
+    segs = [_Segment(document_class="A", schema_dir_name="a", start_page=1, end_page=2)]
+    _validate_segments(segs, n_pages=4, require_full_coverage=False)  # no raise
+
+
+def test_validate_segments_still_rejects_overlap_when_relaxed():
+    """Even on the user-declared path, overlapping/out-of-order ranges are a
+    safety error (they'd corrupt extraction), so they still raise."""
+    segs = [
+        _Segment(document_class="A", schema_dir_name="a", start_page=1, end_page=3),
+        _Segment(document_class="B", schema_dir_name="b", start_page=2, end_page=4),  # overlaps
+    ]
+    with pytest.raises(ValueError):
+        _validate_segments(segs, n_pages=4, require_full_coverage=False)
+
+
+def test_validate_segments_still_rejects_out_of_range_when_relaxed():
+    segs = [_Segment(document_class="A", schema_dir_name="a", start_page=1, end_page=9)]
+    with pytest.raises(ValueError):
+        _validate_segments(segs, n_pages=4, require_full_coverage=False)
 
 
 def test_segment_model_rejects_backwards_range():

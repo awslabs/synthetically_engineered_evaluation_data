@@ -1,8 +1,9 @@
 """Public Python API for seed-data.
 
 The blessed entry point is the :class:`Generator` — construct it once with your
-configuration (models, threshold, renderer, output directory), then call one of
-its three verbs:
+configuration (models, threshold, renderer, output directory), then call a verb.
+
+Generation verbs make synthetic documents:
 
     from seed_data import Generator, ModelConfig
 
@@ -12,13 +13,24 @@ its three verbs:
     docs   = gen.generate_batch("invoice", count=10, scenario="...")
     packet = gen.generate_packet("lending-package", count=3)
 
+Inference verbs reverse-engineer a schema from real example documents, then feed
+it back into generation:
+
+    schema = gen.infer_schema("./samples/*.pdf", name="invoice")
+    out    = gen.infer_packet("./lending_package.pdf", name="lending-package",
+                              output_dir="./packets/lending-package")
+    doc    = gen.generate_from_samples("./invoice.pdf", name="invoice", scenario="...")
+    docs   = gen.generate_batch_from_samples("./invoice.pdf", name="invoice",
+                                             count=10, scenario="...")
+
 Configuration lives on the ``Generator``; per-call arguments describe only *what*
 to make. Every verb returns a typed result (``GeneratedDoc`` / ``BatchResult`` /
-``PacketResult``) — no stringly-typed dicts.
+``PacketResult`` / ``Schema``) — no stringly-typed dicts.
 
 ``generate()`` runs the modern staged pipeline (``seed_data.stages.pipeline``).
 ``generate_batch()`` and ``generate_packet()`` wrap the existing batch/packet
-engines. The engines are internal; this facade is the supported surface.
+engines; the inference verbs live in ``seed_data.infer`` / ``seed_data.packet_infer``.
+The engines are internal; this facade is the supported surface.
 """
 from __future__ import annotations
 

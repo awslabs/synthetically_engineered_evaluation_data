@@ -166,14 +166,20 @@ def _detect_segments(
     return segments
 
 
-def _validate_segments(segments: list[_Segment], n_pages: int) -> None:
-    """Enforce the same invariants as parse_boundaries on model-detected segments.
+def _validate_segments(segments: list[_Segment], n_pages: int,
+                       *, require_full_coverage: bool = True) -> None:
+    """Validate detected segments before page extraction.
 
-    The no-``--boundaries`` path feeds raw vision-model output into page
-    extraction, so a hallucinated range must fail loudly here (a clear
-    ``ValueError`` the CLI catches) rather than as an ``IndexError`` deep inside
-    pypdf. Requires: in range, ascending, non-overlapping, and contiguous cover
-    of pages 1..n_pages (a packet's segments should tile the whole file).
+    The safety invariants — in range, ascending, non-overlapping — always hold:
+    they are what prevent a hallucinated range from crashing as an ``IndexError``
+    deep inside pypdf (or extracting an empty PDF). Those are enforced regardless
+    of how the split was produced.
+
+    ``require_full_coverage`` (contiguous tiling of pages 1..n_pages) is enforced
+    only for **model-detected** splits, where a gap means the model missed a
+    document. For a **user-supplied ``--boundaries``** split the user has
+    explicitly declared what to extract, so partial coverage (e.g. ``"1,2"`` on a
+    3-page file) is intentional and allowed.
     """
     if not segments:
         raise ValueError("No document segments were detected in the PDF.")
@@ -184,13 +190,20 @@ def _validate_segments(segments: list[_Segment], n_pages: int) -> None:
                 f"Segment {i + 1} ('{s.document_class}') has an invalid page range "
                 f"{s.start_page}-{s.end_page} for a {n_pages}-page document."
             )
-        if s.start_page != expected_start:
+        # Ascending + non-overlapping is a safety invariant (both paths).
+        if s.start_page < expected_start:
             raise ValueError(
-                f"Segments must tile the document with no gaps/overlaps: segment "
+                f"Segments overlap or are out of order: segment {i + 1} starts at "
+                f"page {s.start_page}, at or before the previous segment's end."
+            )
+        # A gap is only an error when the model was supposed to tile the file.
+        if require_full_coverage and s.start_page != expected_start:
+            raise ValueError(
+                f"Segments must tile the document with no gaps: segment "
                 f"{i + 1} starts at page {s.start_page}, expected {expected_start}."
             )
         expected_start = s.end_page + 1
-    if expected_start != n_pages + 1:
+    if require_full_coverage and expected_start != n_pages + 1:
         raise ValueError(
             f"Segments cover pages 1-{expected_start - 1} but the document has "
             f"{n_pages} page(s)."
@@ -293,9 +306,10 @@ def infer_packet(
         pdf.data, packet_name=name, model=model, session=session,
         boundaries=parsed_boundaries, on_question=on_question, verbose=verbose,
     )
-    # Model-detected ranges are untrusted — validate before extraction. (The
-    # --boundaries path was already validated by parse_boundaries.)
-    _validate_segments(segments, n_pages)
+    # Validate before extraction. Safety invariants (in-range, non-overlapping)
+    # always apply; full-coverage tiling is required only for model-detected
+    # splits — user-supplied --boundaries may intentionally skip pages.
+    _validate_segments(segments, n_pages, require_full_coverage=parsed_boundaries is None)
     _dedupe_names(segments)
 
     # Build into a staging dir and move into place only if everything succeeds,

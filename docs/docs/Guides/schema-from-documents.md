@@ -114,6 +114,53 @@ batch = gen.generate_batch_from_samples(
 )
 ```
 
+### Clarifying questions
+
+Inferring from a *single* example has a natural limit: the model can't always tell
+whether a field that appears once is *always* present, what a realistic value range
+is, or what an ID format should be — but **you** often can. Enable a clarifying
+dialogue and the model will ask you about exactly those ambiguities, and fold your
+answers into the schema and guidance.
+
+From the CLI, add `--allow-questions`:
+
+```bash
+seed-data infer-schema ./samples/invoice.pdf --name invoice \
+  --output ./schemas/invoice --allow-questions
+```
+
+```text
+↪ Does the PO number appear on every invoice, or only some?
+  your answer > only on net-30 invoices, about half
+↪ What's the realistic range for the invoice total?
+  your answer > $500 to $50,000
+```
+
+The model asks a few targeted questions (capped, and only when genuinely
+uncertain), then finalizes. It only prompts on an **interactive terminal** — in a
+non-interactive shell (CI, a pipe, a background job) the flag is safely ignored so
+a run never hangs waiting for input.
+
+From Python, pass an `on_question` callback — the host decides how to collect the
+answer (stdin, a notebook widget, a Slack DM, a web modal):
+
+```python
+def ask(question: str) -> str:
+    return input(f"{question}\n> ")   # or any UI; return "" to decline
+
+schema = gen.infer_schema(
+    "./samples/invoice.pdf", name="invoice",
+    output_dir="./schemas/invoice",
+    on_question=ask,
+)
+```
+
+`on_question` works on all four inference verbs (`infer_schema`, `infer_packet`,
+`generate_from_samples`, `generate_batch_from_samples`). A `None`/empty answer or a
+callback that raises degrades gracefully to "use your best judgment" — a dialogue
+hiccup never aborts inference. Omit it (the default) to run fully
+non-interactively.
+
 ## Packet inference
 
 When you have **one file containing several different document types**
@@ -160,6 +207,9 @@ Review it, then generate synthetic packets from it:
 seed-data packet ./packets/lending-package \
   --scenario "First-time homebuyer in Portland, OR"
 ```
+
+`--allow-questions` works here too: on an interactive terminal the model may ask
+you to clarify an ambiguous split or a per-segment field before finalizing.
 
 ### Python
 
