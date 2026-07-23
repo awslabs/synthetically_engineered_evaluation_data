@@ -87,8 +87,7 @@ Run `seed-data --help` (and `seed-data packet --help`) to see every option.
 ## Python API Usage
 
 Everything the CLI does is available programmatically through the `Generator`
-class — configure it once, then call one of three verbs. Each returns a typed
-result.
+class — configure it once, then call a verb. Each returns a typed result.
 
 ```python
 from seed_data import Generator, ModelConfig
@@ -133,6 +132,17 @@ print(pkt.merged_pdf)
 for s in pkt.sections:
     print(s.document_class, s.page_indices)
 ```
+
+**Schema from real documents** → a `Schema` you can generate from. Point SEED at
+example documents and a vision model reverse-engineers the schema for you:
+
+```python
+schema = gen.infer_schema("./samples/*.pdf", name="invoice")
+doc = gen.generate(schema, scenario="Midwest food distributor")
+```
+
+See [Schema from Documents](../Guides/schema-from-documents.md) for inferring from
+images, S3, or one concatenated multi-document PDF.
 
 **Define a document type in code** — no files on disk, from a pydantic model:
 

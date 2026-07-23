@@ -57,8 +57,32 @@ def test_bad_model_choice_errors():
 
 # --- console-script entry point is installed -------------------------------
 
+def _seed_data_script() -> str | None:
+    """Locate the installed `seed-data` console script.
+
+    Prefer PATH, but fall back to the bin/Scripts dir next to the running
+    interpreter — so the test passes when the package is installed in a venv
+    that isn't `activate`d on PATH (e.g. pytest run via an absolute venv python),
+    and only skips when the script genuinely isn't installed.
+    """
+    import os
+    import shutil
+    found = shutil.which("seed-data")
+    if found:
+        return found
+    bindir = os.path.dirname(sys.executable)
+    for name in ("seed-data", "seed-data.exe"):
+        cand = os.path.join(bindir, name)
+        if os.path.isfile(cand):
+            return cand
+    return None
+
+
 def test_console_script_installed():
-    r = subprocess.run(["seed-data", "--help"], capture_output=True, text=True, timeout=60)
+    script = _seed_data_script()
+    if script is None:
+        pytest.skip("seed-data console script not installed in this environment")
+    r = subprocess.run([script, "--help"], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0
     assert "--schema-dir" in r.stdout
 
@@ -83,3 +107,37 @@ def test_clone_schema_library_refuses_existing(tmp_path):
     r = _run("clone-schema-library", str(dest))
     assert r.returncode == 1
     assert "exists" in (r.stderr + r.stdout).lower()
+
+
+# --- infer-schema subcommand parses (no Bedrock) ---------------------------
+
+def test_infer_schema_help_exits_clean():
+    r = _run("infer-schema", "--help")
+    assert r.returncode == 0
+    out = r.stdout
+    # the flags that define the feature must all be discoverable
+    for flag in ("--name", "--output", "--packet", "--boundaries",
+                 "--allow-questions", "--then-generate", "--infer-model"):
+        assert flag in out, f"{flag} missing from infer-schema --help"
+
+
+def test_infer_schema_requires_name_and_output():
+    # inputs given but no --name / --output -> argparse exits 2
+    r = _run("infer-schema", "somefile.pdf")
+    assert r.returncode == 2
+    assert "name" in (r.stderr + r.stdout).lower()
+
+
+def test_infer_schema_bad_model_choice_errors():
+    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", "/tmp/x",
+             "--infer-model", "not-a-real-model")
+    assert r.returncode == 2
+    assert "invalid choice" in r.stderr.lower()
+
+
+def test_infer_schema_packet_with_then_generate_rejected():
+    # --packet and --then-generate are mutually exclusive -> clean argparse error
+    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", "/tmp/x",
+             "--packet", "--then-generate")
+    assert r.returncode == 2
+    assert "then-generate" in (r.stderr + r.stdout).lower()

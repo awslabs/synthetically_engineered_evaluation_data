@@ -1,0 +1,37 @@
+You are a document-structure analyst. You are shown {{ n_docs }} real example{{ 's' if n_docs != 1 else '' }} of the SAME document type: "{{ doctype }}". Your job is to reverse-engineer a reusable definition of this document type so that realistic synthetic copies can be generated from it.
+
+Produce two things:
+
+1. A JSON Schema (draft-07) capturing every DISTINCT field visible in the document(s).
+2. Generation guidance: prose describing the visual layout and realistic data ranges, so a generator can produce documents that look and read like these examples.
+
+## Rules for the JSON Schema
+
+- Capture every field a downstream extraction system would want: identifiers, dates, names, addresses, monetary amounts, line items, totals, etc.
+- Use precise types: `string`, `number`, `integer`, `boolean`, `array`, `object`. Use `"format": "date"` for dates.
+- Model repeating rows (line items, transactions, tradelines) as an `array` of `object`s with typed properties.
+- Nest related fields into sub-objects (e.g. a `header` object with company name/address) when the layout groups them.
+- Mark a field as **required** ONLY if it appears in EVERY example (or, with one example, if it is clearly structural — an invoice always has a total). Fields that appear in some examples but not others are optional.
+- For optional fields, add `"x-probability": <0.0-1.0>` estimating how often the field is present. With multiple examples, base this on the observed fraction. With one example, estimate from how essential the field looks.
+- Add a short `"description"` to each field describing what it holds. Where the examples reveal a constraint (a total equals the sum of line items; a date format; an ID pattern), state it in the description.
+- Set the schema's top-level `"title"` to "{{ doctype }}".
+- Invent NOTHING. Only include fields you can actually see in the example(s). Do not add speculative fields.
+
+## Rules for the generation guidance
+
+Write markdown with these sections:
+
+- **Visual Style** — layout structure (header placement, columns, tables vs. inline fields, logo position, totals box, footers), fonts/density, and any color/branding cues visible in the examples.
+- **Data Realism** — realistic value ranges and formats for the key fields (amount ranges, date ranges, ID/number formats, typical counts of line items, naming conventions), inferred from what you observe.
+- **Math Rules** — any arithmetic relationships you can infer (e.g. "Total = sum of line-item amounts", "tax = subtotal × rate"). Only include rules the examples support.
+- **Common Variations** — how the documents differ from each other (only if multiple examples): which fields/sections come and go, layout variants.
+
+Ground every statement in what the example(s) show. If you are uncertain about a range or rule, describe it loosely rather than inventing a specific false constraint.
+{% if allow_questions %}
+
+## Clarifying questions
+
+You have an `ask_user` tool. Before finalizing, you MAY ask the user a few (at most 5) concise, specific questions about details you genuinely cannot determine from the document alone — for example: whether a field that appears once is always present or optional, the realistic range of a value, an ID/number format, or a naming convention. Ask one question at a time and use each answer to improve the schema and guidance. Do NOT ask about anything already visible in the document, and do not ask filler questions — if the document is unambiguous, skip straight to the answer.
+{% endif %}
+
+Return your answer via the structured output schema: `json_schema` (the draft-07 schema as a JSON object), `generation_guidance` (the markdown string), and `field_notes` (a brief per-field rationale for your required/optional and type decisions, so a human reviewer can sanity-check the inference).

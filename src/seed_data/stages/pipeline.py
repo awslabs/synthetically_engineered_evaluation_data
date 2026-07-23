@@ -130,6 +130,7 @@ def build_pipeline_graph(
     *,
     max_attempts: int = 5,
     timeout: int = 3600,
+    node_timeout: int = 600,
     augment: bool = False,
 ):
     """Build the full single-document pipeline as a self-contained Graph.
@@ -139,6 +140,14 @@ def build_pipeline_graph(
     inside a larger graph (e.g. batch fan-out, where N of these run concurrently).
 
     data_generator → data_critic → [doc render loop] → (augment stage).
+
+    ``node_timeout`` is a hard per-node cap (via Strands' ``asyncio.wait_for``
+    wrapper). Unlike ``set_execution_timeout`` — which is only checked *between*
+    node executions and so cannot interrupt a node that has wedged mid-run — this
+    fires while a node is stuck. It is the safety net against an infinite hang
+    (e.g. a stalled vision/structured-output call, or the augment loop). The
+    default (600s) sits well above a legitimately slow node (a full doc render
+    loop is typically well under 300s) while bounding any wedge.
     """
     builder = GraphBuilder()
     builder.add_node(data_stage.build_generator(ctx), data_stage.GENERATOR_NAME)
@@ -156,6 +165,8 @@ def build_pipeline_graph(
     aug_budget = 8 if augment else 0
     builder.set_max_node_executions(max_attempts * 2 + 4 + aug_budget)
     builder.set_execution_timeout(timeout)
+    if node_timeout:
+        builder.set_node_timeout(node_timeout)
     builder.reset_on_revisit(True)
     builder.set_entry_point(data_stage.GENERATOR_NAME)
     return builder.build()

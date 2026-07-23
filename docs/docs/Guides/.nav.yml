@@ -1,6 +1,7 @@
 nav:
   - README.md
   - creating-a-document-type.md
+  - schema-from-documents.md
   - single-document.md
   - batch-generation.md
   - packets.md

@@ -28,8 +28,8 @@ apt-get install libpango-1.0-0 libgdk-pixbuf2.0-0
 
 ```bash
 # Clone and setup
-git clone https://github.com/awslabs/synthetically-engineered-evaluation-data.git
-cd synthetically-engineered-evaluation-data
+git clone https://github.com/awslabs/synthetically_engineered_evaluation_data.git
+cd synthetically_engineered_evaluation_data
 
 # Option 1: uv (recommended)
 uv sync
