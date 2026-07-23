@@ -71,6 +71,7 @@ Everything is available from both the command line and Python; they run the same
 seed-data --schema-dir invoice --scenario "Midwest food-distributor invoice"   # single
 seed-data --schema-dir fcc-invoice --count 10 --scenario "Local TV stations"    # batch
 seed-data packet lending-package --scenario "First-time homebuyer in Portland"  # packet
+seed-data infer-schema ./samples/*.pdf --name invoice --output ./schemas/invoice  # schema from real docs
 ```
 
 **Python:**
@@ -83,7 +84,14 @@ gen = Generator(models=ModelConfig(doc="gpt-oss", critic="haiku"), threshold=5)
 doc    = gen.generate("invoice", scenario="Midwest food-distributor invoice")
 batch  = gen.generate_batch("fcc-invoice", count=10, scenario="Local TV stations")
 packet = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland")
+schema = gen.infer_schema("./samples/*.pdf", name="invoice")  # reverse-engineer a schema from real docs
 ```
+
+**Schema from documents** — the inverse of generation. Point SEED at real example
+documents (PDF/PNG/JPEG, local or `s3://`) and a vision model reverse-engineers a
+schema you can generate unlimited synthetic look-alikes from. Works for a single
+document type, or splits one concatenated multi-document PDF into a per-type packet.
+See [Schema from Documents](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/schema-from-documents.md).
 
 Full docs: [CLI Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/CLI-Usage/README.md) · [Python API Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Python-API-Usage/README.md).
 
@@ -270,7 +278,8 @@ Utility subcommand — copy the bundled schema library out to edit locally:
 seed-data clone-schema-library ./schemas
 ```
 
-Run `seed-data --help` and `seed-data packet --help` for the complete list.
+Run `seed-data --help`, `seed-data packet --help`, and
+`seed-data infer-schema --help` for the complete list.
 
 ### What to expect from a batch
 

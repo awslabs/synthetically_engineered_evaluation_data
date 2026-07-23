@@ -11,9 +11,11 @@ from seed_data import Generator, ModelConfig, Schema, GeneratedDoc, BatchResult
 ```
 
 The mental model: **configure a `Generator` once** (models, threshold, renderer,
-output directory), then call one of its three verbs. Configuration lives on the
+output directory), then call one of its verbs. Configuration lives on the
 `Generator`; per-call arguments describe only *what* to make. Every verb returns a
 typed result — no stringly-typed dicts.
+
+**Generation** — make synthetic documents:
 
 | Verb | Makes | Returns |
 |---|---|---|
@@ -21,10 +23,21 @@ typed result — no stringly-typed dicts.
 | `gen.generate_batch(...)` | N diverse documents from one brief | `BatchResult` |
 | `gen.generate_packet(...)` | a coordinated multi-document packet | `PacketResult` (or `list`) |
 
+**Inference** — reverse-engineer a schema from real example documents, then feed it
+back into generation (see [Schema from Documents](../Guides/schema-from-documents.md)):
+
+| Verb | Makes | Returns |
+|---|---|---|
+| `gen.infer_schema(...)` | a `Schema` from sample doc(s) of one type | `Schema` |
+| `gen.infer_packet(...)` | a packet dir from one concatenated multi-doc PDF | `str` (output dir) |
+| `gen.generate_from_samples(...)` | infer, then generate one document | `GeneratedDoc` |
+| `gen.generate_batch_from_samples(...)` | infer, then generate a batch | `BatchResult` |
+
 See also the task-oriented guides:
 [Single Document](../Guides/single-document.md) ·
 [Batch Generation](../Guides/batch-generation.md) ·
-[Packets](../Guides/packets.md).
+[Packets](../Guides/packets.md) ·
+[Schema from Documents](../Guides/schema-from-documents.md).
 
 ## `Generator(...)` — configure once
 
@@ -152,6 +165,99 @@ for section in result.sections:
     print(section.page_indices)       # pages this section occupies in the merged PDF
     print(section.inference_result)   # the section's ground-truth JSON label (dict)
 ```
+
+## `gen.infer_schema(...)` — a Schema from example documents
+
+Reverse-engineer a [`Schema`](#schema-define-a-document-type-in-code) from one or
+more real example documents of the *same* type. `inputs` accepts local
+paths/globs/directories and/or `s3://` URIs (PDF, PNG, or JPEG). Returns the
+`Schema` (and, with `output_dir`, also writes `schema.json` + `generation_guidance.md`
+there for review/reuse). See [Schema from Documents](../Guides/schema-from-documents.md).
+
+```python
+from seed_data import Generator
+
+gen = Generator()
+
+schema = gen.infer_schema(
+    "./samples/*.pdf",          # path, glob, dir, or s3:// URI(s); PDF/PNG/JPEG
+    name="invoice",             # the document-type name (schema title)
+    model=None,                 # vision-capable model key; None -> "sonnet"
+    max_docs=5,                 # cap on how many examples to feed the model
+    output_dir="./schemas/invoice",  # optional: also write the schema for review
+    on_question=None,           # optional callback -> clarifying dialogue (see below)
+)
+
+doc = gen.generate(schema, scenario="Midwest food distributor")
+```
+
+## `gen.infer_packet(...)` — a packet from one concatenated PDF
+
+The inverse of `generate_packet`: takes a single file that is several *different*
+document types concatenated, detects the boundaries + classes, infers a schema per
+segment, and writes a packet directory (`packet.json` + one schema dir per segment)
+ready for `generate_packet`. Returns the output directory path.
+
+```python
+gen = Generator()
+
+out = gen.infer_packet(
+    "./real/lending_package.pdf",   # one concatenated PDF (path or s3:// URI)
+    name="lending-package",         # the packet name
+    output_dir="./packets/lending-package",
+    model=None,                     # vision-capable model; None -> "sonnet"
+    boundaries="1-3,4,5-8",         # optional: fixed page ranges (else model-detected)
+    on_question=None,               # optional clarifying dialogue (see below)
+)
+
+result = gen.generate_packet(out, scenario="First-time homebuyer in Portland, OR")
+```
+
+## `gen.generate_from_samples(...)` / `gen.generate_batch_from_samples(...)`
+
+One-shot convenience: infer a schema from example documents, then immediately
+generate from it. `generate_from_samples` → one `GeneratedDoc`;
+`generate_batch_from_samples` → a `BatchResult`. Both persist the inferred schema
+to `output_dir` (when given) so you keep an editable schema, not a throwaway.
+
+```python
+gen = Generator()
+
+# infer -> single
+doc = gen.generate_from_samples(
+    "./samples/invoice.pdf", name="invoice",
+    scenario="IT consulting services",
+    output_dir="./schemas/invoice",   # optional; keeps the inferred schema
+)
+
+# infer -> batch (count>1). Same diversity/seed/on_document knobs as generate_batch.
+batch = gen.generate_batch_from_samples(
+    "s3://my-bucket/invoices/", name="invoice",
+    count=10, scenario="Regional US variety",
+    output_dir="./schemas/invoice",
+)
+```
+
+## Clarifying dialogue (`on_question`)
+
+All four inference verbs accept an `on_question` callback. When provided, the model
+may ask you to clarify details it **cannot** determine from the document alone —
+whether a field that appears once is always present, a realistic value range, an ID
+format — and your answers shape the inferred schema. Without it (the default),
+inference runs fully non-interactively.
+
+```python
+def ask(question: str) -> str:
+    # Collect the answer however your host wants: stdin, a notebook widget,
+    # a Slack DM, a web modal. Return "" to decline (the model uses its judgment).
+    return input(f"{question}\n> ")
+
+schema = gen.infer_schema("./samples/invoice.pdf", name="invoice", on_question=ask)
+```
+
+The callback is host-pluggable and safe: a `None`/empty answer or a raising callback
+degrades to "use your best judgment" rather than aborting inference. The CLI wires
+this to a terminal prompt via `--allow-questions` (interactive TTYs only).
 
 ## Result & config types
 

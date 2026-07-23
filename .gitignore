@@ -23,10 +23,27 @@ critiques/
 # Reference sample documents — never commit these. They are local-only
 # style references for the doc critic and may contain third-party / real
 # content. See any schemas/<type>/samples/README.md for details.
-src/doc_gen_agent/schemas/*/samples/*.pdf
-src/doc_gen_agent/schemas/*/samples/*.png
-src/doc_gen_agent/schemas/*/samples/*.jpg
-src/doc_gen_agent/schemas/*/samples/*.jpeg
+# Matched anywhere so the guard survives package renames (was src/doc_gen_agent/).
+**/samples/*.pdf
+**/samples/*.png
+**/samples/*.jpg
+**/samples/*.jpeg
+
+# Local-only test inputs — may contain real PII / third-party documents.
+# NEVER commit to this public repo (e.g. real boarding passes, invoices).
+testing_samples/
+
+# Local developer artifacts — do not ship in the package or the public repo.
+# (gitignore comments must be on their own line — no trailing inline comments)
+# scratch_validate.py: local live-Bedrock validation harness (do-not-commit)
+scratch_validate.py
+# notebooks/: scratch/demo notebooks (hardcode internal profiles)
+notebooks/
+# .mcp.json: local MCP server config (Strands docs server, etc.)
+.mcp.json
+
+# Internal working notes — not for the public docs tree.
+docs/.threatmodel/
 
 # Archives
 *.zip

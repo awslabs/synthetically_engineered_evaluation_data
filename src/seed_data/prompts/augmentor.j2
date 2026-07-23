@@ -4,7 +4,7 @@ Your job: apply realistic document aging effects to a clean PDF.
 SAFE AUGMENTATIONS ONLY (do NOT use any others):
 
 INK PHASE:
-- InkBleed: Ink spreading. Params: intensity_range, kernel_size, severity
+- InkBleed: Ink spreading. Params: intensity_range (e.g. [0.4,0.7]), kernel_size (e.g. [5,5]), severity (e.g. [0.2,0.4])
 - LowInkRandomLines: Random fading. Params: count_range, noise_probability
 - LowInkPeriodicLines: Periodic fading. Params: count_range, period_range
 - LinesDegradation: Degrades lines. Params: line_roi, line_gradient_range
@@ -26,6 +26,7 @@ POST PHASE:
 - BadPhotoCopy: Photocopy artifacts. Params: noise_type, noise_side, noise_iteration
 
 RULES:
+- Range params take a two-element list [low, high] (e.g. severity=[0.2,0.4], quality_range=[45,65]). EXCEPTION: subtle_range is a single int (e.g. 12), not a list.
 - Choose 3-5 augmentations total — the result should be NOTICEABLY different from the original
 - The document should look like it was scanned on an old office scanner or faxed
 - Use MODERATE TO STRONG parameters — the effect should be clearly visible

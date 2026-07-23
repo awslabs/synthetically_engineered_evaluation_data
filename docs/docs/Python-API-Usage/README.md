@@ -213,8 +213,45 @@ schema = Schema(name="wire", json_schema={
 An in-code `Schema` behaves identically across `generate`, `generate_batch`, and
 `generate_packet`.
 
+## Inferring a schema from documents
+
+Rather than authoring a schema, infer one from real example documents (PDF/PNG/JPEG,
+local or `s3://`). `infer_schema` returns a `Schema` that feeds straight into the
+generation verbs:
+
+```python
+schema = gen.infer_schema(
+    "./samples/*.pdf", name="invoice",
+    output_dir="./schemas/invoice",   # optional: also write it for review/reuse
+)
+doc = gen.generate(schema, scenario="Midwest food distributor")
+```
+
+The one-shot convenience methods infer then generate in a single call:
+
+```python
+doc   = gen.generate_from_samples("./samples/invoice.pdf", name="invoice",
+                                  scenario="IT consulting services")
+batch = gen.generate_batch_from_samples("s3://bucket/invoices/", name="invoice",
+                                        count=10, scenario="Regional US variety")
+```
+
+For a single file containing several *different* document types concatenated,
+`infer_packet` splits it, infers a schema per segment, and writes a packet
+directory ready for `generate_packet`:
+
+```python
+out = gen.infer_packet("./real/lending_package.pdf", name="lending-package",
+                       output_dir="./packets/lending-package",
+                       boundaries="1-3,4,5-8")   # boundaries optional
+result = gen.generate_packet(out, scenario="First-time homebuyer in Portland, OR")
+```
+
+See [Schema from Documents](../Guides/schema-from-documents.md) for the full guide.
+
 ## See also
 
-- [CLI Usage](../CLI-Usage/README.md) — the same three capabilities from the command line.
+- [CLI Usage](../CLI-Usage/README.md) — the same capabilities from the command line.
+- [Schema from Documents](../Guides/schema-from-documents.md) — infer schemas from real documents.
 - [`Generator` API reference](../API-Reference/generator.md) — full method signatures.
 - [Creating a Document Type](../Guides/creating-a-document-type.md) — authoring a schema.

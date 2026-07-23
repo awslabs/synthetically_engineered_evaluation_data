@@ -62,23 +62,74 @@ AUGMENTATION_REGISTRY = {
 }
 
 
+import inspect as _inspect
+
+
+def _coerce_to_default_shape(value, default):
+    """Coerce an LLM-supplied param value to match augraphy's expected shape.
+
+    Augraphy params are shape- and type-sensitive in ways the model gets wrong:
+    some want a scalar (``SubtleNoise.subtle_range`` is a bare int), some want an
+    int tuple (``NoiseTexturize.sigma_range``), some a float tuple
+    (``InkBleed.severity``). Rather than a hand-maintained param table, we read
+    the augmentation's own default and shape ``value`` to match it — version-
+    accurate, and it repairs the two model mistakes seen in the wild:
+      - a scalar given where a range is expected → ``(x, x)``
+      - a range given where a scalar is expected → the low bound
+      - float given where the default is int-typed → ``int(...)``
+    JSON has no tuples, so lists always become tuples for range params.
+    """
+    want_tuple = isinstance(default, tuple)
+    # Is the default integer-typed? (a tuple of ints, or a bare int)
+    if want_tuple:
+        want_int = all(isinstance(x, int) for x in default) if default else False
+    else:
+        want_int = isinstance(default, int) and not isinstance(default, bool)
+
+    def _num(x):
+        if isinstance(x, bool):
+            return x
+        if want_int and isinstance(x, (int, float)):
+            return int(x)
+        return x
+
+    if want_tuple:
+        if isinstance(value, (list, tuple)):
+            seq = list(value)
+        else:                       # scalar given where a range is expected
+            seq = [value, value]
+        # match the default's arity (usually 2) when we synthesized from a scalar
+        return tuple(_num(x) for x in seq)
+    # scalar expected
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else default   # range given where scalar expected
+    return _num(value)
+
+
 def _build_augmentation(name: str, params: dict):
-    """Instantiate an augraphy augmentation by name with given params."""
+    """Instantiate an augraphy augmentation by name, coercing params to the
+    shapes/types augraphy actually expects (see ``_coerce_to_default_shape``)."""
     cls = AUGMENTATION_REGISTRY.get(name)
     if cls is None:
         raise ValueError(f"Unknown augmentation: {name}. Available: {list(AUGMENTATION_REGISTRY.keys())}")
-    # Convert list params to tuples, and ensure integer params stay as ints
-    # (JSON parse turns everything to float)
+
+    try:
+        defaults = {
+            k: p.default
+            for k, p in _inspect.signature(cls.__init__).parameters.items()
+            if p.default is not _inspect.Parameter.empty
+        }
+    except (ValueError, TypeError):
+        defaults = {}
+
     converted = {}
     for k, v in params.items():
-        if isinstance(v, list) and len(v) == 2 and all(isinstance(x, (int, float)) for x in v):
-            # If both values are whole numbers, convert to int tuple
-            if all(x == int(x) for x in v):
-                converted[k] = (int(v[0]), int(v[1]))
-            else:
-                converted[k] = (v[0], v[1])
-        elif isinstance(v, float) and v == int(v):
-            converted[k] = int(v)
+        if k in defaults and isinstance(defaults[k], (int, float, tuple)) \
+                and not isinstance(defaults[k], bool):
+            converted[k] = _coerce_to_default_shape(v, defaults[k])
+        elif isinstance(v, list):
+            # Unknown param that's a 2-list → tuple (augraphy convention); else as-is.
+            converted[k] = tuple(v) if len(v) == 2 else v
         else:
             converted[k] = v
     return cls(**converted)
@@ -110,7 +161,7 @@ def _images_to_pdf(images: list[np.ndarray], output_path: str, dpi: int = 200):
     )
 
 
-def run_augmentation(pdf_path: str, config: dict, dpi: int = 150, timeout: int = 90) -> str:
+def run_augmentation(pdf_path: str, config: dict, dpi: int = 150) -> str:
     """Apply augraphy augmentations to a PDF.
 
     Args:
@@ -118,10 +169,15 @@ def run_augmentation(pdf_path: str, config: dict, dpi: int = 150, timeout: int =
         config: Dict with keys "ink_phase", "paper_phase", "post_phase".
                 Each is a list of {"name": str, "params": dict}.
         dpi: Resolution for PDF rendering (lower = faster).
-        timeout: Max seconds per page augmentation.
 
     Returns:
         Path to the augmented PDF.
+
+    Note: augraphy's ``pipeline(img)`` is synchronous CPU work and cannot be
+    safely interrupted from a worker thread (``signal.alarm`` is main-thread
+    only, and there is no safe thread-kill). The hard bound against a wedged
+    augment run is the graph's per-node timeout (``build_pipeline_graph``'s
+    ``node_timeout``), which unblocks the pipeline even if this call stalls.
     """
 
     ink_phase = [_build_augmentation(a["name"], a.get("params", {}))
