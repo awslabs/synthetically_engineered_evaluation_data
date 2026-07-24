@@ -9,6 +9,7 @@ Merge `seed-synthetically-engineered-evaluation-data-from-discovery` (branch `hp
 | Rename package `doc_gen_agent` → `seed` | Keep `seed_data` package + `seed-data` CLI unchanged | Package was already renamed; `seed-data` is on PyPI. Renaming breaks users. |
 | `src/seed/documents/`, `src/seed/structured/` | `src/seed_data/structured/`, `src/seed_data/ingest/`, `src/seed_data/evaluation/` | Additive subpackages under existing `seed_data`, no renames |
 | Single breaking commit (Phase 1) | No breaking commits — every milestone is backward-compatible | "Don't break what's already available" constraint |
+| New top-level functions (`ingest()`, `run()`) | New verbs on existing `Generator` class | Python offering shape is `Generator` — configure once, call typed verbs, get typed results. No bare module-level functions. |
 | Drop Streamlit UI | Same (still dropped) | Doc-gen's vanilla HTML/JS pattern is the UI story |
 
 ## Architecture (after unification)
@@ -16,35 +17,66 @@ Merge `seed-synthetically-engineered-evaluation-data-from-discovery` (branch `hp
 ```
 seed-data (PyPI package: seed_data)
 ├── Existing (unchanged)
-│   ├── seed_data.stages.*         — document generation pipeline
+│   ├── seed_data.stages.*         — document generation pipeline (internal engines)
 │   ├── seed_data.critique         — LLM critique loops
 │   ├── seed_data.augment          — augraphy augmentation
 │   ├── seed_data.packet           — multi-document packets
-│   ├── seed_data.api              — Generator class
+│   ├── seed_data.api              — Generator class (THE public Python API)
 │   ├── seed_data.schemas/         — 17 built-in document types
 │   └── seed_data.cli              — existing CLI (--schema-dir, packet)
 │
-├── New (from seed-tabular)
+├── New (from seed-tabular — internal engines exposed via Generator verbs)
 │   ├── seed_data.schema/          — unified schema models (Milestone 1)
 │   │   ├── models.py              — InferredSchema, EntitySchema, FieldDefinition, etc.
 │   │   ├── io.py                  — JSON Schema ↔ InferredSchema converters
 │   │   ├── adapter.py             — InferredSchema → doc-gen triple (Milestone 3)
 │   │   └── legacy.py              — existing Schema class (moved, re-exported)
-│   ├── seed_data.ingest/          — schema extraction from any input (Milestone 2)
-│   ├── seed_data.structured/      — structured data generation (Milestone 2)
+│   ├── seed_data.ingest/          — schema extraction engine (Milestone 2)
+│   ├── seed_data.structured/      — structured data generation engine (Milestone 2)
 │   │   ├── pipeline.py            — graph pipeline
 │   │   ├── distributions/         — distribution-aware generation
 │   │   └── postprocessing/        — validate/correct/filter
 │   ├── seed_data.evaluation/      — quality metrics (Milestone 2)
-│   ├── seed_data.common/          — shared config, prompts (Milestone 2)
-│   └── seed_data.run              — unified dispatch (Milestone 4)
+│   └── seed_data.common/          — shared config, prompts (Milestone 2)
+│
+├── Public Python API (Generator — configure once, call typed verbs)
+│   ├── gen.generate()             — existing: schema → GeneratedDoc (PDF)
+│   ├── gen.generate_batch()       — existing: schema → BatchResult
+│   ├── gen.generate_packet()      — existing: packet → PacketResult
+│   ├── gen.ingest()               — NEW: any inputs → InferredSchema
+│   ├── gen.generate_structured()  — NEW: schema → StructuredResult (CSV/Parquet/Excel)
+│   └── gen.run()                  — NEW: inputs → dispatch → typed result
 │
 └── CLI (additive subcommands)
-    ├── seed-data ingest            — any input → InferredSchema
+    ├── seed-data ingest            — any input → InferredSchema JSON
     ├── seed-data generate-structured — schema → CSV/Parquet/Excel
     ├── seed-data generate-documents  — schema → PDFs
     └── seed-data run               — end-to-end (ingest + generate)
 ```
+
+### Python API Offering (preserved and extended)
+
+The package offering is the `Generator` facade. No bare module-level functions are
+added to `__init__.py`. New capabilities are new *verbs* on the same class:
+
+```python
+from seed_data import Generator, ModelConfig
+
+gen = Generator(models=ModelConfig(data="gpt-oss", critic="sonnet"), output_dir="./out")
+
+# Existing (unchanged)
+doc     = gen.generate("invoice", scenario="Midwest food distributors")
+batch   = gen.generate_batch("invoice", count=10, scenario="...")
+packet  = gen.generate_packet("lending-package", count=3)
+
+# New verbs (same pattern: configure once, per-call args describe *what* to make)
+schema  = gen.ingest("Customer orders with priority field", "./constraints.pdf")
+struct  = gen.generate_structured(schema, rows=500, format="parquet")
+result  = gen.run("FCC invoices", output="documents", count=5)
+```
+
+Typed results: `GeneratedDoc`, `BatchResult`, `PacketResult` (existing),
+`InferredSchema`, `StructuredResult` (new). All are Pydantic models — no raw dicts.
 
 ## Milestones
 

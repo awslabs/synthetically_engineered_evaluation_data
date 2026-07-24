@@ -185,26 +185,103 @@ def generate_structured_cmd(schema_path: str, rows: int = 100, format: str = "cs
 
 The existing CLI uses `argparse` via `__main__.py` and `cli.py`. We'll add these as sub-parsers to maintain the pattern.
 
-### 2.8 Public Python API
+### 2.8 Public Python API — extend the `Generator` facade (do NOT add bare functions)
 
-Add to `src/seed_data/__init__.py`:
+**The supported Python surface is the `Generator` class** (`seed_data.api`), which
+follows a "configure once, call typed verbs, get typed results" contract — its
+docstring states plainly: *"The engines are internal; this facade is the supported
+surface."* The structured extension must be delivered through this same offering,
+not as module-level `ingest()` / `generate_structured()` functions returning dicts.
+That keeps one blessed entry point and one mental model for users.
+
+Two additions to `Generator`, mirroring the existing `generate*` verbs:
 
 ```python
-# In __getattr__:
-if name == "ingest":
-    from seed_data.ingest import ingest
-    return ingest
-if name == "generate_structured":
-    from seed_data.structured import generate_structured
-    return generate_structured
+class Generator:
+    # ... existing generate / generate_batch / generate_packet unchanged ...
+
+    def ingest(self, *inputs: str) -> InferredSchema:
+        """Ingest any inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) into a
+        unified InferredSchema. Auto-detects each input's type.
+
+        Returns a typed InferredSchema (not a dict), consistent with the other verbs.
+        """
+        from seed_data.ingest import run_ingest
+        return run_ingest(*inputs, models=self.models, session=self.session)
+
+    def generate_structured(
+        self,
+        schema: "str | InferredSchema",
+        *,
+        rows: int = 100,
+        format: str = "csv",
+        verbose: bool = True,
+    ) -> "StructuredResult":
+        """Generate structured data (CSV/Parquet/Excel) from a schema.
+
+        `schema` accepts a bundled name, a path to an InferredSchema JSON file, or
+        an InferredSchema object. Returns a typed StructuredResult — consistent
+        with GeneratedDoc / BatchResult / PacketResult.
+        """
+        from seed_data.structured import run_structured
+        resolved = self._resolve_inferred(schema)
+        return run_structured(
+            resolved, target_count=rows, export_format=format,
+            output_dir=self.output_dir, models=self.models,
+            threshold=self.threshold, session=self.session, verbose=verbose,
+        )
 ```
 
-Usage:
+Notes:
+- Configuration (`models`, `threshold`, `output_dir`, `session`) is read from the
+  `Generator` instance — exactly like the existing verbs. Per-call args describe
+  only *what* to make.
+- `StructuredResult` is a new typed Pydantic model (see 2.9), NOT a dict. It sits
+  alongside `GeneratedDoc` / `BatchResult` / `PacketResult`.
+- The underlying `seed_data.ingest.run_ingest` and `seed_data.structured.run_structured`
+  functions are **internal engines**, not part of the public API — same as
+  `stages.pipeline.generate` is internal today.
+- Add `Generator.available_input_types()` discovery helper alongside the existing
+  `available_schemas()` / `available_packets()`.
+
+### 2.9 Typed result model
+
+Add to `seed_data/api.py` (alongside `BatchResult`), keeping the "no stringly-typed
+dicts" contract:
+
 ```python
-from seed_data import ingest, generate_structured
-schema = ingest("Generate realistic customer orders with varying statuses")
-result = generate_structured(schema, target_count=500, export_format="parquet")
+class StructuredResult(BaseModel):
+    """Typed result of a structured-data generation run."""
+    success: bool
+    schema: InferredSchema
+    output_paths: list[str] = Field(default_factory=list)   # written files
+    format: str                                             # csv | parquet | xlsx
+    row_counts: dict[str, int] = Field(default_factory=dict)  # per-entity row count
+    evaluation: dict[str, float] = Field(default_factory=dict) # metric scores
+    token_usage: dict = Field(default_factory=lambda: {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0})
+    error: str | None = None
 ```
+
+Usage — one consistent offering across modalities:
+
+```python
+from seed_data import Generator, ModelConfig
+
+gen = Generator(models=ModelConfig(data="gpt-oss", critic="sonnet"), output_dir="./out")
+
+# Document generation (existing)
+doc     = gen.generate("invoice", scenario="Midwest food distributors")
+
+# Structured generation (new — same facade, same shape)
+schema  = gen.ingest("Generate realistic customer orders with varying statuses")
+result  = gen.generate_structured(schema, rows=500, format="parquet")
+print(result.row_counts, result.evaluation)
+```
+
+`StructuredResult` and `InferredSchema` are re-exported lazily from
+`seed_data.__init__` (via `__getattr__`) so they can be type-imported, matching how
+`GeneratedDoc` / `BatchResult` are exposed today. No bare `ingest` / `generate_structured`
+functions are added to the top-level namespace.
 
 ---
 
@@ -275,8 +352,8 @@ uv run pytest tests/integration/test_structured_e2e.py -v
 | `test_ingest_csv_to_schema` | `seed-data ingest sample.csv` → schema matches CSV columns |
 | `test_generate_structured_csv` | `seed-data generate-structured schema.json --rows 10 --format csv` → valid CSV |
 | `test_generate_structured_parquet` | Same with parquet output |
-| `test_end_to_end_text` | `ingest("order data") → generate_structured(schema, 50)` → 50 rows |
-| `test_quality_loop` | Generation with quality thresholds → evaluation passes |
+| `test_end_to_end_text` | `gen.ingest("order data") → gen.generate_structured(schema, rows=50)` → 50 rows |
+| `test_quality_loop` | Generation with quality thresholds → `result.evaluation` scores pass |
 
 ---
 
@@ -284,11 +361,13 @@ uv run pytest tests/integration/test_structured_e2e.py -v
 
 - [ ] `pip install -e ".[structured]"` installs pandas/numpy/scipy
 - [ ] `pip install -e .` (without extras) still works — structured is optional at install time
-- [ ] `seed-data ingest "Customer orders with priority field" --output schema.json` produces valid schema
-- [ ] `seed-data generate-structured schema.json --rows 100 --format csv --output ./out` produces CSV
+- [ ] `seed-data ingest "Customer orders with priority field" --output schema.json` produces valid schema (CLI)
+- [ ] `seed-data generate-structured schema.json --rows 100 --format csv --output ./out` produces CSV (CLI)
 - [ ] Existing `seed-data --schema-dir fcc-invoice` still works (no regression)
 - [ ] All new unit tests pass without Bedrock credentials
 - [ ] Integration tests pass with Bedrock credentials
-- [ ] `from seed_data import ingest, generate_structured` works
+- [ ] Python API: `gen.ingest(...)` returns `InferredSchema`, `gen.generate_structured(...)` returns `StructuredResult` (on `Generator`)
+- [ ] No new bare functions added to `seed_data.__init__` — extension is via `Generator` verbs
+- [ ] `StructuredResult` and `InferredSchema` are type-importable from `seed_data`
 - [ ] Quality metrics (diversity, fidelity, coverage, structural) compute and log correctly
 - [ ] Post-processing pipeline catches and fixes common issues
