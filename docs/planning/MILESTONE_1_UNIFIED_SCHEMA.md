@@ -4,6 +4,8 @@
 
 **Duration:** ~1 week
 
+**Baseline:** builds on `v0.0.6` (`main`). Note the existing `seed_data/infer.py` already defines a private `_InferredSchema` — this milestone disambiguates the two (see 1.0 below).
+
 ---
 
 ## What Changes
@@ -14,10 +16,30 @@
 | `src/seed_data/schema/__init__.py` | Re-exports: `InferredSchema`, `EntitySchema`, `FieldDefinition`, `DistributionSpec`, `RelationshipDefinition` |
 | `src/seed_data/schema/models.py` | Port + extend models from `seed-tabular/models/schemas.py` |
 | `src/seed_data/schema/io.py` | Converters: `InferredSchema ↔ JSON Schema dict`, `from_schema_dir()`, `to_schema_dir()` |
+| `src/seed_data/infer.py` | **MODIFIED (optional)** — rename private `_InferredSchema` → `_InferenceDraft` to remove the name clash |
 | `pyproject.toml` | Add `pydantic` to deps (already transitive via strands, but make explicit) |
 | `tests/test_schema_models.py` | Unit tests for the new models + IO |
 
-Nothing is renamed. The existing `seed_data.schema` module (which defines the doc-gen `Schema` class) is at `src/seed_data/schema.py`. It must be **moved to** `src/seed_data/schema/legacy.py` and re-exported unchanged from `src/seed_data/schema/__init__.py` so the public `from seed_data import Schema` still works.
+Nothing public is renamed. The existing `seed_data.schema` module (which defines the doc-gen `Schema` class) is at `src/seed_data/schema.py`. It must be **moved to** `src/seed_data/schema/legacy.py` and re-exported unchanged from `src/seed_data/schema/__init__.py` so the public `from seed_data import Schema` still works.
+
+### 1.0 Reconcile with v0.0.6's `_InferredSchema` (do this first)
+
+`seed_data/infer.py` (shipped in v0.0.6) contains:
+
+```python
+class _InferredSchema(BaseModel):
+    """Structured output the inference model returns."""
+    json_schema: dict
+    generation_guidance: str
+    field_notes: str = ""
+```
+
+This is a **different, thinner** thing than seed-tabular's `InferredSchema` (which has typed `FieldDefinition`s, distributions, relationships, multi-entity support). Two models with near-identical names in the same package is a footgun.
+
+Decision for this milestone:
+- The **canonical** rich model keeps the name **`InferredSchema`** and lives in `seed_data/schema/models.py`.
+- The existing `_InferredSchema` in `infer.py` is **private** (leading underscore, used only as a Bedrock structured-output holder). Rename it to `_InferenceDraft` to eliminate the clash. This is an internal-only rename — no public API changes, so it's non-breaking. Update its one usage site in `infer.py._run_inference`.
+- Add a regression test asserting `infer_schema()` still returns a `Schema` unchanged after the rename.
 
 ---
 
@@ -108,10 +130,13 @@ from seed_data.schema.io import from_json_schema, to_json_schema, from_schema_di
 | `test_to_schema_dir` | Write → reload → compare (full round-trip on disk) |
 | `test_legacy_schema_class` | `from seed_data.schema import Schema` still works (backward compat) |
 | `test_legacy_schema_resolve` | Existing `Schema(name=..., json_schema=...).resolve()` unchanged |
+| `test_infer_schema_unaffected_by_rename` | After `_InferredSchema` → `_InferenceDraft` rename, `infer.infer_schema(...)` still returns a `Schema` (mock the vision model) |
+| `test_no_inferredschema_name_clash` | `seed_data.schema.InferredSchema` is the rich model; `infer.py` no longer exposes `_InferredSchema` |
 
-### Regression (`tests/test_pipeline_wiring.py` existing)
+### Regression (existing tests)
 
-- Runs the pipeline wiring (no LLM) — must still pass unchanged after `schema.py` → `schema/` refactor.
+- `tests/test_pipeline_wiring.py` — pipeline wiring (no LLM) must still pass unchanged after `schema.py` → `schema/` refactor.
+- Any existing `infer.py` / `infer-schema` tests must still pass after the `_InferredSchema` → `_InferenceDraft` rename.
 
 ### Integration (manual, documented)
 
@@ -136,4 +161,6 @@ seed-data --schema-dir fcc-invoice --count 1  # (requires Bedrock creds)
 - [ ] `to_json_schema(from_json_schema(schema_dict))` preserves field names, types, constraints
 - [ ] All existing unit tests pass without modification
 - [ ] New tests cover all converters + edge cases (nested, arrays, x-probability)
+- [ ] `_InferredSchema` name clash resolved (renamed to `_InferenceDraft` in `infer.py`); `infer_schema()` behavior unchanged
+- [ ] `seed-data infer-schema` (v0.0.6 CLI) still works after the rename
 - [ ] `pip install -e .` works, `seed-data --help` works

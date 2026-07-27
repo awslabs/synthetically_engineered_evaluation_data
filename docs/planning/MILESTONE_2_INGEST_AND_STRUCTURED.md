@@ -6,6 +6,17 @@
 
 **Depends on:** Milestone 1 (unified schema layer)
 
+### Relationship to v0.0.6's existing inference
+
+v0.0.6 already ships `Generator.infer_schema` + `seed_data/infer.py`, which turns **documents** (PDF/PNG/JPEG, local + `s3://`) into a `Schema` via a vision model, and `seed_data/inputs.py` which resolves those inputs. This milestone does **not** replace that — it adds the **non-document** input paths (free-text, CSV, JSON-Schema, SQL-DDL, ERD) and the tabular output engine.
+
+Concretely:
+- **Reuse** `seed_data/inputs.py`'s input-resolution (paths/globs/dirs/`s3://`, `Document` type) wherever possible instead of re-implementing file loading.
+- `infer_schema` remains the vision/document path → returns `Schema`.
+- New `ingest` handles non-document inputs → returns the richer `InferredSchema` (typed fields/distributions/relationships from Milestone 1).
+- Where a document input carries tabular structure, `ingest` may delegate to `infer_schema` and then enrich the result into an `InferredSchema`.
+- The two converge on the same canonical model so downstream (`generate_structured`, `generate`) treats them uniformly.
+
 ---
 
 ## What Changes
@@ -27,7 +38,7 @@
 | `tests/test_structured.py` | **NEW** |
 | `tests/test_evaluation.py` | **NEW** |
 
-Existing files are not modified except `cli.py` (additive subcommands) and `pyproject.toml` (additive deps).
+Existing files are not modified except `cli.py` (additive subcommands) and `pyproject.toml` (additive deps). The `_InferredSchema` → `_InferenceDraft` rename in `infer.py` is handled in Milestone 1; `seed_data/inputs.py` is imported (reused), not modified.
 
 ---
 
@@ -88,6 +99,8 @@ Key changes during port:
 - Replace `from models.schemas import InferredSchema, PipelineInput` → `from seed_data.schema import InferredSchema`
 - Replace `from models.config import ...` → `from seed_data.common.config import ...`
 - Simplify `PipelineInput` — the ingest function auto-detects inputs (strings → free-text, `.pdf`→ document, `.sql`/`.json`→ schema, `.csv`/`.xlsx`→ example data). Expose a simple `ingest(*inputs) → InferredSchema` API.
+- **Reuse v0.0.6 input resolution:** `detect.py` should build on `seed_data.inputs` (the `Document` type, `resolve_inputs`, `SUPPORTED_EXTS`, and `s3://` handling already exist there). Only add detection for the non-document types tabular introduces (`.csv`/`.xlsx` example data, `.sql` DDL, `.json` schema, ERD formats, and bare-string free-text). Do NOT re-implement PDF/image/S3 loading.
+- **Delegate documents to `infer_schema`:** when an input resolves to a document, `ingest` calls the existing `seed_data.infer.infer_schema` rather than duplicating vision extraction, then enriches its `Schema` into an `InferredSchema`.
 
 ### 2.4 Port structured generation (`src/seed_data/structured/`)
 
@@ -295,10 +308,13 @@ functions are added to the top-level namespace.
 | `test_detect_input_csv` | `detect_input_type("data.csv")` → `InputType.EXAMPLE_DATA` |
 | `test_detect_input_json_schema` | `detect_input_type("schema.json")` → `InputType.SCHEMA` |
 | `test_detect_input_sql` | `detect_input_type("create_table.sql")` → `InputType.SCHEMA` |
-| `test_detect_input_pdf` | `detect_input_type("requirements.pdf")` → `InputType.DOCUMENT` |
+| `test_detect_input_pdf` | `detect_input_type("requirements.pdf")` → `InputType.DOCUMENT` (delegates to `seed_data.inputs`) |
+| `test_detect_input_s3` | `detect_input_type("s3://bucket/doc.pdf")` → `InputType.DOCUMENT` (reuses `inputs.py` S3 handling) |
 | `test_detect_input_mixed` | Multiple inputs detected correctly |
+| `test_detect_reuses_inputs_module` | Document/image/S3 classification defers to `seed_data.inputs`, not a reimplementation |
 | `test_schema_extraction_mock` | Mock the LLM call, verify `InferredSchema` output from a text description |
 | `test_schema_extraction_from_csv_mock` | Mock LLM, feed CSV header → valid schema with correct fields |
+| `test_ingest_delegates_document_to_infer_schema` | Mock `infer.infer_schema`; a `.pdf` input routes through it, result enriched to `InferredSchema` |
 | `test_ingest_entrypoint_mock` | Full `ingest()` call with mocked agents → returns `InferredSchema` |
 
 ### Unit Tests — Structured (`tests/test_structured.py`)

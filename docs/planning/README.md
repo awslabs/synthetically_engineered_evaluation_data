@@ -16,6 +16,23 @@ The live [PyPI `seed-data` package](https://pypi.org/project/seed-data/) (v0.0.6
 
 Everything new (structured generation, ingest) is delivered as **additive `Generator` verbs and additive CLI subcommands**. A user on today's `pip install seed-data` sees no difference until they choose to install `[structured]` and call the new verbs.
 
+## Baseline: build on v0.0.6, not v0.0.5
+
+This branch is rebased onto `main` (tag `v0.0.6`, commit `0dd05ae`). **v0.0.6 already shipped a document-based schema-inference front-half** that overlaps with what this plan calls "ingest". We build on it rather than duplicate it:
+
+| Already in v0.0.6 (published, @sromoam) | This plan adds |
+|---|---|
+| `Generator.infer_schema(inputs, name=...)` — reads PDF/PNG/JPEG (local + `s3://`) via a vision model → `Schema` | Non-document inputs: free-text, CSV, JSON-Schema, SQL-DDL, ERD → schema |
+| `Generator.infer_packet(...)` — split a concatenated PDF → packet.json + per-segment schemas | (reused as-is) |
+| `Generator.generate_from_samples` / `generate_batch_from_samples` — one-shot infer→generate | `generate_structured` one-shot analog for tabular output |
+| `seed_data/infer.py`, `inputs.py`, `packet_infer.py` | `seed_data/ingest/` (non-doc extractors), `seed_data/structured/` |
+| CLI `seed-data infer-schema` | CLI `seed-data ingest`, `generate-structured`, `run` |
+| Private `_InferredSchema` (json_schema + guidance) in `infer.py` | Public `InferredSchema` (typed fields, distributions, relationships) — **naming reconciled**, see below |
+
+**Naming reconciliation:** v0.0.6 has a private `_InferredSchema` in `infer.py` that is a thin (json_schema + guidance) structured-output holder — NOT the same as seed-tabular's rich `InferredSchema` (typed `FieldDefinition`s, distributions, relationships). To avoid confusion, the ported tabular model keeps the name `InferredSchema` (it is the richer, canonical one) and the existing private `_InferredSchema` is either left as-is (it's private/internal to `infer.py`) or renamed to `_InferenceDraft` in a follow-up. Milestone 1 makes this call explicitly.
+
+**Unified extraction:** rather than a parallel `ingest` surface, the non-document extractors extend the same inference concept. `infer_schema` stays the document/vision path; the new `ingest` verb handles the non-document inputs and both converge on the canonical `InferredSchema`. Milestone 2 wires them so `Generator` exposes one coherent "give me a schema from whatever I have" story.
+
 ## Key Decisions (divergences from original plan)
 
 | Original Plan | Actual Decision | Why |
@@ -24,6 +41,8 @@ Everything new (structured generation, ingest) is delivered as **additive `Gener
 | `src/seed/documents/`, `src/seed/structured/` | `src/seed_data/structured/`, `src/seed_data/ingest/`, `src/seed_data/evaluation/` | Additive subpackages under existing `seed_data`, no renames |
 | Single breaking commit (Phase 1) | No breaking commits — every milestone is backward-compatible | "Don't break what's already available" constraint |
 | New top-level functions (`ingest()`, `run()`) | New verbs on existing `Generator` class | Python offering shape is `Generator` — configure once, call typed verbs, get typed results. No bare module-level functions. |
+| Build ingest from scratch | Build on v0.0.6's `infer_schema` / `infer.py` inference surface | v0.0.6 already ships doc-based schema inference; the plan adds the non-document input types on top instead of duplicating |
+| `InferredSchema` as the only such name | Reconcile with existing private `_InferredSchema` in `infer.py` | Two different models with a near-identical name; Milestone 1 disambiguates |
 | Drop Streamlit UI | Same (still dropped) | Doc-gen's vanilla HTML/JS pattern is the UI story |
 
 ## Architecture (after unification)
