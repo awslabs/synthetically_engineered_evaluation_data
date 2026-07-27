@@ -2,6 +2,20 @@
 
 Merge `seed-synthetically-engineered-evaluation-data-from-discovery` (branch `hp/agentic-redesign`) into this repo, expanding `seed-data` to support **structured data generation** (CSV/Parquet/Excel) alongside the existing **document generation** (PDFs).
 
+## Non-Negotiable: Preserve the published `seed-data` offering
+
+The live [PyPI `seed-data` package](https://pypi.org/project/seed-data/) (v0.0.6, maintainer: @sromoam) must keep working exactly as published. This is a hard constraint on every milestone — the extension **adds to** this offering, it never changes it:
+
+| Published surface | Guarantee |
+|---|---|
+| `pip install seed-data` | Unchanged — same project name, still installs the same way |
+| Import name `seed_data` | Unchanged — `from seed_data import Generator, ModelConfig` keeps working |
+| CLI `seed-data` | Unchanged — existing flags (`--schema-dir`, `packet`, …) behave identically |
+| `Generator` API (`generate` / `generate_batch` / `generate_packet`) | Unchanged — same signatures, same typed returns |
+| Base install deps | Unchanged — structured deps are opt-in via the `[structured]` extra |
+
+Everything new (structured generation, ingest) is delivered as **additive `Generator` verbs and additive CLI subcommands**. A user on today's `pip install seed-data` sees no difference until they choose to install `[structured]` and call the new verbs.
+
 ## Key Decisions (divergences from original plan)
 
 | Original Plan | Actual Decision | Why |
