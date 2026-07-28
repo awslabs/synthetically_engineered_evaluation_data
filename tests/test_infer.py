@@ -220,7 +220,6 @@ def test_written_schema_loads_back_via_load_schema_dir(tmp_path):
 def test_infer_schema_mocked(tmp_path, monkeypatch):
     """infer_schema wires resolve_inputs -> vision -> Schema without Bedrock."""
     import seed_data.infer as infer_mod
-    from seed_data.infer import _InferredSchema
 
     _write(str(tmp_path / "a.pdf"))
     _write(str(tmp_path / "b.pdf"))
@@ -261,9 +260,9 @@ def test_infer_schema_respects_max_docs(tmp_path, monkeypatch):
     assert seen["n"] == 2
 
 
-def test_inferred_schema_structured_model():
-    from seed_data.infer import _InferredSchema
-    m = _InferredSchema(json_schema={"type": "object"}, generation_guidance="g")
+def test_inference_draft_structured_model():
+    from seed_data.infer import _InferenceDraft
+    m = _InferenceDraft(json_schema={"type": "object"}, generation_guidance="g")
     assert m.field_notes == ""   # optional, defaults empty
 
 

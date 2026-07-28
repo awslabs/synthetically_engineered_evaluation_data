@@ -16,7 +16,7 @@
 | `src/seed_data/schema/__init__.py` | Re-exports: `InferredSchema`, `EntitySchema`, `FieldDefinition`, `DistributionSpec`, `RelationshipDefinition` |
 | `src/seed_data/schema/models.py` | Port + extend models from `seed-tabular/models/schemas.py` |
 | `src/seed_data/schema/io.py` | Converters: `InferredSchema ↔ JSON Schema dict`, `from_schema_dir()`, `to_schema_dir()` |
-| `src/seed_data/infer.py` | **MODIFIED (optional)** — rename private `_InferredSchema` → `_InferenceDraft` to remove the name clash |
+| `src/seed_data/infer.py` | **MODIFIED** — rename private `_InferredSchema` → `_InferenceDraft` to remove the name clash |
 | `pyproject.toml` | Add `pydantic` to deps (already transitive via strands, but make explicit) |
 | `tests/test_schema_models.py` | Unit tests for the new models + IO |
 
@@ -86,15 +86,19 @@ def to_json_schema(schema: InferredSchema, entity_name: str | None = None) -> di
 def from_schema_dir(path: str) -> InferredSchema:
     """Load a bundled schema dir (schema.json + generation_guidance.md) into InferredSchema."""
 
-def to_schema_dir(schema: InferredSchema, path: str) -> None:
-    """Serialize InferredSchema back to a schema dir on disk."""
+def to_schema_dir(schema: InferredSchema, path: str, entity_name: str | None = None) -> None:
+    """Serialize an InferredSchema entity to a schema dir on disk."""
 ```
 
-The key challenge is mapping JSON Schema's nested `properties` / `items` / `$ref` into the flat-ish `FieldDefinition` list. Doc-gen's schemas use:
+The key challenge is mapping JSON Schema's nested `properties` / `items` into the flat-ish `FieldDefinition` list. Doc-gen's schemas use:
 - Top-level `properties` → simple fields
 - Nested `object` types (e.g., address with street/city/state) → `FieldDefinition(type="object", children=[...])`
 - Arrays of objects (e.g., line items) → `FieldDefinition(type="array", children=[...])`
-- `x-probability` → `nullable=True` + store probability in a custom field or extension
+- Doc-gen's nullable idiom `anyOf: [{...}, {"type": "null"}]` → `nullable=True`, type taken from the non-null branch
+- Fields absent from the object's `required` list → `nullable=True`
+- `x-probability` (doc-gen's "sometimes present" marker) → `nullable=True`
+
+Implemented and verified against all 17 bundled schemas (`$ref` / `$defs` are not used by any bundled schema, so `$ref` resolution is deferred until a schema needs it).
 
 ### 1.4 Wire up `__init__.py` re-exports
 
@@ -125,9 +129,12 @@ from seed_data.schema.io import from_json_schema, to_json_schema, from_schema_di
 | `test_from_json_schema_flat` | Convert the existing `fcc-invoice` schema.json → `InferredSchema`, verify field count + types |
 | `test_from_json_schema_nested` | Convert a schema with nested objects (address, line items) → verify `children` populated |
 | `test_from_json_schema_xprobability` | Handle `x-probability` annotation → maps to nullable/optional |
+| `test_from_json_schema_anyof_nullable` | `anyOf: [{...}, {"type":"null"}]` → `nullable=True`, type from non-null branch |
+| `test_from_json_schema_required_vs_nullable` | Field in `required` → `nullable=False`; absent → `nullable=True` |
 | `test_to_json_schema_roundtrip` | `from_json_schema(to_json_schema(schema))` ≈ original (modulo ordering) |
 | `test_from_schema_dir` | Load `schemas/fcc-invoice/` → `InferredSchema` with `generation_guidance` populated |
-| `test_to_schema_dir` | Write → reload → compare (full round-trip on disk) |
+| `test_to_schema_dir_roundtrip` | Write → reload → compare (full round-trip on disk) |
+| `test_all_bundled_schemas_loadable` | Parametrized over every bundled schema: each `schema.json` → `InferredSchema` → re-serializes (satisfies "all 17 schemas" criterion) |
 | `test_legacy_schema_class` | `from seed_data.schema import Schema` still works (backward compat) |
 | `test_legacy_schema_resolve` | Existing `Schema(name=..., json_schema=...).resolve()` unchanged |
 | `test_infer_schema_unaffected_by_rename` | After `_InferredSchema` → `_InferenceDraft` rename, `infer.infer_schema(...)` still returns a `Schema` (mock the vision model) |

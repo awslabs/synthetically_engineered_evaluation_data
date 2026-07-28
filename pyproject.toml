@@ -16,6 +16,7 @@ classifiers = [
 dependencies = [
     "strands-agents",
     "strands-agents-tools",
+    "pydantic>=2",
     "reportlab",
     # xhtml2pdf 0.2.14 imports ShowBoundaryValue from reportlab.platypus.frames,
     # which current reportlab (4.5.x) does not provide -> ImportError in the render
