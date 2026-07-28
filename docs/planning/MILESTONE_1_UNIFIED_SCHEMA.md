@@ -124,10 +124,11 @@ from seed_data.schema.io import from_json_schema, to_json_schema, from_schema_di
 | `test_field_definition_basic` | Construct a `FieldDefinition` with all field types (string, int, float, date, enum), verify serialization |
 | `test_field_definition_nested` | Create nested object `FieldDefinition` with `children`, verify JSON round-trip |
 | `test_field_definition_distribution` | Attach `DistributionSpec` to a field, verify params serialize correctly |
-| `test_entity_schema_with_relationships` | Build `EntitySchema` with FK relationships, verify `structured_relationships` |
+| `test_field_definition_enum_coercion` | `enum_values` with `None`/non-str entries coerced to strings |
+| `test_entity_schema_with_relationships` | Build `EntitySchema` with FK relationships, verify `structured_relationships` + new-extension defaults |
 | `test_inferred_schema_multi_entity` | Multi-entity schema (e.g., Customer + Order), verify entity linking |
 | `test_from_json_schema_flat` | Convert the existing `fcc-invoice` schema.json → `InferredSchema`, verify field count + types |
-| `test_from_json_schema_nested` | Convert a schema with nested objects (address, line items) → verify `children` populated |
+| `test_from_json_schema_nested_array_of_objects` | Convert a schema with an array-of-objects (line items) → verify `children` populated |
 | `test_from_json_schema_xprobability` | Handle `x-probability` annotation → maps to nullable/optional |
 | `test_from_json_schema_anyof_nullable` | `anyOf: [{...}, {"type":"null"}]` → `nullable=True`, type from non-null branch |
 | `test_from_json_schema_required_vs_nullable` | Field in `required` → `nullable=False`; absent → `nullable=True` |
@@ -162,12 +163,12 @@ seed-data --schema-dir fcc-invoice --count 1  # (requires Bedrock creds)
 
 ## Acceptance Criteria
 
-- [ ] `from seed_data import Schema` works (legacy API preserved)
-- [ ] `from seed_data.schema import InferredSchema, from_schema_dir` works
-- [ ] Every existing schema.json in `schemas/` can be loaded via `from_schema_dir()`
-- [ ] `to_json_schema(from_json_schema(schema_dict))` preserves field names, types, constraints
-- [ ] All existing unit tests pass without modification
-- [ ] New tests cover all converters + edge cases (nested, arrays, x-probability)
-- [ ] `_InferredSchema` name clash resolved (renamed to `_InferenceDraft` in `infer.py`); `infer_schema()` behavior unchanged
-- [ ] `seed-data infer-schema` (v0.0.6 CLI) still works after the rename
-- [ ] `pip install -e .` works, `seed-data --help` works
+- [x] `from seed_data import Schema` works (legacy API preserved)
+- [x] `from seed_data.schema import InferredSchema, from_schema_dir` works
+- [x] Every existing schema.json in `schemas/` can be loaded via `from_schema_dir()` (17/17, parametrized test)
+- [x] `to_json_schema(from_json_schema(schema_dict))` preserves field names, types, constraints
+- [x] All existing unit tests pass without modification (195 passed)
+- [x] New tests cover all converters + edge cases (nested object, array-of-objects, anyOf-null, required-vs-nullable, x-probability)
+- [x] `_InferredSchema` name clash resolved (renamed to `_InferenceDraft` in `infer.py`); `infer_schema()` behavior unchanged
+- [x] `seed-data infer-schema` (v0.0.6 CLI) still works after the rename
+- [x] `pip install -e .` works, `seed-data --help` works
