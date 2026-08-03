@@ -109,18 +109,17 @@ entity name with spaces replaced by underscores: `<entity>.csv`, `.json`,
 `.xlsx`, or `.parquet`. A schema with entities `Customer` and `Order` at
 `--format csv` produces `output/customer.csv` and `output/order.csv`.
 
-Structured generation is an **opt-in extra** — it needs pandas, numpy, scipy and
-openpyxl, which are kept out of the base install so `pip install seed-data`
-stays lean for document-only users:
+Structured generation is an **opt-in extra** — pandas and the file-format engines
+(openpyxl for `.xlsx`, pyarrow for `.parquet`) are kept out of the base install so
+`pip install seed-data` stays lean for document-only users:
 
 ```bash
 pip install "seed-data[structured]"
 ```
 
 The document pipeline never needs the extra. Structured commands raise a clear
-`ImportError` pointing at it if it is missing. `--format parquet` additionally
-needs a parquet engine (`pip install pyarrow`); that is not part of the
-`[structured]` extra.
+`ImportError` pointing at it if it is missing. Every output format works with the
+extra installed — no separate engine install.
 
 Ingest is the shared front door. `seed-data ingest` takes free text, example
 data files (CSV/JSON/XLSX), formal schemas (JSON Schema, SQL DDL), documents
@@ -293,15 +292,20 @@ Note: pip resolves dependencies fresh and does not use `uv.lock`.
 | Install | Adds | Use for |
 |---|---|---|
 | `pip install seed-data` | base only | Documents. Stays lean — no pandas |
-| `pip install "seed-data[structured]"` | pandas, numpy, scipy, openpyxl | Structured (tabular) generation |
+| `pip install "seed-data[structured]"` | pandas, openpyxl, pyarrow | Structured (tabular) generation |
 | `pip install "seed-data[all]"` | every optional feature | Both modalities |
 | `pip install -e ".[dev]"` | `[all]` + pytest, ruff, mkdocs | Contributing |
 
 The base install is CI-enforced to import and pass its test suite with no pandas
 present, so the published document-only offering keeps working exactly as
 before. Structured commands raise a clear `ImportError` telling you to install
-the extra; the document pipeline never needs it. `--format parquet` also needs a
-parquet engine (`pip install pyarrow`), which is not part of `[structured]`.
+the extra; the document pipeline never needs it. All four output formats —
+including `--format parquet` — work with `[structured]` alone.
+
+The extra also pins numpy and scipy, but those are not what makes it heavy: both
+already arrive in the base install as transitive dependencies of `augraphy`. They
+are named in the extra only to declare the versions this code uses directly.
+pandas is the dependency the base install genuinely omits.
 
 ### PDF renderers
 

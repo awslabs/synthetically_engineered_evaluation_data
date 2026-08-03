@@ -482,6 +482,15 @@ class Generator:
             format: ``csv`` / ``parquet`` / ``excel`` / ``json``.
             verbose: print progress.
         """
+        from seed_data.common.deps import require_structured
+
+        # Checked before anything else: without the extra, the pipeline's own
+        # pandas import fails deep inside run_graph_pipeline, where the broad
+        # `except` in run_structured turns it into
+        # StructuredResult(error="No module named 'pandas'") — a missing install
+        # reported as a generation failure. Fail here, naming the extra.
+        require_structured("Generator.generate_structured")
+
         from seed_data.structured import run_structured
         resolved = self._resolve_inferred(schema)
         return run_structured(
@@ -535,6 +544,15 @@ class Generator:
             raise ValueError(
                 f"output must be 'structured' or 'documents', got {output!r}"
             )
+
+        if output == "structured":
+            # Validated up front rather than at the generate_structured call
+            # below: ingest is a multi-agent LLM run, and failing after it would
+            # bill the user for the expensive half of the chain before reporting
+            # a missing install that was knowable from the start.
+            from seed_data.common.deps import require_structured
+
+            require_structured("Generator.run(output='structured')")
 
         schema = self.ingest(*inputs, name=name, verbose=verbose)
 

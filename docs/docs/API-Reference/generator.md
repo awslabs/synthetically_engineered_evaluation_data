@@ -345,16 +345,17 @@ else:
 One file per entity is written into the output directory, named from the lowercased
 entity name with spaces replaced by underscores — `customer.csv`, `purchase_order.csv`.
 The extension follows `format`: `.csv`, `.json`, `.xlsx` (`format="excel"`), or
-`.parquet`. `format="parquet"` additionally needs a parquet engine
-(`pip install pyarrow`), which is not part of the `[structured]` extra.
+`.parquet`. `format="parquet"` needs no extra install beyond `[structured]`,
+which ships pyarrow.
 
 !!! note "Requires the `[structured]` extra"
     Structured generation needs `pip install "seed-data[structured]"` (pandas,
-    numpy, scipy, openpyxl). Without it the missing dependency surfaces the same
-    way any other pipeline failure does — a `StructuredResult` with
-    `success=False` and the missing module named in `error` — because the verb
-    returns a typed result rather than raising. The document pipeline never needs
-    the extra.
+    openpyxl, pyarrow). Without it, the verb raises `ImportError` immediately,
+    naming the extra to install. This is the one failure it raises rather than
+    returning as a `StructuredResult` — a missing install is a caller mistake
+    knowable before any work starts, not a generation outcome, and reporting it as
+    `success=False` made it look like the pipeline had run and failed. The
+    document pipeline never needs the extra.
 
 ## `gen.run(...)` — end to end
 

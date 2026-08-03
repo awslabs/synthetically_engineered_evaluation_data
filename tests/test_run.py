@@ -14,6 +14,19 @@ from seed_data.schema.models import EntitySchema, FieldDefinition, InferredSchem
 from seed_data.stages.pipeline import GeneratedDoc
 
 
+@pytest.fixture(autouse=True)
+def _structured_extra_present(monkeypatch):
+    """Report the ``[structured]`` extra as installed for every test here.
+
+    ``run(output="structured")`` guards on the extra before ingesting, so on a lean
+    base install these tests would fail on the guard. They mock the generation half
+    outright, so no pandas is ever touched and the extra's real presence is beside
+    the point — what is under test is dispatch. The guard itself is covered in
+    tests/test_deps_guard.py, which asserts it fires (and that ingest is skipped).
+    """
+    monkeypatch.setattr("seed_data.common.deps.structured_available", lambda: True)
+
+
 @pytest.fixture
 def schema():
     return InferredSchema(entities=[

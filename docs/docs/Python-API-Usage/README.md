@@ -302,8 +302,8 @@ gen.generate_structured(schema, rows=500, format="excel")     # customer.xlsx
 gen.generate_structured(schema, rows=500, format="parquet")   # customer.parquet
 ```
 
-`format="parquet"` additionally needs a parquet engine (`pip install pyarrow`),
-which is not part of the `[structured]` extra.
+`format="parquet"` needs no extra install beyond `[structured]`, which ships
+pyarrow.
 
 The natural next step is to load the result back into pandas:
 

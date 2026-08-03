@@ -9,8 +9,8 @@ JSON — from the same `InferredSchema` and through the same critique machinery 
 document pipeline uses. One schema, two output shapes: rows when you need a
 dataset, PDFs when you need documents.
 
-Structured generation is opt-in, because it pulls in pandas, numpy, scipy, and
-openpyxl:
+Structured generation is opt-in, because it pulls in pandas and the file-format
+engines (openpyxl, pyarrow):
 
 ```bash
 pip install "seed-data[structured]"
@@ -102,11 +102,11 @@ Four formats, chosen with `--format` / `format=`:
 | `csv` | `.csv` | The default |
 | `json` | `.json` | Records-oriented, indented |
 | `excel` | `.xlsx` | Written with openpyxl, from the `[structured]` extra |
-| `parquet` | `.parquet` | Additionally needs a parquet engine |
+| `parquet` | `.parquet` | Written with pyarrow, from the `[structured]` extra |
 
-`--format parquet` needs a parquet engine (`pip install pyarrow`) on top of the
-`[structured]` extra; pyarrow is deliberately not part of that extra, so install
-it yourself if you want Parquet.
+Every format works with the `[structured]` extra alone. If a parquet engine is
+somehow missing (a hand-pinned environment, say), the export fails fast with a
+message naming the install to run — before writing or clearing any files.
 
 Each entity is written to **its own file** in the output directory. The file name
 is the entity name lowercased with spaces replaced by underscores, plus the

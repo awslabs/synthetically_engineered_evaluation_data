@@ -34,9 +34,9 @@ pip install "seed-data[structured]"
 pip install "seed-data[all]"
 ```
 
-Structured support is opt-in because it pulls in pandas, numpy, scipy, and openpyxl, which are only needed for tabular generation and scoring. Keeping them out of the base install means anyone who only wants documents does not pay for that dependency tree. The document pipeline never needs the extra; structured commands raise a clear `ImportError` telling you to install it.
+Structured support is opt-in because it pulls in pandas and the file-format engines (openpyxl for `.xlsx`, pyarrow for `.parquet`), which are only needed for tabular generation and scoring. Keeping them out of the base install means anyone who only wants documents does not pay for that dependency tree. The document pipeline never needs the extra; structured commands raise a clear `ImportError` telling you to install it.
 
-Note that `--format parquet` additionally needs a parquet engine (`pip install pyarrow`), which is not part of the `[structured]` extra.
+The extra also pins numpy and scipy, but those already ship in the base install as transitive dependencies of `augraphy`; they are listed only to declare the versions this code uses directly. Every output format, `--format parquet` included, works with the extra alone.
 
 Verify with `seed-data --help` (see [Verify Installation](#verify-installation)).
 
@@ -99,7 +99,7 @@ seed-data --help          # or: python -m seed_data --help
 If you installed the `[structured]` extra, check that the tabular stack is importable:
 
 ```bash
-python -c "import pandas, numpy, scipy, openpyxl; print('structured extra OK')"
+python -c "import pandas, openpyxl, pyarrow; print('structured extra OK')"
 ```
 
 You can also run the test suite (no AWS credentials required):

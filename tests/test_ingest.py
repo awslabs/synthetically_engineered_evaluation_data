@@ -145,3 +145,132 @@ def test_run_ingest_erd_format_detection(monkeypatch):
 
     run_ingest("diagram.mmd", verbose=False)
     assert captured.get("erd_format") == "mermaid"
+
+
+# --- _load_data: file readers -----------------------------------------------
+
+def _load(path):
+    """Call the loader the way analyze_example_data does."""
+    import os
+
+    from seed_data.ingest.tools import _load_data
+
+    return _load_data(str(path), os.path.splitext(str(path))[1].lower())
+
+
+def test_load_data_csv_names_entity_after_the_file(tmp_path):
+    pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+
+    csv = tmp_path / "orders.csv"
+    csv.write_text("id,total\n1,9.99\n2,19.99\n")
+
+    frames = _load(csv)
+    assert list(frames) == ["orders"]
+    assert len(frames["orders"]) == 2
+
+
+def test_load_data_reads_single_sheet_excel(tmp_path):
+    """Regression: .xlsx had no reader at all, so every spreadsheet ingest failed.
+
+    detect_input_type classifies .xls/.xlsx as EXAMPLE_DATA and routes them here,
+    so the branch has to exist. A lone default-named sheet takes the filename, to
+    match how .csv is named.
+    """
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    xlsx = tmp_path / "orders.xlsx"
+    pd.DataFrame({"id": [1, 2], "total": [9.99, 19.99]}).to_excel(
+        xlsx, index=False, sheet_name="Sheet1"
+    )
+
+    frames = _load(xlsx)
+    assert list(frames) == ["orders"], "a default 'Sheet1' carries no meaning; the filename does"
+    assert frames["orders"]["total"].tolist() == [9.99, 19.99]
+
+
+def test_load_data_keeps_meaningful_single_sheet_name(tmp_path):
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    xlsx = tmp_path / "export_2026.xlsx"
+    pd.DataFrame({"id": [1]}).to_excel(xlsx, index=False, sheet_name="Customer")
+
+    assert list(_load(xlsx)) == ["Customer"]
+
+
+def test_load_data_treats_each_sheet_as_an_entity(tmp_path):
+    """A workbook is the natural way to hand over a multi-table dataset."""
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    xlsx = tmp_path / "shop.xlsx"
+    with pd.ExcelWriter(xlsx) as writer:
+        pd.DataFrame({"id": [1, 2]}).to_excel(writer, index=False, sheet_name="Customer")
+        pd.DataFrame({"id": [9], "customer_id": [1]}).to_excel(
+            writer, index=False, sheet_name="Order"
+        )
+
+    frames = _load(xlsx)
+    assert sorted(frames) == ["Customer", "Order"]
+    assert len(frames["Customer"]) == 2
+    assert len(frames["Order"]) == 1
+
+
+def test_load_data_skips_empty_sheets(tmp_path):
+    """Template workbooks routinely carry blank trailing sheets.
+
+    An empty sheet infers an entity with no fields, which is noise in the schema.
+    """
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    xlsx = tmp_path / "shop.xlsx"
+    with pd.ExcelWriter(xlsx) as writer:
+        pd.DataFrame({"id": [1]}).to_excel(writer, index=False, sheet_name="Customer")
+        pd.DataFrame().to_excel(writer, index=False, sheet_name="Blank")
+
+    assert list(_load(xlsx)) == ["Customer"]
+
+
+def test_load_data_rejects_a_workbook_with_no_data(tmp_path):
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    xlsx = tmp_path / "empty.xlsx"
+    pd.DataFrame().to_excel(xlsx, index=False, sheet_name="Blank")
+
+    with pytest.raises(ValueError, match="No non-empty sheets"):
+        _load(xlsx)
+
+
+def test_load_data_unsupported_extension_names_what_works(tmp_path):
+    pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+
+    bad = tmp_path / "data.parquet"
+    bad.write_bytes(b"not really parquet")
+
+    with pytest.raises(ValueError, match=r"\.csv, \.json, \.xls or \.xlsx"):
+        _load(bad)
+
+
+def test_analyze_example_data_summarizes_a_workbook(tmp_path):
+    """The tool wrapper must surface every sheet as an entity."""
+    import json
+
+    pd = pytest.importorskip("pandas", reason="requires the [structured] optional dependencies")
+    pytest.importorskip("openpyxl", reason="requires the [structured] optional dependencies")
+
+    from seed_data.ingest.tools import analyze_example_data
+
+    xlsx = tmp_path / "shop.xlsx"
+    with pd.ExcelWriter(xlsx) as writer:
+        pd.DataFrame({"email": ["a@x.com", "b@x.com"]}).to_excel(
+            writer, index=False, sheet_name="Customer"
+        )
+        pd.DataFrame({"total": [1.5]}).to_excel(writer, index=False, sheet_name="Order")
+
+    result = json.loads(analyze_example_data.__wrapped__(str(xlsx)))
+    assert sorted(result["entities_found"]) == ["Customer", "Order"]
+    assert "Entity: Customer" in result["summary"]
+    assert "Entity: Order" in result["summary"]

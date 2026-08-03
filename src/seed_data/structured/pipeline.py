@@ -25,6 +25,7 @@ from strands.types.content import ContentBlock, Message
 
 from seed_data.common.config import (
     QUALITY_THRESHOLDS,
+    completeness_score,
 )
 from seed_data.schema.models import InferredSchema
 
@@ -170,7 +171,7 @@ def build_graph_pipeline(
 
     def distribution_step(task_text):
         logger.info("Graph: distribution inference")
-        result = _dist_infer(schema_json=ps.schema_json)
+        result = _dist_infer(schema_input=ps.schema_json)
         ps.schema_json = result
         return result
 
@@ -236,11 +237,24 @@ def build_graph_pipeline(
             logger.warning("Evaluation failed: %s", e)
             return json.dumps({"quality_passed": True, "retry": "none", "reason": f"Evaluation error: {e}"})
 
+        # Worst entity, not the mean: averaging lets a healthy entity mask one
+        # that collapsed, which is exactly the failure this gate exists to catch.
+        # Entities absent from `data` count as 0 rows rather than being skipped —
+        # a missing entity is the most complete failure there is.
+        worst_completeness = min(
+            (
+                completeness_score(len(data.get(e.entity_name, [])), target_count)
+                for e in schema.entities
+            ),
+            default=1.0,
+        )
+
         scores = {
             "diversity": report.overall_diversity_score,
             "fidelity": report.overall_fidelity_score,
             "coverage": report.overall_coverage_score,
             "structural": report.overall_structural_score,
+            "completeness": worst_completeness,
         }
         ps.evaluation_scores = scores
         ps.evaluation_issues = report.issues

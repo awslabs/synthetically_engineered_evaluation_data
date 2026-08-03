@@ -422,3 +422,70 @@ def test_export_data_only_removes_its_own_files(tmp_path):
     assert bystander.exists(), "unrelated file must survive export"
     assert not stale.exists(), "stale same-entity export should be cleared"
     assert (tmp_path / "customer.csv").exists()
+
+
+def test_export_data_rejects_bad_format_without_deleting(tmp_path):
+    """Regression: a rejected format must leave the previous export intact.
+
+    Cleanup used to run *before* the format was validated, so an unusable format
+    emptied the directory it was writing into — the user ended up with neither the
+    new export nor the one they already had.
+    """
+    from seed_data.structured.exporter import export_data
+
+    prior = tmp_path / "customer.csv"
+    prior.write_text("id,name\n1,Acme\n")
+
+    data_json = json.dumps({"Customer": [{"id": 2, "name": "Globex"}]})
+    result = export_data.__wrapped__(data_json, "tsv", str(tmp_path))
+
+    assert "Unsupported format" in result
+    assert prior.read_text() == "id,name\n1,Acme\n", "prior export was destroyed"
+
+
+def test_export_data_parquet_missing_engine_preserves_prior(tmp_path, monkeypatch):
+    """Regression: no parquet engine must fail fast, before touching any file.
+
+    pandas' own error ("Unable to find a usable engine") names neither the package
+    nor this project's extra, and it was raised only after cleanup had already
+    deleted the previous export.
+    """
+    from seed_data.structured import exporter
+
+    prior = tmp_path / "customer.csv"
+    prior.write_text("id,name\n1,Acme\n")
+
+    # Simulate an environment with neither engine installed.
+    monkeypatch.setattr(exporter, "_parquet_engine_error", lambda: "no engine, install pyarrow")
+
+    data_json = json.dumps({"Customer": [{"id": 2, "name": "Globex"}]})
+    result = exporter.export_data.__wrapped__(data_json, "parquet", str(tmp_path))
+
+    assert "pyarrow" in result
+    assert prior.read_text() == "id,name\n1,Acme\n", "prior export was destroyed"
+    assert not (tmp_path / "customer.parquet").exists()
+
+
+def test_parquet_engine_error_is_none_when_engine_present():
+    """With pyarrow installed (it ships in [structured]) the check must not fire."""
+    pytest.importorskip("pyarrow", reason="requires the [structured] optional dependencies")
+
+    from seed_data.structured.exporter import _parquet_engine_error
+
+    assert _parquet_engine_error() is None
+
+
+def test_export_data_parquet_round_trips(tmp_path):
+    """The happy path: parquet actually writes and reads back."""
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("pyarrow", reason="requires the [structured] optional dependencies")
+
+    from seed_data.structured.exporter import export_data
+
+    data_json = json.dumps({"Customer": [{"id": 1, "name": "Acme"}, {"id": 2, "name": "Globex"}]})
+    result = json.loads(export_data.__wrapped__(data_json, "parquet", str(tmp_path)))
+
+    assert result["record_counts"] == {"Customer": 2}
+    written = tmp_path / "customer.parquet"
+    assert written.exists()
+    assert pd.read_parquet(written)["name"].tolist() == ["Acme", "Globex"]

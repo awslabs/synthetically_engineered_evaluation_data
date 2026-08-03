@@ -11,7 +11,11 @@ import logging
 from strands import tool
 
 from seed_data.evaluation.metrics import run_evaluation
-from seed_data.common.config import MAX_GENERATION_ATTEMPTS, QUALITY_THRESHOLDS
+from seed_data.common.config import (
+    MAX_GENERATION_ATTEMPTS,
+    QUALITY_THRESHOLDS,
+    completeness_score,
+)
 from seed_data.schema.models import InferredSchema
 from seed_data.structured.postprocessing.pipeline import PostProcessingConfig, PostProcessingPipeline
 
@@ -29,8 +33,15 @@ def _run_post_processing(data: dict[str, list[dict]], schema: InferredSchema) ->
     return result.data
 
 
-def _evaluate_entity(entity_name: str, records: list[dict], schema: InferredSchema) -> dict:
-    """Run evaluation on a single entity and return scores."""
+def _evaluate_entity(
+    entity_name: str, records: list[dict], schema: InferredSchema, target_count: int
+) -> dict:
+    """Run evaluation on a single entity and return scores.
+
+    ``target_count`` is required for the completeness dimension: the other scores
+    describe the records that exist, and only this one notices that too few were
+    produced.
+    """
     report = run_evaluation({entity_name: records}, schema)
     entity_report = report.entity_reports.get(entity_name)
     if not entity_report:
@@ -41,6 +52,7 @@ def _evaluate_entity(entity_name: str, records: list[dict], schema: InferredSche
         "fidelity": entity_report.fidelity.get("overall_score", 0.0),
         "coverage": entity_report.coverage.get("overall_score", 0.0),
         "structural": report.overall_structural_score,
+        "completeness": completeness_score(len(records), target_count),
     }
 
     failed_dimensions = []
@@ -139,7 +151,12 @@ def generation_loop(
                 all_passed = False
                 continue
 
-            eval_result = _evaluate_entity(entity_name, records, schema)
+            eval_result = _evaluate_entity(entity_name, records, schema, target)
+            # `scores` now includes completeness, so this mean no longer prefers a
+            # tiny immaculate batch over a full one: a 5-of-20-row attempt scoring
+            # 1.0 on every shape metric lands below a 19-row attempt that scores
+            # slightly worse on them. Previously row count was invisible here and
+            # the short attempt won `best_data`.
             overall = sum(eval_result["scores"].values()) / max(len(eval_result["scores"]), 1)
 
             attempt_history[entity_name].append({

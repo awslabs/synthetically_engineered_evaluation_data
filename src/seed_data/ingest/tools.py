@@ -99,13 +99,14 @@ def parse_schema_definition(schema_text: str, format: str) -> str:
 
 @tool
 def analyze_example_data(file_path: str) -> str:
-    """Analyze a CSV or JSON file with example data to infer schema.
+    """Analyze a CSV, JSON or Excel file with example data to infer schema.
 
     Reads the file, computes statistical summaries (types, unique counts,
     sample values, ranges), and returns the analysis for schema inference.
+    Each sheet of a multi-sheet workbook is treated as a separate entity.
 
     Args:
-        file_path: Path to a CSV or JSON file containing example data.
+        file_path: Path to a .csv, .json, .xls or .xlsx file of example data.
 
     Returns:
         Statistical summary of the data for schema inference.
@@ -265,6 +266,24 @@ def _load_data(file_path: str, ext: str) -> dict[str, "pd.DataFrame"]:
         entity_name = os.path.splitext(os.path.basename(file_path))[0]
         return {entity_name: df}
 
+    elif ext in (".xls", ".xlsx"):
+        # `detect_input_type` classifies .xls/.xlsx as EXAMPLE_DATA and routes them
+        # here, so this branch must exist or every spreadsheet ingest fails.
+        # Each sheet becomes its own entity — a workbook is the natural way to hand
+        # over a multi-table dataset — falling back to the filename for a lone sheet
+        # so single-sheet workbooks match the .csv naming.
+        sheets = pd.read_excel(file_path, sheet_name=None)
+        non_empty = {name: df for name, df in sheets.items() if not df.empty}
+        if not non_empty:
+            raise ValueError(f"No non-empty sheets found in {os.path.basename(file_path)}")
+        if len(non_empty) == 1:
+            only_name, only_df = next(iter(non_empty.items()))
+            stem = os.path.splitext(os.path.basename(file_path))[0]
+            # A default "Sheet1" carries no meaning; the filename does.
+            entity_name = stem if only_name.lower().startswith("sheet") else only_name
+            return {entity_name: only_df}
+        return non_empty
+
     elif ext == ".json":
         with open(file_path) as f:
             raw = json.load(f)
@@ -279,7 +298,7 @@ def _load_data(file_path: str, ext: str) -> dict[str, "pd.DataFrame"]:
                 entity_name = os.path.splitext(os.path.basename(file_path))[0]
                 return {entity_name: pd.DataFrame([raw])}
 
-    raise ValueError(f"Unsupported file format: {ext}. Use .csv or .json")
+    raise ValueError(f"Unsupported file format: {ext}. Use .csv, .json, .xls or .xlsx")
 
 
 def _summarize_dataframe(df: "pd.DataFrame") -> str:

@@ -266,3 +266,97 @@ def test_base_import_isolation_without_structured_deps():
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, f"stdout={r.stdout!r}\nstderr={r.stderr!r}"
     assert "BASE OK" in r.stdout
+
+
+# --- missing [structured] extra is reported, not traced ----------------------
+
+# Simulates a base install by making `import pandas` fail inside the subprocess,
+# so these assert the same behavior whether or not the extra is installed locally.
+# sitecustomize (not usercustomize) is used deliberately: it is imported at
+# interpreter startup even when user-site is disabled, which is the case in a venv.
+_NO_PANDAS_SITECUSTOMIZE = """
+import sys, importlib.abc
+
+
+class _Blocker(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".")[0] == "pandas":
+            raise ImportError("No module named 'pandas'")
+        return None
+
+
+sys.meta_path.insert(0, _Blocker())
+"""
+
+
+@pytest.fixture
+def no_pandas_env(tmp_path):
+    """Env for a subprocess in which pandas is unimportable.
+
+    Asserts the block actually takes effect before handing the env over. Without
+    that check a silently-ineffective blocker turns these into live Bedrock calls —
+    slow, credential-dependent, and green for the wrong reason.
+    """
+    import os
+
+    sitedir = tmp_path / "nopandas"
+    sitedir.mkdir()
+    (sitedir / "sitecustomize.py").write_text(_NO_PANDAS_SITECUSTOMIZE)
+
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(sitedir), "src", env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+
+    probe = subprocess.run(
+        [sys.executable, "-c", "import pandas"],
+        capture_output=True, text=True, timeout=60, env=env,
+    )
+    assert probe.returncode != 0, (
+        "pandas import was not blocked; this test would make live model calls"
+    )
+    return env
+
+
+def _run_env(env, *args):
+    return subprocess.run(
+        [sys.executable, "-m", "seed_data", *args],
+        capture_output=True, text=True, timeout=120, env=env,
+    )
+
+
+def test_generate_structured_without_extra_prints_install_hint(no_pandas_env):
+    """A base user must get the install command, not an ImportError traceback."""
+    r = _run_env(no_pandas_env, "generate-structured", "invoice", "--rows", "5")
+
+    assert r.returncode == 1
+    assert "seed-data[structured]" in r.stderr
+    assert "pip install" in r.stderr
+    assert "Traceback" not in r.stderr, "the guidance must not be buried in a traceback"
+
+
+def test_run_structured_without_extra_fails_before_ingest(no_pandas_env):
+    """`run --output structured` must refuse up front, not after a paid ingest.
+
+    ingest is a multi-agent LLM run; reaching it would mean spending tokens (and
+    needing credentials) before reporting something knowable at startup.
+    """
+    r = _run_env(no_pandas_env, "run", "some free text", "--output", "structured")
+
+    assert r.returncode == 1
+    assert "seed-data[structured]" in r.stderr
+    assert "Traceback" not in r.stderr
+    # Generation never started: no export summary, no quality line.
+    assert "Quality:" not in r.stdout
+    assert "Files:" not in r.stdout
+
+
+def test_generate_documents_without_extra_still_parses(no_pandas_env):
+    """The document modality must stay usable without the extra.
+
+    This is the published offering; --help must work with no pandas anywhere.
+    """
+    r = _run_env(no_pandas_env, "generate-documents", "--help")
+
+    assert r.returncode == 0
+    assert "--entity" in r.stdout

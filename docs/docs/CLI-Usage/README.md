@@ -25,8 +25,8 @@ export AWS_REGION=us-east-1
 ```
 
 The base install covers the whole document pipeline. Structured (tabular)
-generation needs the `[structured]` extra, which adds pandas, numpy, scipy, and
-openpyxl:
+generation needs the `[structured]` extra, which adds pandas plus the
+file-format engines (openpyxl, pyarrow):
 
 ```bash
 pip install "seed-data[structured]"   # structured generation
@@ -439,8 +439,8 @@ output/
 └── order.csv
 ```
 
-`--format parquet` additionally needs a parquet engine (`pip install pyarrow`),
-which is not part of the `[structured]` extra.
+`--format parquet` needs no extra install beyond `[structured]`, which ships
+pyarrow.
 
 ### Flags
 

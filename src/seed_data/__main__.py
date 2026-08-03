@@ -291,9 +291,15 @@ def _generate_structured(argv):
     args = parser.parse_args(argv)
 
     gen = Generator(output_dir=args.output)
-    result = gen.generate_structured(
-        args.schema, rows=args.rows, format=args.format, verbose=not args.quiet,
-    )
+    try:
+        result = gen.generate_structured(
+            args.schema, rows=args.rows, format=args.format, verbose=not args.quiet,
+        )
+    except ImportError as e:
+        # The [structured] extra is missing. Print the guidance plainly instead of
+        # letting a traceback bury it — this is a setup step for the user, not a bug.
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
     print(f"\n{'=' * 60}")
     if result.success:
@@ -475,6 +481,19 @@ def _run(argv):
     )
 
     verbose = not args.quiet
+
+    if args.output == "structured":
+        # Checked before ingest, which is a multi-agent LLM run: failing after it
+        # would bill the user for the expensive half of the chain to report a
+        # missing install that was knowable from the start.
+        from seed_data.common.deps import require_structured
+
+        try:
+            require_structured("seed-data run --output structured")
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
     try:
         # Ingest first so --save-schema can persist it even when generation fails.
         schema = gen.ingest(*args.inputs, name=args.name, verbose=verbose)

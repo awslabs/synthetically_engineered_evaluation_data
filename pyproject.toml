@@ -37,13 +37,16 @@ dependencies = [
 # pip-compatible extras (for `pip install -e ".[dev]"`)
 # Note: the `dev` extra must be kept in sync with [dependency-groups].dev below
 [project.optional-dependencies]
-# Optional structured-data generation stack. Kept out of the base install so
-# `pip install seed-data` stays lean — opt in with `pip install seed-data[structured]`.
+# Optional structured-data generation stack. pandas and openpyxl are genuinely
+# additional; numpy and scipy are already pulled in transitively by the base
+# `augraphy` dependency and are pinned here only to state the versions this code
+# needs directly. Opt in with `pip install seed-data[structured]`.
 structured = [
     "pandas>=2.0",
     "numpy>=1.26",
     "scipy>=1.12",
-    "openpyxl>=3.1",
+    "openpyxl>=3.1",   # engine for --format excel
+    "pyarrow>=15.0",   # engine for --format parquet
 ]
 # Everything a user could opt into. Currently just the structured stack, but a
 # single install target that stays correct as more extras are added.

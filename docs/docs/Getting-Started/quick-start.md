@@ -118,9 +118,8 @@ output/
 └── order.csv
 ```
 
-`--format` also accepts `json`, `excel` (`.xlsx`), and `parquet`. Parquet
-additionally needs a parquet engine — `pip install pyarrow` — which is not part
-of the `[structured]` extra.
+`--format` also accepts `json`, `excel` (`.xlsx`), and `parquet`. All of them
+work with the `[structured]` extra alone — no separate engine install.
 
 If you do not need the intermediate schema file, `seed-data run` does ingest and
 generation in one shot:

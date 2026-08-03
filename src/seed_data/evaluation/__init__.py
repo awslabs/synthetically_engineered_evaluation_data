@@ -9,6 +9,14 @@ Split by dependency weight so the lean base install can import this package:
   ``__getattr__`` so a mere ``import seed_data.evaluation`` never requires that
   stack — only actually touching a scorer does, and then the missing dependency
   surfaces at that point rather than at import time.
+
+``__all__`` lists both groups, because it documents the package's public surface
+rather than what any one environment can resolve. Two consequences on a lean
+install: ``from seed_data.evaluation import *`` binds every name in ``__all__``,
+so it reaches the ``*Metrics`` classes and raises — import the document-side names
+explicitly to stay within the base install. And when a scorer's import does fail
+for want of the extra, ``__getattr__`` rewrites the bare
+``No module named 'pandas'`` into a message naming the extra to install.
 """
 from .critique import (
     StructuredCritiqueResult,
@@ -53,5 +61,19 @@ def __getattr__(name: str):
         import importlib
 
         module_name, attr = _LAZY[name]
-        return getattr(importlib.import_module(module_name), attr)
+        try:
+            return getattr(importlib.import_module(module_name), attr)
+        except ImportError as exc:
+            # Translate the raw "No module named 'pandas'" into a message naming
+            # both the scorer and the extra. Only a *failed* import is rewritten,
+            # deliberately: `run_evaluation` defers its own pandas import into the
+            # function body, so resolving that attribute must keep working on a
+            # lean install. Pre-checking the extra would break the deferral this
+            # package documents.
+            from seed_data.common.deps import require_structured, structured_available
+
+            if structured_available():
+                raise  # a real import error, not a missing extra
+            require_structured(f"seed_data.evaluation.{name}")
+            raise AssertionError("unreachable") from exc  # require_structured raised
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
