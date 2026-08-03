@@ -37,9 +37,23 @@ dependencies = [
 # pip-compatible extras (for `pip install -e ".[dev]"`)
 # Note: the `dev` extra must be kept in sync with [dependency-groups].dev below
 [project.optional-dependencies]
+# Optional structured-data generation stack. Kept out of the base install so
+# `pip install seed-data` stays lean — opt in with `pip install seed-data[structured]`.
+structured = [
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "openpyxl>=3.1",
+]
+# Everything a user could opt into. Currently just the structured stack, but a
+# single install target that stays correct as more extras are added.
+all = ["seed-data[structured]"]
 dev = [
+    # dev implies the full feature set, so `pip install -e ".[dev]"` can run the
+    # structured tests instead of skipping them via importorskip.
+    "seed-data[all]",
     "pytest",
-    "ruff",
+    "ruff>=0.15,<0.16",
     "mkdocs",
     "mkdocs-material",
     "mkdocs-awesome-nav",
@@ -78,7 +92,10 @@ addopts = "--ignore=tests/integration"
 where = ["src"]
 
 [tool.setuptools.package-data]
-seed_data = ["schemas/**/*.json", "schemas/**/*.md", "prompts/*.j2", "packets/**/*.json"]
+# prompts/*.md is listed explicitly (reportlab_cheatsheet.md is loaded at runtime
+# by stages/document.py) rather than relying on setuptools-scm's git-file finder,
+# which would silently drop it if the file were ever untracked.
+seed_data = ["schemas/**/*.json", "schemas/**/*.md", "prompts/*.j2", "prompts/*.md", "packets/**/*.json"]
 
 # uv-native dependency groups (for `uv sync`)
 # Keep in sync with [project.optional-dependencies] above
@@ -90,9 +107,16 @@ dev = [
 ]
 test = [
     "pytest",
+    # structured-generation stack — needed to exercise the structured tests
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "openpyxl>=3.1",
 ]
 lint = [
-    "ruff",
+    # Pin to a minor range so a ruff upgrade can't silently change what the CI
+    # lint gate enforces.
+    "ruff>=0.15,<0.16",
 ]
 docs = [
     "mkdocs",
@@ -108,3 +132,17 @@ docs = [
 # https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns
 exclude-newer = "7 days"
 default-groups = ["dev"]
+
+[tool.ruff]
+# Pin the settings the CI lint gate depends on so local `ruff check` matches CI
+# regardless of a contributor's ruff defaults. line-length 88 is ruff's default;
+# stated explicitly so it can't drift.
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pyflakes (F) + a pycodestyle error subset (E). This is the rule set the tree is
+# already clean against; `ruff format --check` is deliberately NOT part of the
+# gate (the existing code predates any formatter and a full reformat would bury
+# the feature diff — run it as a separate, isolated commit if desired).
+select = ["F", "E4", "E7", "E9"]

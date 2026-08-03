@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from strands import Agent
 
-from seed_data import prompts, MODELS
+from seed_data import prompts
 from seed_data.utils import make_model
 
 

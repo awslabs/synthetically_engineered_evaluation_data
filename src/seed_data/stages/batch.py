@@ -61,7 +61,8 @@ def plan_scenarios(count: int, brief: str, model: str = "sonnet", session=None) 
 class _CoordinatorNode(MultiAgentBase):
     """Entry node the worker pipeline graphs fan out from."""
     def __init__(self, name: str = "coordinator"):
-        super().__init__(); self.name = name
+        super().__init__()
+        self.name = name
 
     async def invoke_async(self, task, invocation_state=None, **kwargs):
         ar = AgentResult(stop_reason="end_turn",

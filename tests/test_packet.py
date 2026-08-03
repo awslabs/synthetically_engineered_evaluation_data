@@ -377,4 +377,4 @@ if __name__ == "__main__":
     test_load_inference_result()
     test_load_inference_result_missing()
     test_write_packet_manifest()
-    print(f"\nAll packet tests passed.")
+    print("\nAll packet tests passed.")

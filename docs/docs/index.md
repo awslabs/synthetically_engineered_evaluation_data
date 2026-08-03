@@ -4,9 +4,9 @@ title: Synthetically Engineered Evaluation Data
 
 # Synthetically Engineered Evaluation Data
 
-**Synthetically Engineered Evaluation Data (SEED)** is an AI-powered synthetic document generation pipeline. It turns a JSON schema into a realistic PDF document, validates it through multi-stage critique loops, and emits a paired ground-truth JSON label. The result is benchmark data for Intelligent Document Processing (IDP) systems: OCR, Key Information Extraction (KIE), and document classification.
+**Synthetically Engineered Evaluation Data (SEED)** is an AI-powered synthetic data generation pipeline. Point it at a schema — or at a plain-English description, a CSV, a JSON Schema, a SQL DDL, or example documents — and it generates one of two things: a realistic PDF document, validated through multi-stage critique loops and paired with a ground-truth JSON label; or realistic structured (tabular) data as CSV, Parquet, Excel, or JSON. The document path produces benchmark data for Intelligent Document Processing (IDP) systems: OCR, Key Information Extraction (KIE), and document classification. The structured path produces populated datasets for testing data pipelines, analytics, and models where real records cannot be used.
 
-Every document is entirely fictional. Names, addresses, and financial figures are invented, and each PDF is rendered from freshly generated HTML/CSS (or ReportLab) code, so there are no real documents or templates copied into the output.
+Every artifact is entirely fictional. Names, addresses, and financial figures are invented, each PDF is rendered from freshly generated HTML/CSS (or ReportLab) code, and structured rows are synthesized from inferred field distributions — so no real documents, templates, or records are copied into the output.
 
 The pipeline is built on the [Strands Agents SDK](https://strandsagents.com/) and calls foundation models through Amazon Bedrock.
 
@@ -16,6 +16,12 @@ Install from PyPI — the default renderer is pure Python, so there is nothing e
 
 ```bash
 pip install seed-data
+```
+
+The base install covers the document pipeline. Structured (tabular) generation needs the `[structured]` extra, which adds pandas/numpy/scipy/openpyxl:
+
+```bash
+pip install "seed-data[structured]"
 ```
 
 Configure AWS Bedrock credentials, then generate a document from either the command line or the Python API. Both produce the same artifacts.
@@ -53,6 +59,30 @@ output/
 └── pdfs/<id>.pdf                  # final document
 ```
 
+**Structured data instead of documents** — describe the dataset in prose, and `run` ingests it into a schema and generates rows in one shot:
+
+```bash
+seed-data run "Customers and their orders for a regional coffee wholesaler" \
+  --output structured --rows 500 --format csv --output-dir ./output
+```
+
+The same thing from Python:
+
+```python
+from seed_data import Generator
+
+gen = Generator(output_dir="./output")
+result = gen.run(
+    "Customers and their orders for a regional coffee wholesaler",
+    output="structured", rows=500, format="csv",
+)
+
+print(result.output_paths)   # e.g. ['./output/customer.csv', './output/order.csv']
+print(result.row_counts)     # {'Customer': 500, 'Order': 500}
+```
+
+One file per entity lands in the output directory, named from the lowercased entity name. On `run`, note that `--output` selects the modality and `--output-dir` selects the path; on every other command `--output` is a path.
+
 Browse the schema library on GitHub:
 [awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
 
@@ -80,6 +110,24 @@ The **data generator** produces JSON data from the schema, the **data critic** v
 
 Batch and packet runs wrap this single-document pipeline. A batch runs N scenarios in parallel from one diversity brief. A packet coordinates several different document types that share context (same person, address, and dates) and merges them into one multi-document PDF.
 
+### Ingest, then fork by modality
+
+The agent chain above starts from a schema. Ingest is what gets you one. Whatever you hand SEED — prose, example data, a formal schema, documents, an ERD — ingest classifies each input, extracts what it can, and merges everything into a single `InferredSchema`. That schema is the fork point: it can drive structured generation or the document pipeline.
+
+```mermaid
+graph LR
+    A["free text"] --> I[ingest]
+    B["example data (CSV/JSON/XLSX)"] --> I
+    C["formal schema (JSON Schema/SQL DDL)"] --> I
+    D["documents (PDF/PNG/JPEG)"] --> I
+    E[ERD] --> I
+    I --> S[InferredSchema]
+    S --> T["structured -> CSV/Parquet/Excel/JSON"]
+    S --> P["documents -> PDF + JSON label"]
+```
+
+`seed-data ingest` writes the schema to disk so you can review and edit it; `generate-structured` and `generate-documents` each consume it. `seed-data run` chains ingest and generation in one call when you do not need the intermediate file. Several inputs of different kinds can be combined in one ingest — a prose description plus a CSV of real examples, say.
+
 ### Key Use Case: Evaluation Data for IDP and KIE
 
 Benchmarking a document understanding system requires paired data: an input document and the exact ground truth it should extract. Collecting real documents is slow, and real documents carry PII and redistribution constraints. SEED generates the pair directly: a schema defines the structure, the pipeline invents realistic fictional data, renders it to a PDF, critiques the render, and saves the source data JSON as the ground-truth labels. Add image augmentation to simulate scanning and faxing artifacts, and you have a controllable, reproducible evaluation set.
@@ -92,7 +140,7 @@ Benchmarking a document understanding system requires paired data: an input docu
 
     ---
 
-    Install SEED, configure AWS Bedrock credentials, and generate your first document and batch.
+    Install SEED, configure AWS Bedrock credentials, and generate your first document, batch, and structured dataset.
 
     [:octicons-arrow-right-24: Get started](Getting-Started/README.md)
 
@@ -100,7 +148,7 @@ Benchmarking a document understanding system requires paired data: an input docu
 
     ---
 
-    Create a document type, run batches, build multi-document packets, and control per-document variation.
+    Create a document type, run batches, build multi-document packets, control per-document variation, ingest any input into a schema, and generate structured data.
 
     [:octicons-arrow-right-24: Read the guides](Guides/README.md)
 
@@ -116,7 +164,7 @@ Benchmarking a document understanding system requires paired data: an input docu
 
     ---
 
-    The `Generator` Python API, `Schema`, typed results, and module-level docs for packets, critique, tools, and utilities.
+    The `Generator` Python API, `Schema` and `InferredSchema`, typed results, and module-level docs for packets, critique, tools, and utilities.
 
     [:octicons-arrow-right-24: Browse the API](API-Reference/README.md)
 

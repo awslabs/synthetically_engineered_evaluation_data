@@ -56,7 +56,11 @@ seed-data (PyPI package: seed_data)
 │   ├── seed_data.packet           — multi-document packets
 │   ├── seed_data.api              — Generator class (THE public Python API)
 │   ├── seed_data.schemas/         — 17 built-in document types
-│   └── seed_data.cli              — existing CLI (--schema-dir, packet)
+│   ├── seed_data.prompts/         — Jinja2 templates + render() loader; loader
+│   │                                reused as-is, new .j2 templates added
+│   ├── seed_data.__main__         — THE CLI (seed-data): default --schema-dir flow
+│   │                                + SUBCOMMANDS dispatch table
+│   └── seed_data.cli              — legacy base_parser() helper only, not the CLI
 │
 ├── New (from seed-tabular — internal engines exposed via Generator verbs)
 │   ├── seed_data.schema/          — unified schema models (Milestone 1)
@@ -70,7 +74,8 @@ seed-data (PyPI package: seed_data)
 │   │   ├── distributions/         — distribution-aware generation
 │   │   └── postprocessing/        — validate/correct/filter
 │   ├── seed_data.evaluation/      — quality metrics (Milestone 2)
-│   └── seed_data.common/          — shared config, prompts (Milestone 2)
+│   └── seed_data.common/          — shared config (Milestone 2); config.py only —
+│                                    prompts reuse seed_data.prompts.render()
 │
 ├── Public Python API (Generator — configure once, call typed verbs)
 │   ├── gen.generate()             — existing: schema → GeneratedDoc (PDF)
@@ -100,16 +105,23 @@ gen = Generator(models=ModelConfig(data="gpt-oss", critic="sonnet"), output_dir=
 # Existing (unchanged)
 doc     = gen.generate("invoice", scenario="Midwest food distributors")
 batch   = gen.generate_batch("invoice", count=10, scenario="...")
-packet  = gen.generate_packet("lending-package", count=3)
+packets = gen.generate_packet("lending-package", count=3)   # list when count > 1
 
 # New verbs (same pattern: configure once, per-call args describe *what* to make)
-schema  = gen.ingest("Customer orders with priority field", "./constraints.pdf")
-struct  = gen.generate_structured(schema, rows=500, format="parquet")
-result  = gen.run("FCC invoices", output="documents", count=5)
+schema  = gen.ingest("Customer orders with priority field", "./constraints.pdf", name="orders")
+struct  = gen.generate_structured(schema, rows=500, format="csv")
+result  = gen.run("FCC invoices", output="documents", name="fcc-invoice", count=5)
 ```
 
+As shipped, `run()` also takes `name=` (passed through to `ingest`) and `entity=`
+(which entity of a multi-entity schema to render), which this sketch omitted.
+`format="parquet"` is accepted but not yet usable — `pyarrow` is missing from the
+`[structured]` extra (open item, tracked in Milestone 5).
+
 Typed results: `GeneratedDoc`, `BatchResult`, `PacketResult` (existing),
-`InferredSchema`, `StructuredResult` (new). All are Pydantic models — no raw dicts.
+`InferredSchema`, `StructuredResult` (new) — typed objects, never raw dicts.
+`GeneratedDoc`, `BatchResult`, `InferredSchema` and `StructuredResult` are
+Pydantic models; `PacketResult` (pre-existing, untouched) is a dataclass.
 
 ## Milestones
 
@@ -121,7 +133,15 @@ Typed results: `GeneratedDoc`, `BatchResult`, `PacketResult` (existing),
 | 4 | [End-to-End Integration](MILESTONE_4_END_TO_END_INTEGRATION.md) | ~1 week | `seed-data run` + cross-modality evaluation |
 | 5 | [Polish & Release](MILESTONE_5_POLISH_AND_RELEASE.md) | ~1 week | CI, docs, audit, fresh-clone verification |
 
-**Total:** ~6 weeks
+**Total:** ~6 weeks (original estimate, kept as the historical record)
+
+## Status
+
+All five milestones are implemented. `uv run pytest` — 347 passed (`tests/integration`
+excluded by default via `addopts`); base install with no `[structured]` extra —
+322 passed, 2 skipped (`test_structured.py` / `test_evaluation.py` skip themselves
+via `pytest.importorskip`); `uv run ruff check .` — clean. Open items and deliberate
+divergences are recorded in the individual milestone documents.
 
 ## Dependency Graph
 
@@ -145,4 +165,4 @@ M2 and M3 can proceed in parallel once M1 is done.
 | Structured deps bloat core install | Optional dep group `[structured]` — base install stays lean |
 | Nested JSON Schema ↔ flat FieldDefinition mismatch | `FieldDefinition.children` field handles nesting; roundtrip tests on all 17 schemas |
 | Tabular's `PipelineInput`/`InputMode` complexity | Simplified to auto-detection in `ingest()` — single entry point |
-| Import errors when structured deps missing | Lazy imports behind `try/except` with clear error messages |
+| Import errors when structured deps missing | Deferred imports (`evaluation/__init__.py` `__getattr__` lazy map; in-function imports in `ingest/tools.py` and `metrics.run_evaluation`) so the pandas dependency surfaces on use, not on import — enforced by the CI `test-base` job, which installs the base wheel in a pandas-free venv and fails if `import pandas` succeeds |

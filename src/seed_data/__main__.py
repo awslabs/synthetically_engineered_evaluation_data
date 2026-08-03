@@ -1,5 +1,6 @@
 """CLI entrypoint: python -m seed_data"""
 import argparse
+import os
 import sys
 import time
 
@@ -225,18 +226,330 @@ def _infer_schema(argv):
             sys.exit(1)
 
 
-def main():
-    # Subcommand dispatch (kept separate so the default generate flow is untouched).
-    if len(sys.argv) > 1 and sys.argv[1] == "clone-schema-library":
-        _clone_schema_library(sys.argv[2:])
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "packet":
-        _packet(sys.argv[2:])
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "infer-schema":
-        _infer_schema(sys.argv[2:])
+def _ingest(argv):
+    """Handle the `ingest` subcommand — inputs -> unified InferredSchema JSON.
+
+    Auto-detects each input's type (free-text, CSV/Excel example data, JSON
+    Schema, SQL DDL, ERD, or PDF/image documents) and writes the merged
+    InferredSchema to --output as JSON.
+    """
+
+    load_dotenv()
+    from seed_data import Generator
+
+    parser = argparse.ArgumentParser(
+        prog="seed-data ingest",
+        description="Ingest inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) "
+                    "into a unified InferredSchema JSON file.",
+    )
+    parser.add_argument("inputs", nargs="+",
+                        help="Free-text description(s), file paths/globs, and/or s3:// URIs")
+    parser.add_argument("--name", default="dataset",
+                        help="Logical dataset name (default: dataset)")
+    parser.add_argument("--output", default="./schema.json",
+                        help="Path to write the InferredSchema JSON (default: ./schema.json)")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator()
+    try:
+        schema = gen.ingest(*args.inputs, name=args.name, verbose=not args.quiet)
+    except (ValueError, FileNotFoundError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    with open(args.output, "w") as f:
+        f.write(schema.model_dump_json(indent=2))
+
+    entity_names = ", ".join(e.entity_name for e in schema.entities) or "(none)"
+    print(f"\n{'=' * 60}")
+    print(f"Wrote InferredSchema to: {args.output}")
+    print(f"Entities: {entity_names}")
+    print("Generate structured data with:")
+    print(f"  seed-data generate-structured {args.output} --rows 100 --format csv")
+
+
+def _generate_structured(argv):
+    """Handle the `generate-structured` subcommand — schema -> CSV/Parquet/Excel."""
+    load_dotenv()
+    from seed_data import Generator
+
+    parser = argparse.ArgumentParser(
+        prog="seed-data generate-structured",
+        description="Generate structured data from an InferredSchema.",
+    )
+    parser.add_argument("schema",
+                        help="Bundled schema name, path to an InferredSchema JSON, "
+                             "or a schema directory")
+    parser.add_argument("--rows", type=int, default=100,
+                        help="Target records per entity (default: 100)")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "parquet", "excel", "json"],
+                        help="Output format (default: csv)")
+    parser.add_argument("--output", default="./output", help="Output directory")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(output_dir=args.output)
+    result = gen.generate_structured(
+        args.schema, rows=args.rows, format=args.format, verbose=not args.quiet,
+    )
+
+    print(f"\n{'=' * 60}")
+    if result.success:
+        for entity, count in result.row_counts.items():
+            print(f"  {entity}: {count} rows")
+        print(f"Files: {', '.join(result.output_paths)}")
+        if result.evaluation:
+            scores = ", ".join(f"{k}={v:.2f}" for k, v in result.evaluation.items())
+            print(f"Quality: {scores}")
+    else:
+        print(f"FAILED: {result.error}")
+        sys.exit(1)
+
+
+def _generate_documents(argv):
+    """Handle the `generate-documents` subcommand — schema -> PDFs.
+
+    Accepts either an InferredSchema JSON file (e.g. produced by `seed-data
+    ingest`) or a legacy schema directory / bundled schema name. The legacy dir
+    path is unchanged from the default `--schema-dir` flow; the JSON path is
+    adapted to the pipeline's schema triple via `schema/adapter.py`.
+    """
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data generate-documents",
+        description="Generate PDF documents from a schema (InferredSchema JSON, "
+                    "schema directory, or bundled schema name).",
+    )
+    parser.add_argument("schema",
+                        help="InferredSchema JSON path, schema directory, or bundled name")
+    parser.add_argument("--entity", default=None,
+                        help="For a multi-entity InferredSchema: which entity to render")
+    parser.add_argument("--count", type=int, default=1,
+                        help="Number of docs (>1 plans diverse scenarios and fans out)")
+    parser.add_argument("--scenario", default="",
+                        help="What to generate this run (>1 count: the theme to diversify)")
+    parser.add_argument("--output", default="./output", help="Output directory")
+    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
+    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices,
+                        help="Model for planning batch scenarios")
+    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--renderer", default="xhtml2pdf",
+                        choices=["xhtml2pdf", "weasyprint", "reportlab"])
+    parser.add_argument("--augment", action="store_true")
+    parser.add_argument("--no-critic-samples", action="store_true",
+                        help="Disable reference sample PDFs in doc critic")
+    parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument("--max-attempts", type=int, default=5)
+    parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for batch scenario planning (regression-stable sets)")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(
+        models=ModelConfig(
+            data=args.data_model, doc=args.doc_model, critic=args.critic_model,
+            aug=args.aug_model, batch=args.batch_model,
+        ),
+        threshold=args.threshold,
+        renderer=args.renderer,
+        output_dir=args.output,
+        max_attempts=args.max_attempts,
+        timeout=args.timeout,
+        critic_samples=not args.no_critic_samples,
+        augment=args.augment,
+    )
+
+    # A directory (or bundled name) keeps the legacy path; a file is an
+    # InferredSchema JSON that the adapter converts.
+    schema_arg = args.schema
+    if os.path.isfile(schema_arg):
+        try:
+            schema_arg = gen._resolve_inferred(schema_arg)
+        except (ValueError, OSError) as e:
+            print(f"Could not load schema from {args.schema}: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        if args.count > 1:
+            scenario = args.scenario or "Generate diverse, realistic documents"
+            batch = gen.generate_batch(
+                schema_arg, count=args.count, scenario=scenario,
+                entity=args.entity, seed=args.seed, verbose=not args.quiet,
+            )
+        else:
+            batch = None
+            doc = gen.generate(
+                schema_arg, scenario=args.scenario,
+                entity=args.entity, verbose=not args.quiet,
+            )
+    except (FileNotFoundError, KeyError, ValueError) as e:
+        print(f"{e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\n{'=' * 60}")
+    if batch is not None:
+        print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
+        print(f"Tokens: {batch.total_tokens:,}")
+        for d in batch.documents:
+            status = "OK  " if d.success else "FAIL"
+            print(f"  {status} {d.doc_id[:8]}  {d.verdict:9} {d.pdf_path or d.error}")
+        if batch.count_succeeded == 0:
+            sys.exit(1)
+    else:
+        if doc.success:
+            print(f"PDF:     {doc.pdf_path}")
+            print(f"Data:    {doc.data_json_path}")
+            print(f"Verdict: {doc.verdict} ({doc.score}/10)")
+        else:
+            print(f"FAILED: {doc.error}")
+            sys.exit(1)
+
+
+def _run(argv):
+    """Handle the `run` subcommand — end-to-end ingest + generate in one shot."""
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data run",
+        description="End-to-end: ingest inputs into a schema, then generate "
+                    "structured data or documents from it.",
+    )
+    parser.add_argument("inputs", nargs="+",
+                        help="Free-text description(s), file paths/globs, and/or s3:// URIs")
+    parser.add_argument("--output", default="structured",
+                        choices=["structured", "documents"],
+                        help="Which modality to generate (default: structured)")
+    parser.add_argument("--output-dir", default="./output",
+                        help="Directory to write artifacts to (default: ./output)")
+    parser.add_argument("--name", default="dataset",
+                        help="Logical dataset name (default: dataset)")
+    parser.add_argument("--save-schema", default=None,
+                        help="Also write the ingested InferredSchema JSON to this path")
+    # structured-only
+    parser.add_argument("--rows", type=int, default=100,
+                        help="structured only: target records per entity (default: 100)")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "parquet", "excel", "json"],
+                        help="structured only: output format (default: csv)")
+    # documents-only
+    parser.add_argument("--count", type=int, default=1,
+                        help="documents only: how many to generate")
+    parser.add_argument("--scenario", default="",
+                        help="documents only: what to generate this run")
+    parser.add_argument("--entity", default=None,
+                        help="documents only: which entity of a multi-entity schema to render")
+    parser.add_argument("--augment", action="store_true",
+                        help="documents only: apply image augmentation")
+    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
+    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices)
+    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--renderer", default="xhtml2pdf",
+                        choices=["xhtml2pdf", "weasyprint", "reportlab"])
+    parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(
+        models=ModelConfig(
+            data=args.data_model, doc=args.doc_model, critic=args.critic_model,
+            aug=args.aug_model, batch=args.batch_model,
+        ),
+        threshold=args.threshold,
+        renderer=args.renderer,
+        output_dir=args.output_dir,
+        timeout=args.timeout,
+        augment=args.augment,
+    )
+
+    verbose = not args.quiet
+    try:
+        # Ingest first so --save-schema can persist it even when generation fails.
+        schema = gen.ingest(*args.inputs, name=args.name, verbose=verbose)
+    except (ValueError, FileNotFoundError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    if args.save_schema:
+        with open(args.save_schema, "w") as f:
+            f.write(schema.model_dump_json(indent=2))
+        print(f"Wrote InferredSchema to: {args.save_schema}")
+
+    if args.output == "structured":
+        result = gen.generate_structured(
+            schema, rows=args.rows, format=args.format, verbose=verbose,
+        )
+        print(f"\n{'=' * 60}")
+        if result.success:
+            for entity, count in result.row_counts.items():
+                print(f"  {entity}: {count} rows")
+            print(f"Files: {', '.join(result.output_paths)}")
+            if result.evaluation:
+                scores = ", ".join(f"{k}={v:.2f}" for k, v in result.evaluation.items())
+                print(f"Quality: {scores}")
+        else:
+            print(f"FAILED: {result.error}")
+            sys.exit(1)
         return
 
+    # documents
+    if args.count > 1:
+        scenario = args.scenario or "Generate diverse, realistic documents"
+        batch = gen.generate_batch(
+            schema, count=args.count, scenario=scenario,
+            entity=args.entity, verbose=verbose,
+        )
+        print(f"\n{'=' * 60}")
+        print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
+        for d in batch.documents:
+            status = "OK  " if d.success else "FAIL"
+            print(f"  {status} {d.doc_id[:8]}  {d.verdict:9} {d.pdf_path or d.error}")
+        if batch.count_succeeded == 0:
+            sys.exit(1)
+    else:
+        doc = gen.generate(
+            schema, scenario=args.scenario, entity=args.entity, verbose=verbose,
+        )
+        print(f"\n{'=' * 60}")
+        if doc.success:
+            print(f"PDF:     {doc.pdf_path}")
+            print(f"Data:    {doc.data_json_path}")
+            print(f"Verdict: {doc.verdict} ({doc.score}/10)")
+        else:
+            print(f"FAILED: {doc.error}")
+            sys.exit(1)
+
+
+# Subcommand name -> handler. Kept as a table so `--help` can list them and
+# dispatch stays a single lookup.
+SUBCOMMANDS = {
+    "clone-schema-library": _clone_schema_library,
+    "packet": _packet,
+    "infer-schema": _infer_schema,
+    "ingest": _ingest,
+    "generate-structured": _generate_structured,
+    "generate-documents": _generate_documents,
+    "run": _run,
+}
+
+
+def main():
+    # Subcommand dispatch (kept separate so the default generate flow is untouched).
+    if len(sys.argv) > 1 and sys.argv[1] in SUBCOMMANDS:
+        SUBCOMMANDS[sys.argv[1]](sys.argv[2:])
+        return
     load_dotenv()
 
     from seed_data import MODELS, Generator, ModelConfig
@@ -244,7 +557,21 @@ def main():
     model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
         prog="seed-data",
-        description="AI-powered document generation pipeline",
+        description="AI-powered synthetic data generation — documents and structured data",
+        epilog=(
+            "subcommands:\n"
+            "  ingest                ingest any input into a unified schema JSON\n"
+            "  generate-structured   schema -> CSV/Parquet/Excel/JSON\n"
+            "  generate-documents    schema -> PDFs (InferredSchema JSON or schema dir)\n"
+            "  run                   end-to-end: ingest + generate in one shot\n"
+            "  infer-schema          infer a schema from real sample documents\n"
+            "  packet                generate a coordinated multi-document packet\n"
+            "  clone-schema-library  copy the bundled schemas somewhere editable\n"
+            "\n"
+            "Run `seed-data <subcommand> --help` for a subcommand's options.\n"
+            "Without a subcommand, --schema-dir generates documents (below)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--schema-dir", required=True,
                         help="Schema directory path, or a bundled schema name")

@@ -7,7 +7,6 @@ returns exactly `count` items — without any Bedrock calls.
 """
 import os
 
-import pytest
 
 from seed_data.stages import batch as batch_mod
 from seed_data.stages.base import StageContext, ModelConfig

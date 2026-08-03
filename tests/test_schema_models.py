@@ -106,6 +106,12 @@ def test_from_json_schema_flat():
 
 
 def test_from_json_schema_required_vs_nullable():
+    """`required` (key presence) and `nullable` (value may be null) are distinct.
+
+    Absence from `required` makes a field optional; it does NOT add a null branch
+    to its type. Collapsing the two would rewrite `{"type": "string"}` into
+    `anyOf: [{"type": "string"}, {"type": "null"}]` on the way back out.
+    """
     raw = {
         "title": "T", "type": "object",
         "required": ["a"],
@@ -116,8 +122,14 @@ def test_from_json_schema_required_vs_nullable():
     }
     inferred = from_json_schema(raw)
     fields = {f.name: f for f in inferred.entities[0].fields}
-    assert fields["a"].nullable is False     # required -> not nullable
-    assert fields["b"].nullable is True      # absent from required -> nullable
+    assert fields["a"].required is True
+    assert fields["b"].required is False     # absent from required -> optional
+    # neither declares a null branch, so neither is nullable
+    assert fields["a"].nullable is False
+    assert fields["b"].nullable is False
+    # only the required one demands a value
+    assert fields["a"].requires_value is True
+    assert fields["b"].requires_value is False
 
 
 def test_from_json_schema_anyof_nullable():
@@ -153,6 +165,12 @@ def test_from_json_schema_nested_array_of_objects():
 
 
 def test_from_json_schema_xprobability():
+    """`x-probability` is a published doc-gen feature and must survive a round-trip.
+
+    It drives per-document field-presence variation via the generator's
+    `random_roll` tool. Mapping it to `nullable` (the old behaviour) both dropped
+    the probability and wrongly added a null branch to the field's type.
+    """
     raw = {
         "title": "T", "type": "object", "required": ["narrative"],
         "properties": {
@@ -161,8 +179,13 @@ def test_from_json_schema_xprobability():
     }
     inferred = from_json_schema(raw)
     field = inferred.entities[0].fields[0]
-    # x-probability marks a "sometimes present" field -> nullable
-    assert field.nullable is True
+    assert field.presence_probability == 0.7
+    # "sometimes absent" is not "may be null" — the type gains no null branch
+    assert field.nullable is False
+    # but a missing value is not a defect either
+    assert field.requires_value is False
+    # and it round-trips back into the emitted schema
+    assert to_json_schema(inferred)["properties"]["narrative"]["x-probability"] == 0.7
 
 
 # --- to_json_schema round-trip ----------------------------------------------
@@ -186,8 +209,12 @@ def test_to_json_schema_roundtrip():
 
     assert rebuilt["title"] == "Widget"
     assert set(rebuilt["properties"]) == {"name", "price", "tags"}
-    assert "name" in rebuilt["required"]
-    assert "price" not in rebuilt.get("required", [])   # nullable -> not required
+    # `required` (key presence) round-trips independently of nullability: `price`
+    # is required *and* nullable — the key is always emitted, its value may be
+    # null. Collapsing the two would drop it from `required`.
+    assert set(rebuilt["required"]) == {"name", "price", "tags"}
+    assert "anyOf" in rebuilt["properties"]["price"]
+    assert {"type": "null"} in rebuilt["properties"]["price"]["anyOf"]
     # nested array of objects preserved
     assert rebuilt["properties"]["tags"]["type"] == "array"
     assert "label" in rebuilt["properties"]["tags"]["items"]["properties"]

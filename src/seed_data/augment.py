@@ -3,6 +3,7 @@
 Handles PDF → PNG → augraphy pipeline → PNG → PDF conversion.
 The LLM agent decides the augmentation config; this module executes it.
 """
+import inspect as _inspect
 import json
 import os
 
@@ -60,9 +61,6 @@ AUGMENTATION_REGISTRY = {
     "Moire": augraphy.Moire,
     "DotMatrix": augraphy.DotMatrix,
 }
-
-
-import inspect as _inspect
 
 
 def _coerce_to_default_shape(value, default):

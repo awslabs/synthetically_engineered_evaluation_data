@@ -90,7 +90,8 @@ def test_infer_schema_delegates_with_config(monkeypatch):
                         lambda schema, d: wrote.update(dir=d, schema=schema))
 
     gen = Generator()
-    cb = lambda q: "yes"
+    def cb(q):
+        return "yes"
     schema = gen.infer_schema("./s/*.pdf", name="invoice", model="haiku",
                               max_docs=3, output_dir="./out/invoice", on_question=cb)
 
@@ -144,8 +145,8 @@ def test_generate_batch_from_samples_infers_then_batches(monkeypatch):
                            count_failed=0, documents=[])
     monkeypatch.setattr(gen, "generate_batch", fake_batch)
 
-    out = gen.generate_batch_from_samples("x.pdf", name="invoice", count=7,
-                                          scenario="varied", seed=42)
+    gen.generate_batch_from_samples("x.pdf", name="invoice", count=7,
+                                     scenario="varied", seed=42)
     assert calls["schema"] is schema
     assert calls["count"] == 7 and calls["scenario"] == "varied" and calls["seed"] == 42
 

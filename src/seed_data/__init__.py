@@ -35,17 +35,26 @@ __all__ = [
     "ModelConfig",
     "GeneratedDoc",
     "BatchResult",
+    "StructuredResult",
+    "InferredSchema",
     "MODELS",
 ]
 
 
 def __getattr__(name):
-    if name in ("Generator", "BatchResult"):
-        from seed_data.api import Generator, BatchResult
-        return {"Generator": Generator, "BatchResult": BatchResult}[name]
+    if name in ("Generator", "BatchResult", "StructuredResult"):
+        from seed_data.api import BatchResult, Generator, StructuredResult
+        return {
+            "Generator": Generator,
+            "BatchResult": BatchResult,
+            "StructuredResult": StructuredResult,
+        }[name]
     if name == "Schema":
         from seed_data.schema import Schema
         return Schema
+    if name == "InferredSchema":
+        from seed_data.schema.models import InferredSchema
+        return InferredSchema
     if name == "ModelConfig":
         from seed_data.stages.base import ModelConfig
         return ModelConfig

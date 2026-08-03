@@ -11,6 +11,9 @@ Two families of models live here:
 
 :mod:`seed_data.schema.io` provides round-trip converters between JSON Schema
 documents (the bundled ``schema.json`` files) and ``InferredSchema``.
+
+:mod:`seed_data.schema.flat` provides the depth-bounded ``InferredSchema`` variant
+required when asking an LLM for one as structured output.
 """
 from seed_data.schema.legacy import Schema
 from seed_data.schema.models import (
@@ -19,21 +22,26 @@ from seed_data.schema.models import (
     DistributionType,
     EntitySchema,
     FieldDefinition,
+    GeneratedSamples,
     InferredSchema,
     RelationshipDefinition,
 )
 from seed_data.schema.io import (
     from_json_schema,
+    from_legacy_schema_dir,
     from_schema_dir,
     to_json_schema,
     to_schema_dir,
 )
+from seed_data.schema.adapter import inferred_to_resolved, inferred_to_schema
+from seed_data.schema.flat import flat_inferred_schema, to_canonical
 
 __all__ = [
     "Schema",
     "InferredSchema",
     "EntitySchema",
     "FieldDefinition",
+    "GeneratedSamples",
     "DistributionSpec",
     "DistributionType",
     "RelationshipDefinition",
@@ -41,5 +49,10 @@ __all__ = [
     "from_json_schema",
     "to_json_schema",
     "from_schema_dir",
+    "from_legacy_schema_dir",
     "to_schema_dir",
+    "inferred_to_resolved",
+    "inferred_to_schema",
+    "flat_inferred_schema",
+    "to_canonical",
 ]

@@ -4,8 +4,8 @@ title: Quick Start
 
 # Quick Start
 
-From zero to your first generated document — from either the command line or
-Python. Both paths produce the same artifacts.
+From zero to your first generated document — and your first structured dataset —
+from either the command line or Python. Both paths produce the same artifacts.
 
 ## 1. Install
 
@@ -82,6 +82,64 @@ seed-data --schema-dir invoice --augment --renderer weasyprint
 
 Run `seed-data --help` (and `seed-data packet --help`) to see every option.
 
+## 5. Generate structured data
+
+SEED also generates structured (tabular) data. That stack is opt-in, so install
+the extra first:
+
+```bash
+pip install "seed-data[structured]"
+```
+
+Structured generation starts from an **InferredSchema** — a schema describing one
+or more entities, their fields, and the relationships between them. `seed-data
+ingest` builds one from whatever you have: a plain-English description, a CSV or
+JSON of example data, a JSON Schema or SQL DDL, existing PDFs, or an ERD
+diagram. Several inputs of different kinds can be combined in one call.
+
+```bash
+seed-data ingest "Customers and their orders for a regional coffee wholesaler" \
+  --name coffee --output ./schema.json
+```
+
+That writes the schema to `./schema.json`, which is also where `--output` points
+by default. Review and edit it if you want, then generate rows from it:
+
+```bash
+seed-data generate-structured ./schema.json --rows 500 --format csv --output ./output
+```
+
+One file per entity lands in the output directory, named from the lowercased
+entity name with spaces replaced by underscores:
+
+```
+output/
+├── customer.csv
+└── order.csv
+```
+
+`--format` also accepts `json`, `excel` (`.xlsx`), and `parquet`. Parquet
+additionally needs a parquet engine — `pip install pyarrow` — which is not part
+of the `[structured]` extra.
+
+If you do not need the intermediate schema file, `seed-data run` does ingest and
+generation in one shot:
+
+```bash
+seed-data run "Customers and their orders for a regional coffee wholesaler" \
+  --name coffee --output structured --rows 500 --format csv --output-dir ./output
+```
+
+!!! note "`--output` on `run` selects the modality"
+
+    On `run`, `--output` chooses `structured` or `documents`, and `--output-dir`
+    is the path. On every other command `--output` is a path. Add
+    `--save-schema ./schema.json` to keep the ingested schema as well.
+
+The same schema can drive the document pipeline instead — `--output documents` on
+`run`, or `seed-data generate-documents ./schema.json`. For a multi-entity schema,
+`--entity` picks which entity to render.
+
 ---
 
 ## Python API Usage
@@ -131,6 +189,28 @@ pkt = gen.generate_packet("lending-package", scenario="First-time homebuyer in P
 print(pkt.merged_pdf)
 for s in pkt.sections:
     print(s.document_class, s.page_indices)
+```
+
+**Structured data** → `StructuredResult`. `ingest` returns an `InferredSchema`,
+which `generate_structured` turns into files (needs the `[structured]` extra):
+
+```python
+schema = gen.ingest(
+    "Customers and their orders for a regional coffee wholesaler",
+    name="coffee",
+)
+result = gen.generate_structured(schema, rows=500, format="csv")
+
+print(result.output_paths)   # ['./output/customer.csv', './output/order.csv']
+print(result.row_counts)     # {'Customer': 500, 'Order': 500}
+print(result.evaluation)     # quality scores per metric
+```
+
+`gen.run(...)` collapses those two calls into one, and `output="documents"` sends
+the same ingested schema down the document pipeline instead:
+
+```python
+result = gen.run("...description...", output="structured", rows=500, format="csv")
 ```
 
 **Schema from real documents** → a `Schema` you can generate from. Point SEED at
@@ -183,3 +263,5 @@ your own custom types work exactly the same way.
 - [Batch Generation](../Guides/batch-generation.md): control diversity and scale.
 - [Packets](../Guides/packets.md): coordinated multi-document sets.
 - [Create a Document Type](../Guides/creating-a-document-type.md): author your own schema.
+- [Ingest](../Guides/ingest.md): every input type, auto-detection, and the `InferredSchema` it produces.
+- [Structured Data](../Guides/structured-data.md): the full tabular guide — formats, relationships, and quality scoring.

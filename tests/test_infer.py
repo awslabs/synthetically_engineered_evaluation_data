@@ -336,6 +336,7 @@ def test_infer_schema_passes_on_question_through(tmp_path, monkeypatch):
         return ({"type": "object"}, "g")
     monkeypatch.setattr(infer_mod, "_run_inference", fake_run)
 
-    cb = lambda q: "yes"
+    def cb(q):
+        return "yes"
     infer_mod.infer_schema(str(tmp_path / "a.pdf"), name="x", on_question=cb, verbose=False)
     assert captured["on_question"] is cb
