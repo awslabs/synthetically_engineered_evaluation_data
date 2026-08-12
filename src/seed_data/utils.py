@@ -8,7 +8,7 @@ import shutil
 from strands.models import BedrockModel
 from botocore.config import Config
 
-from seed_data import MODELS
+from seed_data.model_registry import MODELS
 from seed_data.session import get_boto_session
 
 # GitHub location of the schema library, for docs and CLI messaging.

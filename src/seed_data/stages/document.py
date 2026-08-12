@@ -20,7 +20,8 @@ from strands.agent.conversation_manager.null_conversation_manager import NullCon
 from strands.multiagent import GraphBuilder
 from strands_tools import file_write, shell, editor
 
-from seed_data import prompts, MODELS
+from seed_data import prompts
+from seed_data.model_registry import MODELS
 from seed_data.tools import read_json_file, random_roll
 from seed_data.stages.base import (
     StageContext, Verdict, CritiqueIssue, FunctionNode, rejected,

@@ -12,7 +12,12 @@ the two stay in sync; callers that want a different model pass a ``models`` /
 
 from botocore.config import Config as BotoConfig
 
-from seed_data import MODELS
+# From the leaf module, not ``from seed_data import MODELS``: the package root
+# also exposes the API surface, so importing it from here reached back into a
+# partially-initialised package and worked only because ``MODELS`` was bound
+# before anything heavier. ``model_registry`` imports nothing, so there is no
+# cycle to be fragile about.
+from seed_data.model_registry import MODELS
 
 # Default model for structured generation / ingest agents. Nova 2 Lite handles
 # document + image blocks and is fast/cheap for the tabular pipeline. Resolved
