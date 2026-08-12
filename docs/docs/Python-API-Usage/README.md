@@ -5,10 +5,10 @@ title: Python API Usage
 # Python API Usage
 
 The `Generator` class is the programmatic entry point to SEED. It is configured
-once, then exposes one verb per task, each mirroring the command line: `ingest`
+once, then exposes one verb per task, each mirroring the command line: `plan`
 turns whatever you have into a schema; `generate`, `generate_batch` and
 `generate_packet` make documents from one; `generate_structured` makes tabular
-data; and `run` does ingest plus generation end-to-end. Each verb returns a typed
+data; and `plan_and_generate` does planning plus generation end-to-end. Each verb returns a typed
 result.
 
 ## Installation and setup
@@ -20,8 +20,8 @@ Install the package and configure Amazon Bedrock credentials in the environment
 pip install seed-data
 ```
 
-The base install covers the document pipeline, and `ingest` for every input kind
-except example data. The structured verbs — `generate_structured`, and `run` with
+The base install covers the document pipeline, and `plan` for every input kind
+except example data. The structured verbs — `generate_structured`, and `plan_and_generate` with
 `output="structured"` — need the `[structured]` extra
 (pandas/numpy/scipy/openpyxl). Called without it, they report the missing
 dependency rather than generating anything:
@@ -184,14 +184,14 @@ for r in results:
     print(r.packet_id, r.success, len(r.sections), "sections")
 ```
 
-## Ingest
+## Plan
 
-`ingest` is the front door for turning whatever you already have into a schema.
+`plan` is the front door for turning whatever you already have into a schema.
 It takes one or more inputs, classifies each one, and returns a single
 `InferredSchema` describing every entity it found:
 
 ```python
-schema = gen.ingest(
+schema = gen.plan(
     "Customers and the orders they place with a regional coffee wholesaler",
     "./samples/customers.csv",
     "./ddl/orders.sql",
@@ -242,7 +242,7 @@ Path("./schema.json").write_text(schema.model_dump_json(indent=2))
 schema = InferredSchema.model_validate_json(Path("./schema.json").read_text())
 ```
 
-Editing that JSON by hand is the supported way to correct anything ingest got
+Editing that JSON by hand is the supported way to correct anything planning got
 wrong before you generate from it.
 
 ## Structured data
@@ -321,11 +321,11 @@ print(frames["order"].head())
 
 ## End-to-end (run)
 
-`run` chains `ingest` into a generation verb, so no intermediate schema file is
+`plan_and_generate` chains `plan` into a generation verb, so no intermediate schema file is
 needed. For structured output it returns a `StructuredResult`:
 
 ```python
-result = gen.run(
+result = gen.plan_and_generate(
     "Customers and the orders they place with a regional coffee wholesaler",
     "./samples/customers.csv",
     output="structured",
@@ -336,16 +336,16 @@ result = gen.run(
 print(result.output_paths, result.row_counts)
 ```
 
-For documents it sends the same ingested schema down the document pipeline:
+For documents it sends the same planned schema down the document pipeline:
 
 ```python
-doc = gen.run(
+doc = gen.plan_and_generate(
     "./real/order_confirmation.pdf",
     output="documents",
     scenario="Pacific-northwest coffee wholesaler",
 )
 
-batch = gen.run(
+batch = gen.plan_and_generate(
     "./real/order_confirmation.pdf",
     output="documents",
     count=10,
@@ -371,27 +371,29 @@ def summarize(result: StructuredResult | GeneratedDoc | BatchResult) -> str:
         return f"one document: {result.pdf_path}"
     raise TypeError(f"unexpected result type {type(result).__name__}")
 
-print(summarize(gen.run("./real/order_confirmation.pdf", output="documents")))
+print(summarize(gen.plan_and_generate("./real/order_confirmation.pdf", output="documents")))
 ```
 
-`run` takes no `seed`, and it has no equivalent of the CLI's `--save-schema`. For
-structured output the ingested schema comes back on `result.schema`; for documents
-there is no handle on it. Call `ingest` and the generation verb separately when you
-want to keep the schema on disk, review it before generating, or need a `seed` for
-a regression-stable batch.
+`plan_and_generate` accepts `seed`, but has no equivalent of the CLI's
+`--save-schema`. For structured output the planned schema comes back on
+`result.schema`; for documents there is no handle on it. Note also that `seed`
+cannot pin the schema — planning is an LLM step — so a seeded re-run reproduces the
+values drawn for a given schema, not the schema itself. Call `plan` and the
+generation verb separately when you want to keep the schema on disk, review it
+before generating, or need one fixed schema across repeated runs.
 
 ## Specifying a schema
 
 Every method accepts a schema in three forms — a bundled name, a directory path, or
 an in-code [`Schema`](../API-Reference/generator.md#schema-define-a-document-type-in-code).
 `generate` and `generate_batch` accept a fourth: an `InferredSchema`, the type
-`ingest` returns:
+`plan` returns:
 
 ```python
 gen.generate("invoice")                     # bundled schema name
 gen.generate("./my-schemas/invoice")        # directory path
 gen.generate(my_schema_object)              # in-code Schema (below)
-gen.generate(inferred_schema)               # InferredSchema, e.g. from gen.ingest(...)
+gen.generate(inferred_schema)               # InferredSchema, e.g. from gen.plan(...)
 ```
 
 An in-code [`Schema`](../API-Reference/generator.md#schema-define-a-document-type-in-code)
@@ -429,7 +431,7 @@ An `InferredSchema` describes one or more entities, so `generate` and
 document type. It defaults to the first entity:
 
 ```python
-schema = gen.ingest("Customers and their orders for a coffee wholesaler", name="coffee")
+schema = gen.plan("Customers and their orders for a coffee wholesaler", name="coffee")
 
 doc   = gen.generate(schema, entity="Order", scenario="Pacific-northwest wholesaler")
 batch = gen.generate_batch(schema, entity="Order", count=10,
@@ -487,7 +489,7 @@ populated. It is pure Python, so it works in the base install:
 ```python
 from seed_data.evaluation import evaluate_document_labels
 
-schema = gen.ingest("Purchase orders for a coffee wholesaler", name="coffee")
+schema = gen.plan("Purchase orders for a coffee wholesaler", name="coffee")
 batch = gen.generate_batch(schema, entity="Order", count=10,
                            scenario="Coffee wholesalers across different US regions")
 
@@ -556,7 +558,7 @@ for issue in report.issues:
 ## See also
 
 - [CLI Usage](../CLI-Usage/README.md) — the same capabilities from the command line.
-- [Ingest](../Guides/ingest.md) — every input type and the `InferredSchema` it produces.
+- [Plan](../Guides/plan.md) — every input type and the `InferredSchema` it produces.
 - [Structured Data](../Guides/structured-data.md) — the full tabular guide.
 - [Schema from Documents](../Guides/schema-from-documents.md) — infer schemas from real documents.
 - [`Generator` API reference](../API-Reference/generator.md) — full method signatures.

@@ -1,6 +1,6 @@
-"""Integration: end-to-end ``Generator.run()`` across both modalities (Milestone 4).
+"""Integration: end-to-end ``Generator.plan_and_generate()`` across both modalities (Milestone 4).
 
-The one schema, ingested once, drives both structured and document generation —
+The one schema, planned once, drives both structured and document generation —
 the unification the whole plan is about. Also exercises the cross-modality
 evaluators (§4.2) on real generated output.
 
@@ -17,7 +17,7 @@ from seed_data.stages.pipeline import GeneratedDoc
 
 
 def test_generator_run_structured_text(generator):
-    result = generator.run("Customer orders with an order total and a status",
+    result = generator.plan_and_generate("Customer orders with an order total and a status",
                            output="structured", rows=20)
     assert isinstance(result, StructuredResult)
     assert result.success, f"structured run failed: {result.error}"
@@ -27,7 +27,7 @@ def test_generator_run_structured_text(generator):
 
 
 def test_generator_run_documents_text(generator):
-    result = generator.run("FCC broadcast advertising invoices",
+    result = generator.plan_and_generate("FCC broadcast advertising invoices",
                            output="documents", count=2)
     assert isinstance(result, BatchResult)
     assert result.count_succeeded >= 1, result
@@ -36,9 +36,9 @@ def test_generator_run_documents_text(generator):
 
 def test_same_schema_both_modalities(generator):
     """Ingest once, generate both ways — fields must be consistent across them."""
-    schema = generator.ingest("Retail customer orders", name="retail")
+    schema = generator.plan("Retail customer orders", name="retail")
     fields = {f.name for e in schema.entities for f in e.fields}
-    assert fields, "ingest produced no fields"
+    assert fields, "plan produced no fields"
 
     structured = generator.generate_structured(schema, rows=10)
     assert isinstance(structured, StructuredResult)
@@ -60,7 +60,7 @@ def test_generator_run_from_csv_input(generator, tmp_path):
         for i in range(5):
             w.writerow([f"O{i}", f"Cust{i}", 10.0 * i, "open" if i % 2 else "closed"])
 
-    result = generator.run(str(csv_path), output="structured", rows=15)
+    result = generator.plan_and_generate(str(csv_path), output="structured", rows=15)
     assert isinstance(result, StructuredResult)
     assert result.success
     # schema fields should reflect the CSV columns
@@ -70,7 +70,7 @@ def test_generator_run_from_csv_input(generator, tmp_path):
 
 def test_evaluation_on_documents(generator):
     """After generating a doc, its label JSON scores for coverage/completeness."""
-    schema = generator.ingest("FCC broadcast advertising invoices", name="fcc")
+    schema = generator.plan("FCC broadcast advertising invoices", name="fcc")
     doc = generator.generate(schema)
     assert doc.success
 
@@ -88,7 +88,7 @@ def test_evaluation_on_documents(generator):
 
 def test_critique_structured_on_generated_data(generator):
     """The structured critique runs against real generated data and returns a score."""
-    schema = generator.ingest("Customer orders with dates and totals", name="orders")
+    schema = generator.plan("Customer orders with dates and totals", name="orders")
     result = generator.generate_structured(schema, rows=10, format="json")
     assert result.success
 

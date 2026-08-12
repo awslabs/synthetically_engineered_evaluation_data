@@ -143,19 +143,19 @@ def test_infer_schema_packet_with_then_generate_rejected():
     assert "then-generate" in (r.stderr + r.stdout).lower()
 
 
-# --- ingest subcommand parses (no Bedrock) ---------------------------------
+# --- plan subcommand parses (no Bedrock) -----------------------------------
 
-def test_ingest_help_exits_clean():
-    r = _run("ingest", "--help")
+def test_plan_help_exits_clean():
+    r = _run("plan", "--help")
     assert r.returncode == 0
     out = r.stdout
     for flag in ("--name", "--output", "--quiet"):
-        assert flag in out, f"{flag} missing from ingest --help"
+        assert flag in out, f"{flag} missing from plan --help"
 
 
-def test_ingest_requires_inputs():
+def test_plan_requires_inputs():
     # no positional inputs -> argparse exits 2
-    r = _run("ingest")
+    r = _run("plan")
     assert r.returncode == 2
 
 
@@ -202,25 +202,25 @@ def test_generate_documents_bad_model_choice_errors():
     assert "invalid choice" in r.stderr.lower()
 
 
-# --- run subcommand parses (no Bedrock) ------------------------------------
+# --- plan-and-generate subcommand parses (no Bedrock) ----------------------
 
-def test_run_help_exits_clean():
-    r = _run("run", "--help")
+def test_plan_and_generate_help_exits_clean():
+    r = _run("plan-and-generate", "--help")
     assert r.returncode == 0
     out = r.stdout
-    # `run`'s defining split: --output selects the MODALITY, --output-dir the path.
+    # The defining split: --output selects the MODALITY, --output-dir the path.
     for flag in ("--output", "--output-dir", "--rows", "--count", "--name"):
-        assert flag in out, f"{flag} missing from run --help"
+        assert flag in out, f"{flag} missing from plan-and-generate --help"
 
 
-def test_run_requires_inputs():
-    r = _run("run")
+def test_plan_and_generate_requires_inputs():
+    r = _run("plan-and-generate")
     assert r.returncode == 2
 
 
-def test_run_invalid_output_errors():
+def test_plan_and_generate_invalid_output_errors():
     # --output must be structured|documents -> argparse rejects other choices
-    r = _run("run", "some text", "--output", "invalid")
+    r = _run("plan-and-generate", "some text", "--output", "invalid")
     assert r.returncode == 2
     assert "invalid choice" in r.stderr.lower()
 
@@ -231,8 +231,9 @@ def test_all_subcommands_listed():
     r = _run("--help")
     assert r.returncode == 0
     out = r.stdout
-    for sub in ("ingest", "generate-structured", "generate-documents", "run",
-                "packet", "infer-schema", "clone-schema-library"):
+    for sub in ("plan", "generate-structured", "generate-documents",
+                "plan-and-generate", "packet", "infer-schema",
+                "clone-schema-library"):
         assert sub in out, f"{sub} not listed in top-level --help"
 
 
@@ -335,13 +336,15 @@ def test_generate_structured_without_extra_prints_install_hint(no_pandas_env):
     assert "Traceback" not in r.stderr, "the guidance must not be buried in a traceback"
 
 
-def test_run_structured_without_extra_fails_before_ingest(no_pandas_env):
-    """`run --output structured` must refuse up front, not after a paid ingest.
+def test_plan_and_generate_structured_without_extra_fails_before_planning(no_pandas_env):
+    """`plan-and-generate --output structured` must refuse up front, not after a
+    paid planning run.
 
-    ingest is a multi-agent LLM run; reaching it would mean spending tokens (and
+    Planning is a multi-agent LLM run; reaching it would mean spending tokens (and
     needing credentials) before reporting something knowable at startup.
     """
-    r = _run_env(no_pandas_env, "run", "some free text", "--output", "structured")
+    r = _run_env(no_pandas_env, "plan-and-generate", "some free text",
+                 "--output", "structured")
 
     assert r.returncode == 1
     assert "seed-data[structured]" in r.stderr
@@ -360,3 +363,31 @@ def test_generate_documents_without_extra_still_parses(no_pandas_env):
 
     assert r.returncode == 0
     assert "--entity" in r.stdout
+
+
+# --- deprecated subcommand aliases -----------------------------------------
+
+@pytest.mark.parametrize("old,new", [("ingest", "plan"), ("run", "plan-and-generate")])
+def test_deprecated_subcommand_still_dispatches(old, new):
+    """The retired spelling reaches the same handler, and says so on stderr.
+
+    `--help` is the probe because it proves dispatch without a Bedrock call: the
+    renamed handler is the only thing that could have printed that usage text.
+    """
+    r = _run(old, "--help")
+    assert r.returncode == 0
+    assert f"seed-data {new}" in r.stdout, "alias did not reach the renamed handler"
+    assert "deprecated" in r.stderr.lower()
+    assert f"seed-data {new}" in r.stderr, "the warning must name the replacement"
+
+
+@pytest.mark.parametrize("old", ["ingest", "run"])
+def test_deprecated_subcommands_are_not_advertised(old):
+    """A deprecated alias must not appear in top-level --help.
+
+    Listing it would recommend the name being retired. This is what keeps
+    DEPRECATED_SUBCOMMANDS a separate table from SUBCOMMANDS rather than extra
+    keys in it — `test_all_subcommands_listed` iterates the latter.
+    """
+    out = _run("--help").stdout
+    assert f"  {old} " not in out

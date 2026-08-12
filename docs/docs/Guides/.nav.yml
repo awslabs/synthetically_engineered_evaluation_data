@@ -1,6 +1,6 @@
 nav:
   - README.md
-  - ingest.md
+  - plan.md
   - structured-data.md
   - creating-a-document-type.md
   - schema-from-documents.md

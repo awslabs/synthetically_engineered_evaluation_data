@@ -1,12 +1,12 @@
 ---
-title: Ingest
+title: Plan
 ---
 
-# Ingest
+# Plan
 
-Ingest is the **one front door** into SEED. It takes any description of a dataset
-— a sentence of prose, a CSV of real rows, a JSON Schema, a SQL `CREATE TABLE`, a
-scanned PDF, an ERD diagram — and turns it into a single canonical
+Planning is the **one front door** into SEED. The `plan` verb takes any description
+of a dataset — a sentence of prose, a CSV of real rows, a JSON Schema, a SQL
+`CREATE TABLE`, a scanned PDF, an ERD diagram — and turns it into a single canonical
 `InferredSchema`. That one schema then drives either output modality, so you
 describe your data once and choose the shape it comes out in afterwards.
 
@@ -17,11 +17,11 @@ Two things you can do with the result:
 - **Documents** — feed the *same* schema to `generate-documents` for rendered
   PDFs with paired ground-truth labels.
 
-!!! note "An ingested schema is a draft for review"
-    Ingest infers structure and constraints from whatever you gave it. A wrong
+!!! note "A planned schema is a draft for review"
+    Planning infers structure and constraints from whatever you gave it. A wrong
     `required` field, a too-narrow numeric range, or a missed relationship would
     skew every record and every document you later generate, so `seed-data
-    ingest` **writes the schema and stops** for you to review. Read
+    plan` **writes the schema and stops** for you to review. Read
     `schema.json`, fix anything off, then generate.
 
 Every input is classified automatically — you never declare what you are handing
@@ -44,11 +44,11 @@ on disk.
 ### CLI
 
 ```bash
-seed-data ingest "Retail bank customers with credit scores and account tiers, plus the orders each customer placed" \
+seed-data plan "Retail bank customers with credit scores and account tiers, plus the orders each customer placed" \
   --name banking --output ./schema.json
 ```
 
-Ingest writes one `InferredSchema` JSON file and prints what it found:
+`plan` writes one `InferredSchema` JSON file and prints what it found:
 
 ```text
 ============================================================
@@ -67,14 +67,14 @@ Generate structured data with:
 
 ### Python
 
-`Generator.ingest(...)` returns a typed `InferredSchema` — not a dict — so it
+`Generator.plan(...)` returns a typed `InferredSchema` — not a dict — so it
 drops straight into the generation verbs:
 
 ```python
 from seed_data import Generator
 
 gen = Generator()
-schema = gen.ingest(
+schema = gen.plan(
     "Retail bank customers with credit scores and account tiers",
     name="banking",
 )
@@ -83,7 +83,7 @@ print([e.entity_name for e in schema.entities])
 
 ## Example data
 
-Point ingest at real rows and it reads them, summarizes each column (types,
+Point `plan` at real rows and it reads them, summarizes each column (types,
 cardinality, null counts, ranges, sample values), and infers semantic types
 (email, phone, date, enum) and constraints from what it sees. `.csv`, `.json`,
 `.xls`, and `.xlsx` are recognized.
@@ -92,16 +92,16 @@ cardinality, null counts, ranges, sample values), and infers semantic types
 
 ```bash
 # a CSV of real rows -> a schema shaped like that data
-seed-data ingest ./samples/customers.csv --name customers --output ./schema.json
+seed-data plan ./samples/customers.csv --name customers --output ./schema.json
 
 # a spreadsheet works the same way
-seed-data ingest ./samples/sales.xlsx --name sales --output ./schema.json
+seed-data plan ./samples/sales.xlsx --name sales --output ./schema.json
 ```
 
 ### Python
 
 ```python
-schema = gen.ingest("./samples/customers.csv", name="customers")
+schema = gen.plan("./samples/customers.csv", name="customers")
 ```
 
 Real rows are the strongest signal available for value distributions: a column of
@@ -118,10 +118,10 @@ format is chosen from the extension.
 
 ```bash
 # a JSON Schema document
-seed-data ingest ./contracts/customer.schema.json --name customer --output ./schema.json
+seed-data plan ./contracts/customer.schema.json --name customer --output ./schema.json
 
 # SQL DDL — CREATE TABLE statements, including foreign keys
-seed-data ingest ./db/schema.sql --name warehouse --output ./schema.json
+seed-data plan ./db/schema.sql --name warehouse --output ./schema.json
 ```
 
 A `.json` path only counts as a formal schema when the file **exists on disk**; a
@@ -130,7 +130,7 @@ description that happens to end in `.json` is treated as free text instead.
 ### Python
 
 ```python
-schema = gen.ingest("./db/schema.sql", name="warehouse")
+schema = gen.plan("./db/schema.sql", name="warehouse")
 ```
 
 ## Documents
@@ -144,17 +144,17 @@ PNG, or JPEG**, from local paths, globs, directories, or `s3://` URIs — an
 
 ```bash
 # one real invoice -> a schema of the fields it contains
-seed-data ingest ./samples/invoice.pdf --name invoice --output ./schema.json
+seed-data plan ./samples/invoice.pdf --name invoice --output ./schema.json
 
 # globs and s3:// both work
-seed-data ingest './samples/*.pdf' --name invoice --output ./schema.json
-seed-data ingest s3://my-bucket/invoices/ --name invoice --output ./schema.json
+seed-data plan './samples/*.pdf' --name invoice --output ./schema.json
+seed-data plan s3://my-bucket/invoices/ --name invoice --output ./schema.json
 ```
 
 ### Python
 
 ```python
-schema = gen.ingest("./samples/invoice.pdf", name="invoice")
+schema = gen.plan("./samples/invoice.pdf", name="invoice")
 ```
 
 `--name` matters most for this input kind: it becomes the document-type name the
@@ -163,19 +163,19 @@ vision inference works against.
 ## ERD diagrams
 
 An entity-relationship diagram already states the entities, their fields, and the
-foreign keys between them. Ingest parses **DBML** (`.dbml`), **PlantUML**
+foreign keys between them. `plan` parses **DBML** (`.dbml`), **PlantUML**
 (`.puml`, `.plantuml`), and **Mermaid** (`.mmd`, `.mermaid`).
 
 ### CLI
 
 ```bash
-seed-data ingest ./design/warehouse.dbml --name warehouse --output ./schema.json
+seed-data plan ./design/warehouse.dbml --name warehouse --output ./schema.json
 ```
 
 ### Python
 
 ```python
-schema = gen.ingest("./design/warehouse.dbml", name="warehouse")
+schema = gen.plan("./design/warehouse.dbml", name="warehouse")
 ```
 
 An ERD is the best input for **multi-entity** datasets, because the relationships
@@ -183,14 +183,14 @@ are explicit rather than inferred.
 
 ## Combining inputs
 
-Ingest accepts several inputs of **different kinds in one call**. Each is
+`plan` accepts several inputs of **different kinds in one call**. Each is
 classified and routed independently, and the resulting entities are merged into
 one `InferredSchema`.
 
 ### CLI
 
 ```bash
-seed-data ingest \
+seed-data plan \
   ./design/warehouse.dbml \
   ./samples/customers.csv \
   "Orders skew heavily toward Q4; about 8% are refunded" \
@@ -200,7 +200,7 @@ seed-data ingest \
 ### Python
 
 ```python
-schema = gen.ingest(
+schema = gen.plan(
     "./design/warehouse.dbml",              # entities + relationships
     "./samples/customers.csv",              # observed value distributions
     "Orders skew heavily toward Q4",         # the domain rule no file states
@@ -212,7 +212,7 @@ Combining sharpens the result because the input kinds are good at different
 things. The ERD or DDL fixes the **structure** and the foreign keys; the example
 data fixes the **value distributions**; the free text supplies the **domain rules
 that live nowhere in either** — seasonality, plausible ratios, business
-constraints. Ingesting them together gets you all three in one schema instead of
+constraints. Planning from all of them together gets you all three in one schema instead of
 one of the three plus guesswork.
 
 ## The InferredSchema
@@ -312,13 +312,80 @@ The parts worth understanding before you edit it:
   `max_length`, `pattern`, `enum_values`, `default`, and `children` for nested
   object and array fields.
 
+### Relationship to JSON Schema
+
+`InferredSchema` is **not a competing format**. JSON Schema is the interchange
+format, and `InferredSchema` is a deliberate superset of it: everything JSON
+Schema can say about a field, it says the same way (`pattern`, `minimum` /
+`maximum`, `minLength` / `maxLength`, `enum`, `required`, nested `properties`,
+array `items`), plus the generation metadata JSON Schema has no vocabulary for.
+
+Both directions ship in `seed_data.schema.io`:
+
+```python
+import json
+from seed_data.schema.io import from_json_schema, to_json_schema
+
+with open("customer.schema.json") as f:
+    schema = from_json_schema(json.load(f))       # standard -> canonical
+
+document = to_json_schema(schema, entity_name="Customer")  # canonical -> standard
+```
+
+`from_schema_dir` is the directory-level form of the same import, for a folder of
+per-entity JSON Schema files.
+
+Handing `seed-data plan` a `.json` file that exists on disk routes through
+`from_json_schema` — that is what the [Formal schema](#formal-schema) path above
+does, so **you never have to convert anything by hand**.
+
+#### What the superset adds, and why it can't be JSON Schema
+
+JSON Schema answers "is this one document valid?". Generation needs to answer
+"how do I synthesize a correlated multi-entity dataset?" — a different question,
+and these four fields are what carry the difference:
+
+| `InferredSchema` field | What it holds | Why JSON Schema can't express it |
+|---|---|---|
+| `distribution` | `DistributionSpec` — `normal`, `log_normal`, `categorical_weighted`, … with `params` | JSON Schema constrains the *range* a value may fall in, never the *shape* of a population. `{"minimum": 300, "maximum": 850}` accepts a column of all 300s. |
+| `structured_relationships` | `RelationshipDefinition` — source/target entity + field, cardinality | Cross-document foreign keys are outside JSON Schema's scope; `$ref` composes schemas, it does not declare that one instance's field must equal another instance's. |
+| `generation_guidance` | Per-entity free text steering realism | Instructions to a generator, not constraints on a value. |
+| `reference_samples` | Real example rows to imitate | A validator has no use for examples; `examples` is annotation-only and carries no generation semantics. |
+
+Two structural differences also matter:
+
+- **Multi-entity.** One `InferredSchema` holds many entities; a JSON Schema
+  document describes one object. `to_json_schema` therefore serializes **one
+  entity at a time** (`entity_name=` picks which; the first by default).
+- **The round trip is lossy in one direction.** Starting from a JSON Schema
+  document, `from_json_schema` → `to_json_schema` returns what you gave it —
+  types, `required`, `pattern`, bounds, lengths, `enum`, and `x-probability` all
+  come back unchanged. Starting from an `InferredSchema`, exporting and reimporting
+  **loses** the four superset fields above and three more that `to_json_schema`
+  does not emit: `unique`, `default`, and `structured_relationships`.
+
+    So export to JSON Schema for interop with external validators, but keep the
+    `InferredSchema` JSON as your source of truth — don't use a round trip through
+    JSON Schema as a way to store or edit a schema.
+
+#### Custom extensions
+
+Where a JSON Schema extension is genuinely needed, SEED uses the standard `x-`
+prefix convention. Currently one such key is read and written:
+`x-probability`, which maps to `FieldDefinition.presence_probability` and lets a
+field be *sometimes present* across generated documents. It survives the round
+trip in both directions. If the superset fields above ever need to travel inside
+a JSON Schema document rather than beside it, the same `x-` convention is the
+route, and distribution metadata could be aligned with an external vocabulary
+should a standard one emerge.
+
 ### CLI
 
 The file `--output` wrote is plain JSON. Read it, edit it in any editor, and pass
 it back to either generation command:
 
 ```bash
-seed-data ingest "..." --name banking --output ./schema.json
+seed-data plan "..." --name banking --output ./schema.json
 # review and edit ./schema.json, then:
 seed-data generate-structured ./schema.json --rows 500 --format csv
 seed-data generate-documents ./schema.json --entity Customer --count 5
@@ -333,7 +400,7 @@ all use its standard methods:
 from seed_data import Generator, InferredSchema
 
 gen = Generator()
-schema = gen.ingest("Retail bank customers and their orders", name="banking")
+schema = gen.plan("Retail bank customers and their orders", name="banking")
 
 # read
 for entity in schema.entities:
@@ -363,5 +430,5 @@ schema name, if you would rather not load it yourself.
 
 ## Related
 
-- [Structured Data](structured-data.md): generate tabular data from an ingested schema.
+- [Structured Data](structured-data.md): generate tabular data from a planned schema.
 - [Schema from Documents](schema-from-documents.md): the document-only inference path, with clarifying questions and packet splitting.

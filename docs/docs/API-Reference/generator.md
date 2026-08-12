@@ -36,21 +36,21 @@ back into generation (see [Schema from Documents](../Guides/schema-from-document
 | `gen.generate_from_samples(...)` | infer, then generate one document | `GeneratedDoc` |
 | `gen.generate_batch_from_samples(...)` | infer, then generate a batch | `BatchResult` |
 
-**Ingest & structured data** — turn any input into a schema, generate tabular data
+**Planning & structured data** — turn any input into a schema, generate tabular data
 from it, or do both in one call:
 
 | Verb | Makes | Returns |
 |---|---|---|
-| `gen.ingest(...)` | one schema from any mix of inputs | `InferredSchema` |
+| `gen.plan(...)` | one schema from any mix of inputs | `InferredSchema` |
 | `gen.generate_structured(...)` | tabular data (CSV/Parquet/Excel/JSON) | `StructuredResult` |
-| `gen.run(...)` | ingest, then generate — end to end | `GeneratedDoc` \| `BatchResult` \| `StructuredResult` |
+| `gen.plan_and_generate(...)` | plan, then generate — end to end | `GeneratedDoc` \| `BatchResult` \| `StructuredResult` |
 
 See also the task-oriented guides:
 [Single Document](../Guides/single-document.md) ·
 [Batch Generation](../Guides/batch-generation.md) ·
 [Packets](../Guides/packets.md) ·
 [Schema from Documents](../Guides/schema-from-documents.md) ·
-[Ingest](../Guides/ingest.md) ·
+[Plan](../Guides/plan.md) ·
 [Structured Data](../Guides/structured-data.md).
 
 ## `Generator(...)` — configure once
@@ -76,7 +76,7 @@ gen = Generator(
 # Discover what's bundled with the package:
 Generator.available_schemas()      # -> ["invoice", ...]
 Generator.available_packets()      # -> ["lending-package", ...]
-Generator.available_input_types()  # -> ["free_text", "example_data", ...] (ingest)
+Generator.available_input_types()  # -> ["free_text", "example_data", ...] (plan)
 ```
 
 `threshold=7` is the Python default; the CLI's `--threshold` defaults to `5`.
@@ -97,7 +97,7 @@ region portability (EU/GovCloud).
 
 Returns a [`GeneratedDoc`](#generateddoc). `schema` accepts a bundled schema name,
 a path to a schema directory, a [`Schema`](#schema-define-a-document-type-in-code)
-object, or an [`InferredSchema`](#inferredschema) (e.g. straight from `ingest`).
+object, or an [`InferredSchema`](#inferredschema) (e.g. straight from `plan`).
 
 ```python
 from seed_data import Generator, ModelConfig
@@ -257,7 +257,7 @@ batch = gen.generate_batch_from_samples(
 )
 ```
 
-## `gen.ingest(...)` — any input to a schema
+## `gen.plan(...)` — any input to a schema
 
 The unified front door. Takes any mix of inputs — free-text descriptions, example
 data files, formal schema definitions, real documents, ERD diagrams — auto-detects
@@ -271,7 +271,7 @@ from seed_data import Generator
 
 gen = Generator()
 
-schema = gen.ingest(
+schema = gen.plan(
     "Customers place orders; each order has line items",  # free text
     "./samples/customers.csv",   # example data (CSV/XLS/XLSX)
     "./ddl/orders.sql",          # a formal schema (SQL DDL or JSON Schema)
@@ -311,21 +311,21 @@ Generator.available_input_types()
 ```
 
 Profiling `example_data` needs pandas, from the `[structured]` extra. Free-text,
-document, schema, and ERD ingestion all work in the lean base install.
+document, schema, and ERD planning all work in the lean base install.
 
 ## `gen.generate_structured(...)` — tabular data
 
 Generate structured (tabular) data from an `InferredSchema`. Returns a
 [`StructuredResult`](#structuredresult). `schema` accepts a bundled schema name, a
 path to an `InferredSchema` JSON file, or an `InferredSchema` object (e.g. straight
-from `ingest`). Output goes to the `Generator`'s `output_dir`.
+from `plan`). Output goes to the `Generator`'s `output_dir`.
 
 ```python
 from seed_data import Generator
 
 gen = Generator(output_dir="./output")
 
-schema = gen.ingest("Customers and their orders", name="retail")
+schema = gen.plan("Customers and their orders", name="retail")
 
 result = gen.generate_structured(
     schema,              # bundled name, InferredSchema JSON path, or InferredSchema
@@ -357,9 +357,9 @@ which ships pyarrow.
     `success=False` made it look like the pipeline had run and failed. The
     document pipeline never needs the extra.
 
-## `gen.run(...)` — end to end
+## `gen.plan_and_generate(...)` — end to end
 
-Ingest inputs and generate from the result in one call: no intermediate schema file,
+Plan a schema from the inputs and generate from it in one call: no intermediate file,
 no second verb. `output` selects the **modality**; the destination directory is the
 `Generator`'s `output_dir`.
 
@@ -368,10 +368,10 @@ from seed_data import Generator
 
 gen = Generator(output_dir="./output")
 
-result = gen.run(
-    "Customers place orders; each order has line items",  # anything ingest accepts
+result = gen.plan_and_generate(
+    "Customers place orders; each order has line items",  # anything planning accepts
     output="structured",   # "structured" (tables) | "documents" (PDFs)
-    name="retail",         # logical dataset name, passed to ingest
+    name="retail",         # logical dataset name, passed to plan
     rows=100,              # structured only: target records per entity
     format="csv",          # structured only: csv | parquet | excel | json
     count=1,               # documents only: how many (>1 dispatches to batch)
@@ -395,7 +395,7 @@ Any other `output` value raises `ValueError`. Narrow the union by checking the
 modality you asked for:
 
 ```python
-result = gen.run("./samples/*.pdf", output="documents", count=5,
+result = gen.plan_and_generate("./samples/*.pdf", output="documents", count=5,
                  scenario="Midwest food distributors")
 
 print(result.count_succeeded)          # BatchResult, because count > 1
@@ -403,9 +403,9 @@ for doc in result.succeeded:
     print(doc.pdf_path)
 ```
 
-`run` is a convenience chain over [`ingest`](#geningest-any-input-to-a-schema)
+`plan_and_generate` is a convenience chain over [`plan`](#genplan-any-input-to-a-schema)
 plus one generation verb, so it exposes no `seed` or `on_document` hooks — call
-`ingest` then `generate_batch` yourself when you need those.
+`plan` then `generate_batch` yourself when you need those.
 
 ## Clarifying dialogue (`on_question`)
 
@@ -542,7 +542,7 @@ schema = Schema.from_dir("./schemas/invoice")
 
 `Schema` above is the legacy in-code document type, still fully supported and still
 what a schema directory loads into. Alongside it lives the canonical model shared by
-both modalities — it is what `ingest` returns, what `generate_structured` consumes,
+both modalities — it is what `plan` returns, what `generate_structured` consumes,
 and what `generate`/`generate_batch` accept via their `entity=` argument. Three
 nested classes, all importable from `seed_data.schema`:
 

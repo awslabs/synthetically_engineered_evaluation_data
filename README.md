@@ -1,6 +1,6 @@
 # Synthetically Engineered Evaluation Data (SEED)
 
-AI-powered synthetic data generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set. SEED also generates **structured (tabular) data** — CSV, Parquet, Excel, or JSON, one file per entity — from the same ingested schema.
+AI-powered synthetic data generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set. SEED also generates **structured (tabular) data** — CSV, Parquet, Excel, or JSON, one file per entity — from the same planned schema.
 
 Designed for building evaluation datasets for document understanding systems (OCR, Key Information Extraction (KIE), document classification) and for tabular datasets to exercise data pipelines, analytics, and ML workflows. Use it from the command line (`seed-data`) or the typed Python API (`seed_data.Generator`).
 
@@ -72,9 +72,9 @@ seed-data --schema-dir invoice --scenario "Midwest food-distributor invoice"   #
 seed-data --schema-dir fcc-invoice --count 10 --scenario "Local TV stations"    # batch
 seed-data packet lending-package --scenario "First-time homebuyer in Portland"  # packet
 seed-data infer-schema ./samples/*.pdf --name invoice --output ./schemas/invoice  # schema from real docs
-seed-data ingest "Customers and their orders" --output ./schema.json              # any input -> schema
+seed-data plan "Customers and their orders" --output ./schema.json              # any input -> schema
 seed-data generate-structured ./schema.json --rows 500 --format parquet           # structured (tabular)
-seed-data run "Customers and their orders" --output structured --rows 500         # ingest + generate
+seed-data plan-and-generate "Customers and their orders" --output structured --rows 500         # plan + generate
 ```
 
 **Python:**
@@ -88,9 +88,9 @@ doc    = gen.generate("invoice", scenario="Midwest food-distributor invoice")
 batch  = gen.generate_batch("fcc-invoice", count=10, scenario="Local TV stations")
 packet = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland")
 schema = gen.infer_schema("./samples/*.pdf", name="invoice")  # reverse-engineer a schema from real docs
-ing    = gen.ingest("Customers and their orders")             # any input -> InferredSchema
+ing    = gen.plan("Customers and their orders")             # any input -> InferredSchema
 table  = gen.generate_structured(ing, rows=500)               # structured (tabular) data
-result = gen.run("Customers and their orders")                # ingest + generate, one call
+result = gen.plan_and_generate("Customers and their orders")                # plan + generate, one call
 ```
 
 **Schema from documents** — the inverse of generation. Point SEED at real example
@@ -121,16 +121,16 @@ The document pipeline never needs the extra. Structured commands raise a clear
 `ImportError` pointing at it if it is missing. Every output format works with the
 extra installed — no separate engine install.
 
-Ingest is the shared front door. `seed-data ingest` takes free text, example
+Planning is the shared front door. `seed-data plan` takes free text, example
 data files (CSV/JSON/XLSX), formal schemas (JSON Schema, SQL DDL), documents
 (PDF/PNG/JPEG, read with a vision model), ERD diagrams — or several of those
-together — and writes one unified `InferredSchema` JSON. The **same ingested
+together — and writes one unified `InferredSchema` JSON. The **same planned
 schema can drive either modality**: pass it to `generate-structured` for tables,
 or to `generate-documents` for PDFs.
 
 ```bash
-# 1. Ingest anything into a schema
-seed-data ingest "Customers with orders and line items" ./samples/orders.csv \
+# 1. Plan a schema from anything
+seed-data plan "Customers with orders and line items" ./samples/orders.csv \
   --name retail --output ./schema.json
 
 # 2. Generate tables from that schema
@@ -140,12 +140,12 @@ seed-data generate-structured ./schema.json --rows 500 --format csv --output ./o
 seed-data generate-documents ./schema.json --entity Order --count 3
 ```
 
-`seed-data run` does ingest + generate in one shot, with no intermediate schema
-file. Note that on `run` — and only on `run` — `--output` selects the *modality*
+`seed-data plan-and-generate` does planning + generation in one shot, with no intermediate schema
+file. Note that on `plan-and-generate` — and only on `plan-and-generate` — `--output` selects the *modality*
 and `--output-dir` selects the *path*:
 
 ```bash
-seed-data run "Customers with orders and line items" ./samples/orders.csv \
+seed-data plan-and-generate "Customers with orders and line items" ./samples/orders.csv \
   --output structured --rows 500 --format parquet \
   --output-dir ./output --save-schema ./schema.json
 ```
@@ -157,7 +157,7 @@ from seed_data import Generator
 
 gen = Generator(output_dir="./output")
 
-schema = gen.ingest("Customers with orders and line items", "./samples/orders.csv",
+schema = gen.plan("Customers with orders and line items", "./samples/orders.csv",
                     name="retail")
 result = gen.generate_structured(schema, rows=500, format="csv")
 
@@ -170,7 +170,7 @@ print(result.token_usage)   # {'inputTokens': ..., 'outputTokens': ..., 'totalTo
 print(result.error)         # None on success
 ```
 
-`Generator.available_input_types()` lists what ingest can classify:
+`Generator.available_input_types()` lists what planning can classify:
 `free_text`, `example_data`, `schema`, `document`, `erd`.
 
 A structured run writes a flat directory of per-entity files:
@@ -189,16 +189,16 @@ output/
 ```text
    free text ─┐
 example data ─┤
-      schema ─┼─→ ingest ─→ InferredSchema ─┬─→ structured pipeline ─→ CSV/Parquet/
+      schema ─┼─→  plan  ─→ InferredSchema ─┬─→ structured pipeline ─→ CSV/Parquet/
    documents ─┤                             │                          Excel/JSON
          ERD ─┘                             └─→ document pipeline ─→ PDF + JSON label
 ```
 
-`ingest` classifies each input and normalizes everything into one
-`InferredSchema`, so the choice of modality is made *after* ingestion, not
+`plan` classifies each input and normalizes everything into one
+`InferredSchema`, so the choice of modality is made *after* planning, not
 before it. One schema can therefore drive tables, documents, or both. The
 document pipeline is unchanged — `--schema-dir` with a legacy schema directory
-still enters it directly, without ingest.
+still enters it directly, without planning.
 
 ### Single-document pipeline
 
@@ -397,7 +397,7 @@ Packet subcommand (`seed-data packet <name|path>`):
 | `--shuffle` | off | Randomize sub-document order in the merged PDF |
 | `--context-model` | `nova2-lite` | Model for shared-context resolution |
 
-Ingest subcommand (`seed-data ingest <inputs...>`) — any inputs to one
+Plan subcommand (`seed-data plan <inputs...>`) — any inputs to one
 `InferredSchema` JSON:
 
 | Flag | Default | Description |
@@ -418,7 +418,7 @@ Structured subcommand (`seed-data generate-structured <schema>`):
 | `--quiet` | off | Suppress stage progress output |
 
 Document subcommand (`seed-data generate-documents <schema>`) — the modern
-spelling of the default mode, and what lets an ingested schema drive the
+spelling of the default mode, and what lets a planned schema drive the
 document pipeline:
 
 | Flag | Default | Description |
@@ -442,19 +442,19 @@ document pipeline:
 | `--seed` | | Seed for batch scenario planning |
 | `--quiet` | off | Suppress stage progress output |
 
-End-to-end subcommand (`seed-data run <inputs...>`) — ingest, then generate, in
+End-to-end subcommand (`seed-data plan-and-generate <inputs...>`) — plan, then generate, in
 one shot with no intermediate schema file.
 
-**On `run`, `--output` is the modality, not a path.** The path is `--output-dir`.
+**On `plan-and-generate`, `--output` is the modality, not a path.** The path is `--output-dir`.
 Every other command uses `--output` for the path.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `inputs` | required | Same as `ingest`: free-text descriptions, paths/globs, `s3://` URIs |
+| `inputs` | required | Same as `plan`: free-text descriptions, paths/globs, `s3://` URIs |
 | `--output` | `structured` | Which modality to generate: `structured` or `documents` |
 | `--output-dir` | `./output` | Directory to write artifacts to |
 | `--name` | `dataset` | Logical dataset name |
-| `--save-schema` | | Also write the ingested InferredSchema JSON to this path |
+| `--save-schema` | | Also write the planned InferredSchema JSON to this path |
 | `--rows` | `100` | structured only: target records per entity |
 | `--format` | `csv` | structured only: `csv`, `parquet`, `excel`, or `json` |
 | `--count` | `1` | documents only: how many to generate |
@@ -478,9 +478,9 @@ seed-data clone-schema-library ./schemas
 ```
 
 Run `seed-data --help`, `seed-data packet --help`,
-`seed-data infer-schema --help`, `seed-data ingest --help`,
+`seed-data infer-schema --help`, `seed-data plan --help`,
 `seed-data generate-structured --help`, `seed-data generate-documents --help`,
-and `seed-data run --help` for the complete list.
+and `seed-data plan-and-generate --help` for the complete list.
 
 ### What to expect from a batch
 
@@ -573,7 +573,7 @@ output/
 Packet runs use the evaluation-dataset layout (merged PDFs in `input/`,
 per-section labels in `baseline/`); see the [Packets guide](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/packets.md).
 
-Structured runs (`generate-structured`, or `run --output structured`) write one
+Structured runs (`generate-structured`, or `plan-and-generate --output structured`) write one
 file per entity directly into the output directory — no subdirectories:
 
 ```

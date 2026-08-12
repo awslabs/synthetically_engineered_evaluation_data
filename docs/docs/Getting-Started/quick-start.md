@@ -93,12 +93,12 @@ pip install "seed-data[structured]"
 
 Structured generation starts from an **InferredSchema** — a schema describing one
 or more entities, their fields, and the relationships between them. `seed-data
-ingest` builds one from whatever you have: a plain-English description, a CSV or
+plan` builds one from whatever you have: a plain-English description, a CSV or
 JSON of example data, a JSON Schema or SQL DDL, existing PDFs, or an ERD
 diagram. Several inputs of different kinds can be combined in one call.
 
 ```bash
-seed-data ingest "Customers and their orders for a regional coffee wholesaler" \
+seed-data plan "Customers and their orders for a regional coffee wholesaler" \
   --name coffee --output ./schema.json
 ```
 
@@ -121,22 +121,22 @@ output/
 `--format` also accepts `json`, `excel` (`.xlsx`), and `parquet`. All of them
 work with the `[structured]` extra alone — no separate engine install.
 
-If you do not need the intermediate schema file, `seed-data run` does ingest and
+If you do not need the intermediate schema file, `seed-data plan-and-generate` does planning and
 generation in one shot:
 
 ```bash
-seed-data run "Customers and their orders for a regional coffee wholesaler" \
+seed-data plan-and-generate "Customers and their orders for a regional coffee wholesaler" \
   --name coffee --output structured --rows 500 --format csv --output-dir ./output
 ```
 
-!!! note "`--output` on `run` selects the modality"
+!!! note "`--output` on `plan-and-generate` selects the modality"
 
-    On `run`, `--output` chooses `structured` or `documents`, and `--output-dir`
+    On `plan-and-generate`, `--output` chooses `structured` or `documents`, and `--output-dir`
     is the path. On every other command `--output` is a path. Add
-    `--save-schema ./schema.json` to keep the ingested schema as well.
+    `--save-schema ./schema.json` to keep the planned schema as well.
 
 The same schema can drive the document pipeline instead — `--output documents` on
-`run`, or `seed-data generate-documents ./schema.json`. For a multi-entity schema,
+`plan_and_generate`, or `seed-data generate-documents ./schema.json`. For a multi-entity schema,
 `--entity` picks which entity to render.
 
 ---
@@ -190,11 +190,11 @@ for s in pkt.sections:
     print(s.document_class, s.page_indices)
 ```
 
-**Structured data** → `StructuredResult`. `ingest` returns an `InferredSchema`,
+**Structured data** → `StructuredResult`. `plan` returns an `InferredSchema`,
 which `generate_structured` turns into files (needs the `[structured]` extra):
 
 ```python
-schema = gen.ingest(
+schema = gen.plan(
     "Customers and their orders for a regional coffee wholesaler",
     name="coffee",
 )
@@ -205,11 +205,11 @@ print(result.row_counts)     # {'Customer': 500, 'Order': 500}
 print(result.evaluation)     # quality scores per metric
 ```
 
-`gen.run(...)` collapses those two calls into one, and `output="documents"` sends
-the same ingested schema down the document pipeline instead:
+`gen.plan_and_generate(...)` collapses those two calls into one, and `output="documents"` sends
+the same planned schema down the document pipeline instead:
 
 ```python
-result = gen.run("...description...", output="structured", rows=500, format="csv")
+result = gen.plan_and_generate("...description...", output="structured", rows=500, format="csv")
 ```
 
 **Schema from real documents** → a `Schema` you can generate from. Point SEED at
@@ -262,5 +262,5 @@ your own custom types work exactly the same way.
 - [Batch Generation](../Guides/batch-generation.md): control diversity and scale.
 - [Packets](../Guides/packets.md): coordinated multi-document sets.
 - [Create a Document Type](../Guides/creating-a-document-type.md): author your own schema.
-- [Ingest](../Guides/ingest.md): every input type, auto-detection, and the `InferredSchema` it produces.
+- [Plan](../Guides/plan.md): every input type, auto-detection, and the `InferredSchema` it produces.
 - [Structured Data](../Guides/structured-data.md): the full tabular guide — formats, relationships, and quality scoring.

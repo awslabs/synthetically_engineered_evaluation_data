@@ -6,11 +6,11 @@ title: CLI Usage
 
 The `seed-data` command generates synthetic evaluation data from the command line.
 Every input kind — a free-text description, example CSVs, a JSON Schema, SQL DDL,
-an ERD, or real PDFs — goes through one ingest front door that produces a unified
+an ERD, or real PDFs — goes through one planning front door that produces a unified
 schema, and that schema drives either of two output modalities: PDF documents with
 paired ground-truth JSON labels (as a single document, a diverse batch, or a
 coordinated multi-document packet), or structured tabular data as CSV, Parquet,
-Excel, or JSON. The `run` subcommand does both halves — ingest, then generate — in
+Excel, or JSON. The `plan-and-generate` subcommand does both halves — plan, then generate — in
 one shot. This page documents each mode with examples and a complete flag
 reference.
 
@@ -33,8 +33,8 @@ pip install "seed-data[structured]"   # structured generation
 pip install "seed-data[all]"          # every optional feature
 ```
 
-`ingest`, `generate-documents`, `packet`, `infer-schema` and the default mode never
-need the extra. `generate-structured` and `run --output structured` do, and raise an
+`plan`, `generate-documents`, `packet`, `infer-schema` and the default mode never
+need the extra. `generate-structured` and `plan-and-generate --output structured` do, and raise an
 `ImportError` naming the missing dependency if it is absent — install
 `seed-data[structured]` to resolve it.
 
@@ -52,9 +52,9 @@ Every generation mode accepts either a bundled schema name (such as `invoice`) o
 path to a schema directory. The examples below use bundled names, but any path to a
 directory containing a `schema.json` is equally valid.
 
-## Ingest
+## Plan
 
-The `ingest` subcommand is the shared front door: it takes any mix of inputs,
+The `plan` subcommand is the shared front door: it takes any mix of inputs,
 auto-detects what each one is, and merges them into a single `InferredSchema` JSON
 file that both output modalities read. Detection is by scheme and file extension —
 anything without a recognized extension is treated as free text.
@@ -64,26 +64,26 @@ The detected input types are `free_text`, `example_data`, `schema`, `document`, 
 
 ```bash
 # free text — a prose description of the data you want
-seed-data ingest "Retail customers and their orders, with US shipping addresses" \
+seed-data plan "Retail customers and their orders, with US shipping addresses" \
   --name retail --output ./schema.json
 
 # example data — sample rows in CSV (also .xls, .xlsx)
-seed-data ingest ./samples/customers.csv --name retail --output ./schema.json
+seed-data plan ./samples/customers.csv --name retail --output ./schema.json
 
 # schema — a JSON Schema document on disk
-seed-data ingest ./contracts/order.schema.json --name orders --output ./schema.json
+seed-data plan ./contracts/order.schema.json --name orders --output ./schema.json
 
 # schema — SQL DDL (.sql, .ddl)
-seed-data ingest ./db/schema.sql --name warehouse --output ./schema.json
+seed-data plan ./db/schema.sql --name warehouse --output ./schema.json
 
 # erd — an ERD diagram (.dbml, .puml, .plantuml, .mmd, .mermaid)
-seed-data ingest ./design/model.dbml --name warehouse --output ./schema.json
+seed-data plan ./design/model.dbml --name warehouse --output ./schema.json
 
 # document — real PDF/PNG/JPEG, read with a vision model
-seed-data ingest ./samples/invoice.pdf --name invoice --output ./schema.json
+seed-data plan ./samples/invoice.pdf --name invoice --output ./schema.json
 
 # document — the same, from S3 (an object URI or a prefix)
-seed-data ingest s3://my-bucket/invoices/ --name invoice --output ./schema.json
+seed-data plan s3://my-bucket/invoices/ --name invoice --output ./schema.json
 ```
 
 Inputs of different kinds combine in one call, and their entities are merged into
@@ -91,7 +91,7 @@ one schema — useful when prose describes intent, a CSV pins down realistic val
 and DDL fixes the column types:
 
 ```bash
-seed-data ingest \
+seed-data plan \
   "Subscription billing for a B2B SaaS company, monthly and annual plans" \
   ./samples/invoices.csv \
   ./db/billing.sql \
@@ -344,16 +344,16 @@ seed-data packet ./my-packets/onboarding --augment --output ./eval-set
 | `--threshold` | `5` | Critic acceptance score, 1–10 |
 | `--output` | `./output` | Output root directory |
 
-## Documents from an ingested schema
+## Documents from a planned schema
 
 The `generate-documents` subcommand runs the same document pipeline as the modes
 above, but takes its schema as a positional argument instead of `--schema-dir`. It
-accepts an `InferredSchema` JSON file (such as one written by `seed-data ingest`), a
+accepts an `InferredSchema` JSON file (such as one written by `seed-data plan`), a
 schema directory, or a bundled schema name:
 
 ```bash
-# from an ingested schema
-seed-data ingest ./samples/invoice.pdf --name invoice --output ./schemas/invoice.json
+# from a planned schema
+seed-data plan ./samples/invoice.pdf --name invoice --output ./schemas/invoice.json
 seed-data generate-documents ./schemas/invoice.json --scenario "Net-30 terms, Ohio supplier"
 
 # from a bundled name or a schema directory — same as the default mode
@@ -370,7 +370,7 @@ seed-data generate-documents ./schemas/billing.json --entity Invoice \
   --count 10 --scenario "B2B SaaS annual renewals"
 ```
 
-This is the modern spelling of the default mode, and what lets an ingested or
+This is the modern spelling of the default mode, and what lets a planned or
 inferred `InferredSchema` drive document generation. The pre-existing default mode
 is unchanged and remains the documented path for schema directories and bundled
 names — `seed-data --schema-dir invoice` keeps working exactly as before. The two
@@ -412,8 +412,8 @@ needs the `[structured]` extra installed:
 # from a bundled schema name
 seed-data generate-structured invoice --rows 500 --output ./data
 
-# from an ingested schema
-seed-data ingest ./db/billing.sql --name billing --output ./schemas/billing.json
+# from a planned schema
+seed-data plan ./db/billing.sql --name billing --output ./schemas/billing.json
 seed-data generate-structured ./schemas/billing.json --rows 1000 --format parquet
 
 # from a schema directory
@@ -503,47 +503,49 @@ See [Schema from Documents](../Guides/schema-from-documents.md) for the full gui
 
 ## End-to-end run
 
-The `run` subcommand composes the two halves: it ingests its inputs into a schema,
+The `plan-and-generate` subcommand composes the two halves: it plans its inputs into a schema,
 then generates from that schema — no intermediate schema file needed. It accepts the
-same inputs as `ingest`, and `--output` picks which modality to produce:
+same inputs as `plan`, and `--output` picks which modality to produce:
 
 ```bash
 # structured (the default modality)
-seed-data run "Retail customers and their orders in the US midwest" \
+seed-data plan-and-generate "Retail customers and their orders in the US midwest" \
   --rows 500 --format csv --output-dir ./data
 
 # documents
-seed-data run ./samples/invoice.pdf --output documents \
+seed-data plan-and-generate ./samples/invoice.pdf --output documents \
   --count 5 --scenario "Regional US food distributors" --output-dir ./eval-set
 ```
 
-On `run`, and only on `run`, `--output` names the modality (`structured` or
+On `plan-and-generate`, and only on `plan-and-generate`, `--output` names the modality (`structured` or
 `documents`) and `--output-dir` names the path. On every other command — the
 default mode, `generate-structured`, `generate-documents`, `packet`, `infer-schema` —
 `--output` is a path. Getting this backwards is the easiest mistake to make here:
 
 ```bash
 # WRONG on run: ./data is not a modality, argparse rejects it
-seed-data run "..." --output ./data
+seed-data plan-and-generate "..." --output ./data
 
 # RIGHT: modality on --output, path on --output-dir
-seed-data run "..." --output structured --output-dir ./data
+seed-data plan-and-generate "..." --output structured --output-dir ./data
 ```
 
-Because `run` discards the schema by default, `--save-schema` writes it out as well.
-It is written after ingest and before generation, so you keep the schema even if
+Because `plan-and-generate` discards the schema by default, `--save-schema` writes it out as well.
+It is written after planning and before generation, so you keep the schema even if
 generation fails:
 
 ```bash
-seed-data run ./db/billing.sql "Monthly and annual B2B SaaS plans" \
+seed-data plan-and-generate ./db/billing.sql "Monthly and annual B2B SaaS plans" \
   --name billing --save-schema ./schemas/billing.json \
   --rows 1000 --format parquet --output-dir ./data
 ```
 
 Flags are per-modality: `--rows` and `--format` apply only to `structured`, and
-`--count`, `--scenario`, `--entity`, and `--augment` apply only to `documents`. For
-finer control — a fixed planner seed, or a retry budget — run `ingest` and the
-generate subcommand separately; `run` has no `--seed` and no `--max-attempts`.
+`--count`, `--scenario`, `--entity`, and `--augment` apply only to `documents`.
+`--seed` applies to both, but note it cannot pin the schema: planning is an LLM
+step, so a seeded re-run reproduces the *values* drawn for a given schema, not the
+schema itself. For a retry budget, or to reuse one reviewed schema across runs, use
+`plan` and the generate subcommand separately.
 
 ### Flags
 
@@ -553,7 +555,7 @@ generate subcommand separately; `run` has no `--seed` and no `--max-attempts`.
 | `--output` | `structured` | Which modality to generate: `structured` or `documents` |
 | `--output-dir` | `./output` | Directory to write artifacts to |
 | `--name` | `dataset` | Logical dataset name |
-| `--save-schema` | | Also write the ingested `InferredSchema` JSON to this path |
+| `--save-schema` | | Also write the planned `InferredSchema` JSON to this path |
 | `--rows` | `100` | structured only: target records per entity |
 | `--format` | `csv` | structured only: `csv`, `parquet`, `excel`, or `json` |
 | `--count` | `1` | documents only: how many to generate |
@@ -579,13 +581,13 @@ seed-data clone-schema-library ./schemas
 ```
 
 For a complete list of options, run `seed-data --help` or `--help` on any subcommand:
-`ingest`, `generate-structured`, `generate-documents`, `run`, `infer-schema`,
+`plan`, `generate-structured`, `generate-documents`, `plan-and-generate`, `infer-schema`,
 `packet`, `clone-schema-library`.
 
 ## See also
 
 - [Python API Usage](../Python-API-Usage/README.md) — the same capabilities from Python.
-- [Ingest](../Guides/ingest.md) — the shared front door in depth: every input kind and how they merge.
+- [Plan](../Guides/plan.md) — the shared front door in depth: every input kind and how they merge.
 - [Structured Data](../Guides/structured-data.md) — the structured modality end to end.
 - [Schema from Documents](../Guides/schema-from-documents.md) — infer schemas from real documents.
 - [Creating a Document Type](../Guides/creating-a-document-type.md) — authoring a schema.

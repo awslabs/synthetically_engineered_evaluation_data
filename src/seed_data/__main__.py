@@ -226,8 +226,8 @@ def _infer_schema(argv):
             sys.exit(1)
 
 
-def _ingest(argv):
-    """Handle the `ingest` subcommand — inputs -> unified InferredSchema JSON.
+def _plan(argv):
+    """Handle the `plan` subcommand — inputs -> unified InferredSchema JSON.
 
     Auto-detects each input's type (free-text, CSV/Excel example data, JSON
     Schema, SQL DDL, ERD, or PDF/image documents) and writes the merged
@@ -238,7 +238,7 @@ def _ingest(argv):
     from seed_data import Generator
 
     parser = argparse.ArgumentParser(
-        prog="seed-data ingest",
+        prog="seed-data plan",
         description="Ingest inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) "
                     "into a unified InferredSchema JSON file.",
     )
@@ -253,7 +253,7 @@ def _ingest(argv):
 
     gen = Generator()
     try:
-        schema = gen.ingest(*args.inputs, name=args.name, verbose=not args.quiet)
+        schema = gen.plan(*args.inputs, name=args.name, verbose=not args.quiet)
     except (ValueError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -287,13 +287,18 @@ def _generate_structured(argv):
                         choices=["csv", "parquet", "excel", "json"],
                         help="Output format (default: csv)")
     parser.add_argument("--output", default="./output", help="Output directory")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed the programmatic columns (numeric, enum, date, ID, "
+                             "pattern) for reproducible output; free-text fields come "
+                             "from an LLM and stay unseeded")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
     gen = Generator(output_dir=args.output)
     try:
         result = gen.generate_structured(
-            args.schema, rows=args.rows, format=args.format, verbose=not args.quiet,
+            args.schema, rows=args.rows, format=args.format, seed=args.seed,
+            verbose=not args.quiet,
         )
     except ImportError as e:
         # The [structured] extra is missing. Print the guidance plainly instead of
@@ -318,7 +323,7 @@ def _generate_documents(argv):
     """Handle the `generate-documents` subcommand — schema -> PDFs.
 
     Accepts either an InferredSchema JSON file (e.g. produced by `seed-data
-    ingest`) or a legacy schema directory / bundled schema name. The legacy dir
+    plan`) or a legacy schema directory / bundled schema name. The legacy dir
     path is unchanged from the default `--schema-dir` flow; the JSON path is
     adapted to the pipeline's schema triple via `schema/adapter.py`.
     """
@@ -419,15 +424,16 @@ def _generate_documents(argv):
             sys.exit(1)
 
 
-def _run(argv):
-    """Handle the `run` subcommand — end-to-end ingest + generate in one shot."""
+def _plan_and_generate(argv):
+    """Handle the `plan-and-generate` subcommand — plan a schema, then generate,
+    in one shot."""
     load_dotenv()
     from seed_data import MODELS, Generator, ModelConfig
 
     model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
-        prog="seed-data run",
-        description="End-to-end: ingest inputs into a schema, then generate "
+        prog="seed-data plan-and-generate",
+        description="End-to-end: plan a schema from the inputs, then generate "
                     "structured data or documents from it.",
     )
     parser.add_argument("inputs", nargs="+",
@@ -440,7 +446,7 @@ def _run(argv):
     parser.add_argument("--name", default="dataset",
                         help="Logical dataset name (default: dataset)")
     parser.add_argument("--save-schema", default=None,
-                        help="Also write the ingested InferredSchema JSON to this path")
+                        help="Also write the planned InferredSchema JSON to this path")
     # structured-only
     parser.add_argument("--rows", type=int, default=100,
                         help="structured only: target records per entity (default: 100)")
@@ -465,6 +471,10 @@ def _run(argv):
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--threshold", type=int, default=5)
     parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="structured: seed the programmatic columns; documents "
+                             "(--count > 1): seed batch scenario planning. Schema "
+                             "planning is an LLM step and is never seeded")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
@@ -483,20 +493,20 @@ def _run(argv):
     verbose = not args.quiet
 
     if args.output == "structured":
-        # Checked before ingest, which is a multi-agent LLM run: failing after it
+        # Checked before planning, which is a multi-agent LLM run: failing after it
         # would bill the user for the expensive half of the chain to report a
         # missing install that was knowable from the start.
         from seed_data.common.deps import require_structured
 
         try:
-            require_structured("seed-data run --output structured")
+            require_structured("seed-data plan-and-generate --output structured")
         except ImportError as e:
             print(e, file=sys.stderr)
             sys.exit(1)
 
     try:
         # Ingest first so --save-schema can persist it even when generation fails.
-        schema = gen.ingest(*args.inputs, name=args.name, verbose=verbose)
+        schema = gen.plan(*args.inputs, name=args.name, verbose=verbose)
     except (ValueError, FileNotFoundError) as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -508,7 +518,8 @@ def _run(argv):
 
     if args.output == "structured":
         result = gen.generate_structured(
-            schema, rows=args.rows, format=args.format, verbose=verbose,
+            schema, rows=args.rows, format=args.format, seed=args.seed,
+            verbose=verbose,
         )
         print(f"\n{'=' * 60}")
         if result.success:
@@ -528,7 +539,7 @@ def _run(argv):
         scenario = args.scenario or "Generate diverse, realistic documents"
         batch = gen.generate_batch(
             schema, count=args.count, scenario=scenario,
-            entity=args.entity, verbose=verbose,
+            entity=args.entity, seed=args.seed, verbose=verbose,
         )
         print(f"\n{'=' * 60}")
         print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
@@ -557,10 +568,20 @@ SUBCOMMANDS = {
     "clone-schema-library": _clone_schema_library,
     "packet": _packet,
     "infer-schema": _infer_schema,
-    "ingest": _ingest,
+    "plan": _plan,
     "generate-structured": _generate_structured,
     "generate-documents": _generate_documents,
-    "run": _run,
+    "plan-and-generate": _plan_and_generate,
+}
+
+# Deprecated spellings, kept dispatchable for one release. Deliberately a separate
+# table from SUBCOMMANDS: `--help` lists that one, and an alias listed there would
+# advertise the name this rename is retiring. Neither spelling ever shipped in a
+# release — both are new on this branch — so these are a courtesy to in-flight
+# scripts, not a compatibility guarantee.
+DEPRECATED_SUBCOMMANDS = {
+    "ingest": ("plan", _plan),
+    "run": ("plan-and-generate", _plan_and_generate),
 }
 
 
@@ -568,6 +589,18 @@ def main():
     # Subcommand dispatch (kept separate so the default generate flow is untouched).
     if len(sys.argv) > 1 and sys.argv[1] in SUBCOMMANDS:
         SUBCOMMANDS[sys.argv[1]](sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] in DEPRECATED_SUBCOMMANDS:
+        # Printed rather than warnings.warn: this is a CLI, so the user is a person
+        # reading a terminal, and Python hides DeprecationWarning by default. stderr
+        # so it cannot corrupt piped stdout.
+        current, handler = DEPRECATED_SUBCOMMANDS[sys.argv[1]]
+        print(
+            f"warning: 'seed-data {sys.argv[1]}' is deprecated; "
+            f"use 'seed-data {current}' instead.",
+            file=sys.stderr,
+        )
+        handler(sys.argv[2:])
         return
     load_dotenv()
 
@@ -579,10 +612,10 @@ def main():
         description="AI-powered synthetic data generation — documents and structured data",
         epilog=(
             "subcommands:\n"
-            "  ingest                ingest any input into a unified schema JSON\n"
+            "  plan                  any input -> a unified schema JSON to review\n"
             "  generate-structured   schema -> CSV/Parquet/Excel/JSON\n"
             "  generate-documents    schema -> PDFs (InferredSchema JSON or schema dir)\n"
-            "  run                   end-to-end: ingest + generate in one shot\n"
+            "  plan-and-generate     end-to-end: plan + generate in one shot\n"
             "  infer-schema          infer a schema from real sample documents\n"
             "  packet                generate a coordinated multi-document packet\n"
             "  clone-schema-library  copy the bundled schemas somewhere editable\n"

@@ -13,6 +13,16 @@ Generation verbs make synthetic documents:
     docs   = gen.generate_batch("invoice", count=10, scenario="...")
     packet = gen.generate_packet("lending-package", count=3)
 
+Planning verbs turn any description of a dataset — prose, a CSV of real rows, a
+JSON Schema, SQL DDL, an ERD, a scanned PDF — into one ``InferredSchema`` that
+drives either output modality:
+
+    schema = gen.plan("Retail bank customers and their orders", name="banking")
+    data   = gen.generate_structured(schema, rows=500)
+
+    # or both halves in one call, skipping the schema review step
+    result = gen.plan_and_generate("Customers and their orders", rows=500)
+
 Inference verbs reverse-engineer a schema from real example documents, then feed
 it back into generation:
 
@@ -165,7 +175,7 @@ class Generator:
                 - a path to a schema directory,
                 - a :class:`Schema` object defined in code (JSON schema or a
                   pydantic model, plus generation guidance), or
-                - an :class:`InferredSchema` (e.g. from ``ingest``), adapted
+                - an :class:`InferredSchema` (e.g. from ``plan``), adapted
                   internally to the pipeline's schema triple.
             scenario: Free-text describing what to generate this run (the vendor,
                 industry, region, size, etc.) — steers the content.
@@ -441,9 +451,12 @@ class Generator:
 
     # -- structured data (tabular) ------------------------------------------
 
-    def ingest(self, *inputs: str, name: str = "dataset", verbose: bool = True) -> InferredSchema:
-        """Ingest any inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) into a
-        unified :class:`InferredSchema`. Auto-detects each input's type.
+    def plan(self, *inputs: str, name: str = "dataset", verbose: bool = True) -> InferredSchema:
+        """Plan a dataset: turn any inputs (text, CSV, PDF, JSON Schema, SQL DDL,
+        ERD) into a unified :class:`InferredSchema`. Auto-detects each input's type.
+
+        Named for what you get back — a *plan* for the data, to read and edit
+        before anything is generated — rather than for the reading of the inputs.
 
         Documents/images/``s3://`` inputs are routed through the existing vision
         path (``infer_schema``); non-document inputs go through the schema
@@ -461,12 +474,27 @@ class Generator:
             session=self.session, verbose=verbose,
         )
 
+    def ingest(self, *inputs: str, name: str = "dataset", verbose: bool = True) -> InferredSchema:
+        """Deprecated alias for :meth:`plan`.
+
+        Never shipped in a release — both names have only ever existed on this
+        branch — so this is a courtesy for in-flight callers, not a compatibility
+        guarantee. Slated for removal.
+        """
+        warnings.warn(
+            "Generator.ingest() is deprecated; use Generator.plan() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.plan(*inputs, name=name, verbose=verbose)
+
     def generate_structured(
         self,
         schema: "str | InferredSchema",
         *,
         rows: int = 100,
         format: str = "csv",
+        seed: int | None = None,
         verbose: bool = True,
     ) -> StructuredResult:
         """Generate structured data (CSV/Parquet/Excel/JSON) from a schema.
@@ -480,6 +508,10 @@ class Generator:
             schema: bundled name, JSON path, or ``InferredSchema`` object.
             rows: target records per entity.
             format: ``csv`` / ``parquet`` / ``excel`` / ``json``.
+            seed: RNG seed. Pins the programmatically generated columns (numeric,
+                enum, date, ID, pattern) so a re-run with the same schema and seed
+                reproduces them. Free-text fields come from an LLM and are not
+                seedable, so reproducibility covers the structured columns only.
             verbose: print progress.
         """
         from seed_data.common.deps import require_structured
@@ -496,12 +528,13 @@ class Generator:
         return run_structured(
             resolved, target_count=rows, export_format=format,
             output_dir=self.output_dir, models=self.models,
-            threshold=self.threshold, session=self.session, verbose=verbose,
+            threshold=self.threshold, session=self.session,
+            seed=seed, verbose=verbose,
         )
 
     # -- end-to-end ----------------------------------------------------------
 
-    def run(
+    def plan_and_generate(
         self,
         *inputs: str,
         output: str = "structured",
@@ -512,25 +545,34 @@ class Generator:
         scenario: str = "",
         entity: str | None = None,
         augment: bool | None = None,
+        seed: int | None = None,
         verbose: bool = True,
     ) -> "GeneratedDoc | BatchResult | StructuredResult":
-        """End-to-end: ingest inputs, then generate — in one call.
+        """End-to-end: plan a schema from the inputs, then generate — in one call.
 
-        Chains :meth:`ingest` into :meth:`generate_structured` (``output="structured"``)
+        Chains :meth:`plan` into :meth:`generate_structured` (``output="structured"``)
         or :meth:`generate` / :meth:`generate_batch` (``output="documents"``).
         Configuration stays on the ``Generator``; per-call args describe only what
         to make.
 
+        This skips the review step :meth:`plan` exists to enable — the inferred
+        schema goes straight to generation unseen. Prefer ``plan`` then a generate
+        verb when the schema's accuracy matters.
+
         Args:
-            *inputs: anything ``ingest`` accepts — free text, paths, globs, ``s3://``.
+            *inputs: anything ``plan`` accepts — free text, paths, globs, ``s3://``.
             output: ``"structured"`` (CSV/Parquet/Excel) or ``"documents"`` (PDFs).
-            name: logical dataset name passed through to ``ingest``.
+            name: logical dataset name passed through to ``plan``.
             rows: structured only — target records per entity.
             format: structured only — ``csv`` / ``parquet`` / ``excel`` / ``json``.
             count: documents only — how many to generate (>1 dispatches to batch).
             scenario: documents only — free-text steering the content.
             entity: documents only — which entity of a multi-entity schema to render.
             augment: documents only — override the instance augment setting.
+            seed: RNG seed. For ``output="structured"`` it pins the programmatic
+                columns; for ``output="documents"`` with ``count > 1`` it pins
+                batch scenario planning. The planning step is an LLM run and is
+                never seedable, so the schema itself can still differ between runs.
             verbose: print progress.
 
         Returns:
@@ -547,29 +589,44 @@ class Generator:
 
         if output == "structured":
             # Validated up front rather than at the generate_structured call
-            # below: ingest is a multi-agent LLM run, and failing after it would
+            # below: planning is a multi-agent LLM run, and failing after it would
             # bill the user for the expensive half of the chain before reporting
             # a missing install that was knowable from the start.
             from seed_data.common.deps import require_structured
 
-            require_structured("Generator.run(output='structured')")
+            require_structured("Generator.plan_and_generate(output='structured')")
 
-        schema = self.ingest(*inputs, name=name, verbose=verbose)
+        schema = self.plan(*inputs, name=name, verbose=verbose)
 
         if output == "structured":
             return self.generate_structured(
-                schema, rows=rows, format=format, verbose=verbose,
+                schema, rows=rows, format=format, seed=seed, verbose=verbose,
             )
 
         if count == 1:
+            # `generate` has no seedable randomness — a single document is one LLM
+            # call — so `seed` is deliberately not forwarded here.
             return self.generate(
                 schema, scenario=scenario, augment=augment,
                 entity=entity, verbose=verbose,
             )
         return self.generate_batch(
             schema, count=count, scenario=scenario, augment=augment,
-            entity=entity, verbose=verbose,
+            entity=entity, seed=seed, verbose=verbose,
         )
+
+    def run(self, *inputs: str, **kwargs) -> "GeneratedDoc | BatchResult | StructuredResult":
+        """Deprecated alias for :meth:`plan_and_generate`.
+
+        ``**kwargs`` rather than the full signature so the two cannot drift: a new
+        keyword on ``plan_and_generate`` is forwarded without being restated here.
+        """
+        warnings.warn(
+            "Generator.run() is deprecated; use Generator.plan_and_generate() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.plan_and_generate(*inputs, **kwargs)
 
     # -- discovery -----------------------------------------------------------
 
@@ -587,7 +644,7 @@ class Generator:
 
     @staticmethod
     def available_input_types() -> list[str]:
-        """Input types the ``ingest`` verb can auto-detect."""
+        """Input types the ``plan`` verb can auto-detect."""
         from seed_data.ingest import InputType
         return [t.value for t in InputType]
 

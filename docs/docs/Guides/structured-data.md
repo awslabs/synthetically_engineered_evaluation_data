@@ -23,7 +23,7 @@ install it.
 Two ways in:
 
 - **From a schema** — you already have an `InferredSchema` (from
-  [ingest](ingest.md), from a bundled schema, or hand-authored). See
+  [plan](plan.md), from a bundled schema, or hand-authored). See
   [Generating from a schema](#generating-from-a-schema).
 - **End to end** — inputs straight to rows in one shot, no intermediate schema
   file. See [The run shortcut](#the-run-shortcut).
@@ -41,7 +41,7 @@ feedback, and after repeated failures it revises the schema and starts over.
 `InferredSchema` JSON, or a schema directory:
 
 ```bash
-# from an ingested schema
+# from a planned schema
 seed-data generate-structured ./schema.json --rows 500 --format csv --output ./data
 
 # from a bundled schema name
@@ -81,11 +81,11 @@ print(result.success, result.output_paths)
 ```
 
 The schema argument accepts an `InferredSchema` object, a path to an
-`InferredSchema` JSON, or a bundled schema name — so an ingested schema goes
+`InferredSchema` JSON, or a bundled schema name — so a planned schema goes
 straight in without a round trip through disk:
 
 ```python
-schema = gen.ingest("./design/warehouse.dbml", "./samples/customers.csv", name="warehouse")
+schema = gen.plan("./design/warehouse.dbml", "./samples/customers.csv", name="warehouse")
 result = gen.generate_structured(schema, rows=1000, format="parquet")
 ```
 
@@ -140,11 +140,11 @@ resolve to an existing parent record, and it is a major term in the `structural`
 score.
 
 Relationships that come from an ERD or SQL DDL are explicit, which is why those
-inputs give the best multi-entity results. If ingest missed a foreign key, add it
+inputs give the best multi-entity results. If planning missed a foreign key, add it
 to `structured_relationships` by hand before generating — free-text
 `relationships` entries like `"belongs_to: Customer"` steer the generator but are
 not what integrity enforcement and scoring read. See
-[The InferredSchema](ingest.md#the-inferredschema).
+[The InferredSchema](plan.md#the-inferredschema).
 
 ```python
 result = gen.generate_structured(schema, rows=500)
@@ -276,7 +276,7 @@ install with no extra.
 
 ## Both modalities from one schema
 
-This is the payoff of unification. One ingested `InferredSchema` drives structured
+This is the payoff of unification. One planned `InferredSchema` drives structured
 generation **and** document generation, so a tabular dataset and a set of PDFs
 about the same domain come from the same declared fields, types, and constraints —
 not two schemas you have to keep in sync by hand.
@@ -284,8 +284,8 @@ not two schemas you have to keep in sync by hand.
 ### CLI
 
 ```bash
-# ingest once
-seed-data ingest ./design/warehouse.dbml ./samples/customers.csv \
+# plan once
+seed-data plan ./design/warehouse.dbml ./samples/customers.csv \
   --name warehouse --output ./schema.json
 
 # review ./schema.json, then generate rows from it
@@ -296,7 +296,7 @@ seed-data generate-documents ./schema.json --entity Customer --count 5 --output 
 ```
 
 `generate-documents` is the modern spelling of the default `--schema-dir` mode,
-and it is what lets an ingested or inferred `InferredSchema` drive the document
+and it is what lets a planned or inferred `InferredSchema` drive the document
 pipeline. For a multi-entity schema, `--entity` selects which entity to render as
 the document type; it defaults to the first.
 
@@ -306,7 +306,7 @@ the document type; it defaults to the first.
 from seed_data import Generator
 
 gen = Generator()
-schema = gen.ingest(
+schema = gen.plan(
     "./design/warehouse.dbml",
     "./samples/customers.csv",
     name="warehouse",
@@ -327,29 +327,29 @@ batch = gen.generate_batch(schema, count=10, scenario="Pacific Northwest region"
 
 ## The run shortcut
 
-`run` does ingest and generation in a single call, so you go from inputs to
+`plan_and_generate` does planning and generation in a single call, so you go from inputs to
 artifacts without an intermediate schema file.
 
 ### CLI
 
-!!! note "On `run`, `--output` is the modality"
-    On `run` — and **only** on `run` — `--output` selects the *modality*
+!!! note "On `plan-and-generate`, `--output` is the modality"
+    On `plan-and-generate` — and **only** on `plan-and-generate` — `--output` selects the *modality*
     (`structured` or `documents`) and `--output-dir` selects the *path*. On every
     other command `--output` is a path. Passing a directory to `--output` here
     fails the choices check rather than silently writing somewhere unexpected.
 
 ```bash
 # free text -> CSV, in one shot
-seed-data run "Retail bank customers with credit scores and account tiers" \
+seed-data plan-and-generate "Retail bank customers with credit scores and account tiers" \
   --output structured --rows 500 --format csv --output-dir ./data
 
 # the same inputs -> a batch of PDFs
-seed-data run ./samples/invoice.pdf \
+seed-data plan-and-generate ./samples/invoice.pdf \
   --output documents --count 5 --scenario "Midwest food distributors" \
   --output-dir ./docs
 
-# keep the ingested schema as well
-seed-data run ./design/warehouse.dbml --output structured \
+# keep the planned schema as well
+seed-data plan-and-generate ./design/warehouse.dbml --output structured \
   --save-schema ./schema.json --output-dir ./data
 ```
 
@@ -359,7 +359,7 @@ seed-data run ./design/warehouse.dbml --output structured \
 | `--output` | `structured` | Which modality to generate: `structured` or `documents` |
 | `--output-dir` | `./output` | Directory to write artifacts to |
 | `--name` | `dataset` | Logical dataset name |
-| `--save-schema` | | Also write the ingested `InferredSchema` JSON here |
+| `--save-schema` | | Also write the planned `InferredSchema` JSON here |
 | `--rows` | `100` | structured only: target records per entity |
 | `--format` | `csv` | structured only: `csv`, `parquet`, `excel`, or `json` |
 | `--count` | `1` | documents only: how many to generate |
@@ -378,11 +378,11 @@ seed-data run ./design/warehouse.dbml --output structured \
 
 `--save-schema` is worth using on any run you might repeat: the schema is written
 before generation starts, so you keep it even if generation fails, and you can
-review and reuse it instead of re-ingesting.
+review and reuse it instead of re-planning.
 
 ### Python
 
-`Generator.run(...)` mirrors the flags. Its return type follows the output
+`Generator.plan_and_generate(...)` mirrors the flags. Its return type follows the output
 modality — `StructuredResult` for `output="structured"`, `GeneratedDoc` for
 `output="documents"` with `count=1`, and `BatchResult` for `output="documents"`
 with `count > 1`:
@@ -391,14 +391,14 @@ with `count > 1`:
 gen = Generator(output_dir="./data")
 
 # structured -> StructuredResult
-rows = gen.run("Retail bank customers and their orders", rows=500, format="csv")
+rows = gen.plan_and_generate("Retail bank customers and their orders", rows=500, format="csv")
 
 # one document -> GeneratedDoc
-doc = gen.run("./samples/invoice.pdf", output="documents",
+doc = gen.plan_and_generate("./samples/invoice.pdf", output="documents",
               scenario="Midwest food distributor")
 
 # many documents -> BatchResult
-batch = gen.run("./samples/invoice.pdf", output="documents", count=10,
+batch = gen.plan_and_generate("./samples/invoice.pdf", output="documents", count=10,
                 scenario="Regional US food distributors")
 ```
 
@@ -421,6 +421,6 @@ output/
 
 ## Related
 
-- [Ingest](ingest.md): turn any input into the `InferredSchema` these commands consume.
+- [Plan](plan.md): turn any input into the `InferredSchema` these commands consume.
 - [CLI Usage](../CLI-Usage/README.md): every command and its flags.
 - [Python API Usage](../Python-API-Usage/README.md): the same capabilities from Python.

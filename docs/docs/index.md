@@ -59,10 +59,10 @@ output/
 └── pdfs/<id>.pdf                  # final document
 ```
 
-**Structured data instead of documents** — describe the dataset in prose, and `run` ingests it into a schema and generates rows in one shot:
+**Structured data instead of documents** — describe the dataset in prose, and `plan_and_generate` plans it into a schema and generates rows in one shot:
 
 ```bash
-seed-data run "Customers and their orders for a regional coffee wholesaler" \
+seed-data plan-and-generate "Customers and their orders for a regional coffee wholesaler" \
   --output structured --rows 500 --format csv --output-dir ./output
 ```
 
@@ -72,7 +72,7 @@ The same thing from Python:
 from seed_data import Generator
 
 gen = Generator(output_dir="./output")
-result = gen.run(
+result = gen.plan_and_generate(
     "Customers and their orders for a regional coffee wholesaler",
     output="structured", rows=500, format="csv",
 )
@@ -81,7 +81,7 @@ print(result.output_paths)   # e.g. ['./output/customer.csv', './output/order.cs
 print(result.row_counts)     # {'Customer': 500, 'Order': 500}
 ```
 
-One file per entity lands in the output directory, named from the lowercased entity name. On `run`, note that `--output` selects the modality and `--output-dir` selects the path; on every other command `--output` is a path.
+One file per entity lands in the output directory, named from the lowercased entity name. On `plan-and-generate`, note that `--output` selects the modality and `--output-dir` selects the path; on every other command `--output` is a path.
 
 Browse the schema library on GitHub:
 [awslabs/…/schemas](https://github.com/awslabs/synthetically_engineered_evaluation_data/tree/main/src/seed_data/schemas).
@@ -110,13 +110,13 @@ The **data generator** produces JSON data from the schema, the **data critic** v
 
 Batch and packet runs wrap this single-document pipeline. A batch runs N scenarios in parallel from one diversity brief. A packet coordinates several different document types that share context (same person, address, and dates) and merges them into one multi-document PDF.
 
-### Ingest, then fork by modality
+### Plan, then fork by modality
 
-The agent chain above starts from a schema. Ingest is what gets you one. Whatever you hand SEED — prose, example data, a formal schema, documents, an ERD — ingest classifies each input, extracts what it can, and merges everything into a single `InferredSchema`. That schema is the fork point: it can drive structured generation or the document pipeline.
+The agent chain above starts from a schema. Planning is what gets you one. Whatever you hand SEED — prose, example data, a formal schema, documents, an ERD — planning classifies each input, extracts what it can, and merges everything into a single `InferredSchema`. That schema is the fork point: it can drive structured generation or the document pipeline.
 
 ```mermaid
 graph LR
-    A["free text"] --> I[ingest]
+    A["free text"] --> I[plan]
     B["example data (CSV/JSON/XLSX)"] --> I
     C["formal schema (JSON Schema/SQL DDL)"] --> I
     D["documents (PDF/PNG/JPEG)"] --> I
@@ -126,7 +126,7 @@ graph LR
     S --> P["documents -> PDF + JSON label"]
 ```
 
-`seed-data ingest` writes the schema to disk so you can review and edit it; `generate-structured` and `generate-documents` each consume it. `seed-data run` chains ingest and generation in one call when you do not need the intermediate file. Several inputs of different kinds can be combined in one ingest — a prose description plus a CSV of real examples, say.
+`seed-data plan` writes the schema to disk so you can review and edit it; `generate-structured` and `generate-documents` each consume it. `seed-data plan-and-generate` chains planning and generation in one call when you do not need the intermediate file. Several inputs of different kinds can be combined in one planning call — a prose description plus a CSV of real examples, say.
 
 ### Key Use Case: Evaluation Data for IDP and KIE
 
@@ -148,7 +148,7 @@ Benchmarking a document understanding system requires paired data: an input docu
 
     ---
 
-    Create a document type, run batches, build multi-document packets, control per-document variation, ingest any input into a schema, and generate structured data.
+    Create a document type, run batches, build multi-document packets, control per-document variation, plan a schema from any input, and generate structured data.
 
     [:octicons-arrow-right-24: Read the guides](Guides/README.md)
 

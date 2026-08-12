@@ -1,6 +1,6 @@
 """Integration: document generation through the unified schema path (Milestone 3).
 
-Verifies that an ingested / round-tripped ``InferredSchema`` drives the existing
+Verifies that a planned / round-tripped ``InferredSchema`` drives the existing
 document pipeline unchanged — the whole point of the M3 adapter — and that the
 published ``--schema-dir`` path still works.
 
@@ -21,10 +21,10 @@ def _bundled_schema_dir(name="fcc-invoice") -> str:
     return os.path.join(here, "src", "seed_data", "schemas", name)
 
 
-def test_ingest_then_generate_doc(generator):
-    """ingest(free text) -> InferredSchema -> generate() -> a PDF on disk."""
-    schema = generator.ingest("FCC broadcast advertising invoices", name="fcc")
-    assert schema.entities, "ingest produced an empty schema"
+def test_plan_then_generate_doc(generator):
+    """plan(free text) -> InferredSchema -> generate() -> a PDF on disk."""
+    schema = generator.plan("FCC broadcast advertising invoices", name="fcc")
+    assert schema.entities, "plan produced an empty schema"
 
     doc = generator.generate(schema, scenario="A regional TV station in the Midwest")
     assert isinstance(doc, GeneratedDoc)

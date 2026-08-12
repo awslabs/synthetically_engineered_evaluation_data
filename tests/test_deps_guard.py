@@ -90,29 +90,30 @@ def test_generate_structured_raises_before_resolving_schema(monkeypatch):
     assert not called, "schema resolution must not run when the extra is missing"
 
 
-def test_run_structured_checks_extra_before_ingesting(monkeypatch):
-    """`run(output='structured')` must not pay for ingest before failing.
+def test_plan_and_generate_structured_checks_extra_before_planning(monkeypatch):
+    """`plan_and_generate(output='structured')` must not pay for planning before
+    failing.
 
-    ingest is a multi-agent LLM run; failing after it would bill the user for the
+    Planning is a multi-agent LLM run; failing after it would bill the user for the
     expensive half of the chain to report something knowable up front.
     """
     from seed_data import Generator
 
     monkeypatch.setattr("seed_data.common.deps.structured_available", lambda: False)
 
-    ingested = []
+    planned = []
     monkeypatch.setattr(
-        Generator, "ingest",
-        lambda self, *a, **k: ingested.append(a) or "schema",
+        Generator, "plan",
+        lambda self, *a, **k: planned.append(a) or "schema",
     )
 
     with pytest.raises(ImportError, match=r"seed-data\[structured\]"):
-        Generator().run("some text", output="structured", verbose=False)
+        Generator().plan_and_generate("some text", output="structured", verbose=False)
 
-    assert not ingested, "ingest must not run when the extra is missing"
+    assert not planned, "planning must not run when the extra is missing"
 
 
-def test_run_documents_does_not_require_the_extra(monkeypatch):
+def test_plan_and_generate_documents_does_not_require_the_extra(monkeypatch):
     """The document modality must stay reachable on the base install.
 
     This is the published offering; the guard must not leak into its path.
@@ -120,12 +121,12 @@ def test_run_documents_does_not_require_the_extra(monkeypatch):
     from seed_data import Generator
 
     monkeypatch.setattr("seed_data.common.deps.structured_available", lambda: False)
-    monkeypatch.setattr(Generator, "ingest", lambda self, *a, **k: "schema")
+    monkeypatch.setattr(Generator, "plan", lambda self, *a, **k: "schema")
 
     sentinel = object()
     monkeypatch.setattr(Generator, "generate", lambda self, *a, **k: sentinel)
 
-    assert Generator().run("text", output="documents", verbose=False) is sentinel
+    assert Generator().plan_and_generate("text", output="documents", verbose=False) is sentinel
 
 
 def test_evaluation_lazy_attr_error_names_the_extra(monkeypatch):
@@ -217,3 +218,62 @@ def test_all_names_are_resolvable_with_the_extra():
 
     for name in ev.__all__:
         assert getattr(ev, name) is not None, f"{name} in __all__ but unresolvable"
+
+
+# --- model registry / import structure --------------------------------------
+
+def test_model_registry_is_a_leaf_module():
+    """`seed_data.model_registry` must import nothing.
+
+    `common.config` needs the registry. It used to reach it via `from seed_data
+    import MODELS`, which imports the package root — the same root that exposes
+    the API surface. That worked only because `MODELS` was bound before the lazy
+    `__getattr__`; one eager import added above it would have turned config's
+    import into a circular ImportError. This test pins the property that makes
+    the leaf safe rather than the accident that made the old path work.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import sys\n"
+         "from seed_data.model_registry import MODELS\n"
+         "banned = [m for m in ('strands', 'boto3', 'botocore', 'pandas', 'numpy')\n"
+         "          if m in sys.modules]\n"
+         "assert not banned, banned\n"
+         "assert 'seed_data.api' not in sys.modules\n"
+         "print(len(MODELS))\n"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert int(result.stdout.strip()) > 0
+
+
+def test_common_config_imports_standalone():
+    """Importing `common.config` first, with no prior `import seed_data`, must work.
+
+    A fresh interpreter is the only way to test this: within the test session
+    `seed_data` is already fully imported, which is exactly the condition that
+    hid the fragility.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "from seed_data.common.config import MODEL_ID, MAX_TOKENS\n"
+         "assert MODEL_ID and MAX_TOKENS > 0\n"
+         "print('ok')\n"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
+
+
+def test_models_is_still_exported_from_the_package_root():
+    """`from seed_data import MODELS` is the documented public name — moving the
+    definition to a leaf module must not change it."""
+    import seed_data
+    from seed_data.model_registry import MODELS as leaf_models
+
+    assert seed_data.MODELS is leaf_models
+    assert "MODELS" in seed_data.__all__

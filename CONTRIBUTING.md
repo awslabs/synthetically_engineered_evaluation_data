@@ -65,7 +65,7 @@ Both options give you the full feature set, which is what you want as a contribu
 |------|---------|
 | Run unit tests | `pytest` |
 | Run unit tests (make target) | `make test` |
-| Run only the ingest/structured/evaluation tests | `make test-structured` |
+| Run only the planning/structured/evaluation tests | `make test-structured` |
 | Run the CLI smoke test (no Bedrock) | `pytest tests/test_cli_smoke.py` |
 | Run the integration tests | `uv run pytest tests/integration` |
 | Lint check | `ruff check .` |
@@ -136,10 +136,10 @@ SUBCOMMANDS = {
     "clone-schema-library": _clone_schema_library,
     "packet": _packet,
     "infer-schema": _infer_schema,
-    "ingest": _ingest,
+    "plan": _plan,
     "generate-structured": _generate_structured,
     "generate-documents": _generate_documents,
-    "run": _run,
+    "plan-and-generate": _plan_and_generate,
 }
 ```
 
