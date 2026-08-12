@@ -148,11 +148,18 @@ def build_graph_pipeline(
     output_dir: str = "./output",
     export_format: str = "json",
     target_count: int = 40,
+    seed: int | None = None,
 ):
     """Build a graph pipeline with conditional retry loops and schema revision.
 
     Takes an already-resolved :class:`InferredSchema` (schema extraction is the
     ``ingest`` step, kept separate). The graph starts at distribution inference.
+
+    ``seed`` is forwarded to bulk generation, making the programmatic columns
+    reproducible. Each generation attempt offsets it by the attempt number: a
+    retry that redrew the identical values would fail the quality gate the same
+    way forever, so the retry loop needs fresh draws while the run as a whole
+    stays reproducible.
 
     Returns:
         (graph, task_context, state) — invoke with ``graph(task_context)``; the
@@ -188,6 +195,7 @@ def build_graph_pipeline(
             entity_schema_definitions=ps.schema_json,
             sample_records_json=ps.sample_json,
             target_count=str(target_count),
+            seed=None if seed is None else seed + ps.generation_attempts,
         )
         ps.gen_result_json = result
         return result
@@ -383,6 +391,7 @@ def run_graph_pipeline(
     output_dir: str = "./output",
     export_format: str = "json",
     target_count: int = 40,
+    seed: int | None = None,
 ) -> tuple[str, "PipelineState"]:
     """Run the graph-based pipeline end-to-end.
 
@@ -391,12 +400,13 @@ def run_graph_pipeline(
         output_dir: Directory to write output files.
         export_format: Export format.
         target_count: Target records per entity.
+        seed: optional RNG seed for the programmatic generation columns.
 
     Returns:
         (summary_string, final_pipeline_state).
     """
     graph, task_context, ps = build_graph_pipeline(
-        schema, output_dir, export_format, target_count
+        schema, output_dir, export_format, target_count, seed
     )
 
     logger.info("Starting graph pipeline")

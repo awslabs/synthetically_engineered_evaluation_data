@@ -63,6 +63,8 @@ class RecordCorrector:
             return self._correct_length(record.get(violation.field), field)
         elif violation.violation_type == "pattern_violation":
             return self._correct_pattern(record.get(violation.field), field)
+        elif violation.violation_type == "uniqueness_violation":
+            return self._correct_uniqueness(violation, field, all_data)
         return None
 
     def _correct_range(self, value, field: FieldDefinition):
@@ -132,6 +134,42 @@ class RecordCorrector:
         if field.max_length is not None and len(str_val) > field.max_length:
             return str_val[: field.max_length]
         return value
+
+    def _correct_uniqueness(
+        self, violation: Violation, field: FieldDefinition, all_data: dict[str, list[dict]]
+    ):
+        """Replace a duplicate value with one not already present in the column.
+
+        The validator flags every occurrence after the first, so correcting each
+        flagged record in turn leaves the column unique. `existing` is rebuilt
+        from live data on each call so replacements minted for earlier duplicates
+        are visible here and can't be handed out twice.
+        """
+        records = all_data.get(violation.entity, [])
+        existing = {str(r.get(field.name)) for r in records if r.get(field.name) is not None}
+
+        if field.pattern:
+            from seed_data.structured.generation import _generate_from_pattern
+
+            # _generate_from_pattern excludes anything in `existing` and falls
+            # back to a suffixed base when the pattern space is exhausted, so a
+            # value always comes back.
+            values = _generate_from_pattern(field.pattern, 1, set(existing))
+            if values:
+                return values[0]
+
+        if field.type == "integer":
+            numeric = [int(v) for v in existing if v.lstrip("-").isdigit()]
+            return (max(numeric) + 1) if numeric else 1
+
+        # Suffix the current value until it clears the column. Bounded by
+        # len(existing) + 1 iterations: each candidate that collides removes one
+        # more member of `existing` from contention.
+        base = str(violation.actual_value)
+        suffix = 1
+        while f"{base}_{suffix}" in existing:
+            suffix += 1
+        return f"{base}_{suffix}"
 
     def _correct_pattern(self, value, field: FieldDefinition):
         """Generate a new value matching the field's regex pattern."""

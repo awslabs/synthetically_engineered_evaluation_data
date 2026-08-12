@@ -73,6 +73,7 @@ def generation_loop(
     entity_schema_definitions: str,
     sample_records_json: str,
     target_count: str = "40",
+    seed: int | None = None,
 ) -> str:
     """Generate data with metrics-driven retry loop.
 
@@ -84,6 +85,9 @@ def generation_loop(
         entity_schema_definitions: JSON string of the InferredSchema with distributions.
         sample_records_json: JSON string of sample records from sample generation.
         target_count: Target number of records per entity.
+        seed: optional RNG seed making the programmatic columns reproducible. Each
+            attempt offsets it, so a retry redraws instead of reproducing the
+            values that just failed the gate.
 
     Returns:
         JSON with final data, evaluation scores, and attempt history.
@@ -127,6 +131,7 @@ def generation_loop(
                 entity_schema_definitions=schema_json,
                 sample_records_json=json.dumps({"data": samples}),
                 target_count=str(target),
+                seed=None if seed is None else seed + attempt,
             )
             gen_data = json.loads(gen_result_json)
             if "data" in gen_data:

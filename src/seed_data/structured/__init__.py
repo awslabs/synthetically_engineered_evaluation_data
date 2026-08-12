@@ -23,6 +23,7 @@ def run_structured(
     models=None,
     threshold: int = 7,
     session=None,
+    seed: int | None = None,
     verbose: bool = True,
 ):
     """Generate structured data for a resolved :class:`InferredSchema`.
@@ -40,6 +41,10 @@ def run_structured(
             build their own Bedrock models from ``common.config``).
         threshold: quality threshold carried from the Generator (advisory).
         session: optional boto3 Session.
+        seed: optional RNG seed. Pins the programmatic columns (numeric, enum,
+            date, ID, pattern) so a re-run reproduces them. The LLM fill pass for
+            free-text fields is not seedable, so a seeded run is reproducible in
+            its structured columns only.
         verbose: print progress.
 
     Returns:
@@ -54,6 +59,7 @@ def run_structured(
             output_dir=output_dir,
             export_format=export_format,
             target_count=target_count,
+            seed=seed,
         )
     except Exception as e:  # noqa: BLE001 - surface failures as a typed result
         logger.exception("Structured generation failed")

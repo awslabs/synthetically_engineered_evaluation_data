@@ -47,6 +47,8 @@ class RecordValidator:
                 record_violations = self._validate_record(record, idx, entity_name, entity_schema)
                 violations.extend(record_violations)
 
+            violations.extend(self._validate_uniqueness(records, entity_name, entity_schema))
+
         all_relationships = []
         for entity in schema.entities:
             all_relationships.extend(entity.structured_relationships)
@@ -69,6 +71,54 @@ class RecordValidator:
             fixable_count=fixable,
             unfixable_count=unfixable,
         )
+
+    def _validate_uniqueness(
+        self, records: list[dict], entity_name: str, schema: EntitySchema
+    ) -> list[Violation]:
+        """Flag duplicate values in ``unique=True`` fields.
+
+        Per-record validation cannot see this — uniqueness is a property of the
+        column, so it needs a pass over all records at once. Without it a table
+        of identical primary keys validated cleanly: ``StructuralMetrics`` counts
+        duplicates, but its penalty is capped low enough that duplicate keys
+        alone could never fail the quality gate. Violations reported here are the
+        ones that reach the corrector and the record filter.
+
+        The first occurrence of a value is left alone and every later one is
+        flagged, so correcting or dropping the flagged records leaves the column
+        unique rather than deleting all copies.
+        """
+        violations: list[Violation] = []
+
+        for field in schema.fields:
+            if not field.unique:
+                continue
+
+            seen: set[str] = set()
+            for idx, record in enumerate(records):
+                value = record.get(field.name)
+                if value is None:
+                    continue  # absence is the nullable check's business, not this one
+                key = str(value)
+                if key in seen:
+                    violations.append(
+                        Violation(
+                            entity=entity_name,
+                            record_index=idx,
+                            field=field.name,
+                            violation_type="uniqueness_violation",
+                            actual_value=key,
+                            constraint=f"Field '{field.name}' must be unique",
+                            # Fixable: the corrector can mint a replacement from
+                            # the field's pattern/type without touching any other
+                            # record.
+                            fixable=True,
+                        )
+                    )
+                else:
+                    seen.add(key)
+
+        return violations
 
     def _validate_record(
         self, record: dict, idx: int, entity_name: str, schema: EntitySchema
@@ -108,7 +158,12 @@ class RecordValidator:
         """Check type conformance."""
         try:
             if field.type == "integer":
-                int(value)
+                # int(value) alone truncates: int(3.7) == 3, so a float in an
+                # integer column passed silently and the wrong value survived
+                # into the exported dataset. Go through float() first and require
+                # integrality, which also rejects '3.7' arriving as a string.
+                if not float(value).is_integer():
+                    raise ValueError
             elif field.type == "float":
                 float(value)
             elif field.type == "boolean":
@@ -170,9 +225,15 @@ class RecordValidator:
                 )
             )
 
-        if field.pattern and field.type in ("string", "email", "phone", "enum"):
+        # Enforced for ANY field carrying a pattern, not just the string-ish
+        # types: _needs_llm deliberately routes semantic types (uuid, url, ...)
+        # to the LLM, so restricting the check by type left exactly those values
+        # generated-but-never-verified. fullmatch, not match, so a valid prefix
+        # followed by garbage fails — matching _samples_match_pattern, which is
+        # what decides whether generated samples are considered pattern-shaped.
+        if field.pattern:
             try:
-                if not re.match(field.pattern, str(value)):
+                if not re.fullmatch(field.pattern, str(value)):
                     violations.append(
                         Violation(
                             entity=entity,

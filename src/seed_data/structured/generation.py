@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import string
+import zlib
 
 from strands import Agent, tool
 from strands.models.bedrock import BedrockModel
@@ -22,19 +23,23 @@ DEFAULT_TARGET = 40
 
 
 def _parse_json_lenient(s: str) -> dict | None:
-    """Parse a JSON string, tolerating trailing garbage the LLM appends."""
+    """Parse a JSON string, tolerating trailing garbage the LLM appends.
+
+    ``raw_decode`` stops at the end of the first complete value, so trailing
+    junk after a valid object is simply ignored — which is the whole of the
+    tolerance this needs. (A previous suffix-stripping heuristic here did not
+    work on its own examples: it appended ``}`` after stripping a closer, which
+    over-closed and still failed to parse.)
+
+    Returns ``None`` for anything that isn't a JSON object. Callers immediately
+    do ``.get()`` or ``model_validate`` on the result, so handing back a list
+    would raise past their ``except (KeyError, TypeError)`` guards.
+    """
     try:
-        return json.loads(s)
-    except json.JSONDecodeError:
-        pass
-    for suffix in ["]}]}", "]}}", "]}", "}"]:
-        if s.rstrip().endswith(suffix):
-            candidate = s.rstrip()[:-len(suffix)] + "}"
-            try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-    return None
+        parsed, _ = json.JSONDecoder().raw_decode(s.lstrip())
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _parse_tool_input(
@@ -144,21 +149,76 @@ def _has_distributions(entity_schema: EntitySchema) -> bool:
     return any(f.distribution is not None for f in entity_schema.fields)
 
 
-# Character classes for regex-based ID generation
-_REGEX_CHAR_CLASSES = {
-    r"[A-Z]": string.ascii_uppercase,
-    r"[a-z]": string.ascii_lowercase,
-    r"[0-9]": string.digits,
-    r"[A-Za-z]": string.ascii_letters,
-    r"[A-Za-z0-9]": string.ascii_letters + string.digits,
-    r"[A-Z0-9]": string.ascii_uppercase + string.digits,
-    r"[a-z0-9]": string.ascii_lowercase + string.digits,
-    r"[a-f0-9]": "abcdef" + string.digits,
-    r"[A-HJ-NPR-Z0-9]": "ABCDEFGHJKLMNPRSTUVWXYZ" + string.digits,
-}
+def _expand_char_class(char_class: str) -> str:
+    """Expand a regex character class into the literal characters it matches.
+
+    Handles range spans (``a-z``, ``0-9``, ``A-HJ-NPR-Z``), explicit character
+    sets (``[89ab]``), and the two positions where ``-`` is itself a literal
+    rather than a range operator (first and last inside the brackets).
+
+    A leading ``^`` negates the class; the complement is taken over the
+    printable ASCII set generation actually draws from, since the true
+    complement is unbounded and mostly unusable in generated values.
+
+    Args:
+        char_class: the class including its brackets, e.g. ``"[0-9A-F]"``.
+
+    Returns:
+        The expanded character pool. Empty only if the class itself is empty.
+    """
+    inner = char_class[1:-1]
+
+    negated = inner.startswith("^")
+    if negated:
+        inner = inner[1:]
+
+    chars: list[str] = []
+    i = 0
+    while i < len(inner):
+        # A '-' is a range operator only between two characters; at either end
+        # of the class it is a literal hyphen.
+        is_range = (
+            inner[i] == "-"
+            and i > 0
+            and i + 1 < len(inner)
+        )
+        if is_range:
+            # Already consumed the low end on the previous iteration.
+            low, high = inner[i - 1], inner[i + 1]
+            if ord(low) <= ord(high):
+                chars.extend(chr(c) for c in range(ord(low) + 1, ord(high) + 1))
+            i += 2
+            continue
+        chars.append(inner[i])
+        i += 1
+
+    pool = "".join(dict.fromkeys(chars))  # de-duplicate, preserve order
+
+    if negated:
+        allowed = string.ascii_letters + string.digits
+        pool = "".join(c for c in allowed if c not in pool)
+
+    return pool
 
 
-def _generate_from_pattern(pattern: str, count: int, existing: set[str]) -> list[str]:
+def _entity_seed(seed: int | None, entity_name: str) -> int | None:
+    """Derive a per-entity seed from the run seed.
+
+    Handing every entity the same seed would make them draw the *same* numbers:
+    two entities with an integer column in the same range would come out with
+    identical values, which reads as a correlation that isn't in the schema.
+    Mixing in a stable hash of the name keeps entities independent while staying
+    reproducible — ``zlib.crc32`` rather than ``hash()``, which is salted per
+    process and would break reproducibility across runs.
+    """
+    if seed is None:
+        return None
+    return (seed + zlib.crc32(entity_name.encode())) % (2**32)
+
+
+def _generate_from_pattern(
+    pattern: str, count: int, existing: set[str], rng: random.Random | None = None
+) -> list[str]:
     """Generate unique string values matching a simplified regex pattern.
 
     Supports patterns like:
@@ -166,7 +226,24 @@ def _generate_from_pattern(pattern: str, count: int, existing: set[str]) -> list
       - "[A-HJ-NPR-Z0-9]{17}" → realistic VIN-like strings
       - "QI-[0-9]{6}" → "QI-012345"
       - Literal characters are kept as-is
+
+    Anchors are stripped before parsing. JSON Schema ``pattern`` values are
+    conventionally anchored, and this generates a whole value (so the match is
+    implicitly a fullmatch) — left in place, ``^`` and ``$`` would be emitted as
+    literal characters and every value would fail to match its own pattern.
+
+    Args:
+        rng: source of randomness. Pass a seeded ``random.Random`` to make the
+            output reproducible; defaults to the ``random`` module's shared
+            state, which is not.
     """
+    picker = rng if rng is not None else random
+    # Strip anchors: they constrain matching, not the character content.
+    if pattern.startswith("^"):
+        pattern = pattern[1:]
+    if pattern.endswith("$") and not pattern.endswith(r"\$"):
+        pattern = pattern[:-1]
+
     # Parse pattern into segments: (chars_to_pick_from, repeat_count) or (literal, 1)
     segments: list[tuple[str, int]] = []
     i = 0
@@ -182,12 +259,10 @@ def _generate_from_pattern(pattern: str, count: int, existing: set[str]) -> list
                 q_end = pattern.index("}", i)
                 repeat = int(pattern[i + 1:q_end])
                 i = q_end + 1
-            # Map to actual characters
-            chars = _REGEX_CHAR_CLASSES.get(char_class)
+            chars = _expand_char_class(char_class)
             if not chars:
-                # Try to parse manually: [89ab] → "89ab"
-                inner = char_class[1:-1]
-                chars = inner
+                # Degenerate class (e.g. "[]") — nothing to draw from.
+                continue
             segments.append((chars, repeat))
         elif pattern[i] == "\\":
             # Escaped char like \d
@@ -218,16 +293,31 @@ def _generate_from_pattern(pattern: str, count: int, existing: set[str]) -> list
             if len(chars) == 1:
                 val += chars * repeat
             else:
-                val += "".join(random.choices(chars, k=repeat))
+                val += "".join(picker.choices(chars, k=repeat))
         if val not in existing:
             existing.add(val)
             values.append(val)
 
-    # If we couldn't generate enough unique values, fall back to suffixed
-    while len(values) < count:
-        val = values[-1] if values else "ID"
-        val = f"{val}_{len(values)}"
-        values.append(val)
+    # The pattern space is exhausted (or too dense to sample from) before we hit
+    # `count`. Suffix a STABLE base with a counter rather than the previously
+    # generated value: chaining off values[-1] compounds, growing each value by
+    # the whole of the last one ("5_10", "5_10_11", "5_10_11_12", ...) until the
+    # strings are unbounded and no longer pattern-shaped.
+    if len(values) < count:
+        base = values[0] if values else "ID"
+        logger.warning(
+            "Pattern %r exhausted after %d unique values (wanted %d) — "
+            "suffixing %r to fill the remainder",
+            pattern, len(values), count, base,
+        )
+        suffix = 0
+        while len(values) < count:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+            if candidate in existing:
+                continue
+            existing.add(candidate)
+            values.append(candidate)
 
     return values
 
@@ -307,6 +397,7 @@ def _generate_programmatic(
     existing_records: list[dict],
     all_data: dict[str, list[dict]],
     defer_llm: bool = False,
+    seed: int | None = None,
 ) -> list[dict]:
     """Generate records using hybrid approach: numpy/scipy for structured fields, LLM for free-text.
 
@@ -316,8 +407,17 @@ def _generate_programmatic(
 
     When defer_llm=True, returns partial records with string fields unfilled
     (marked as None). The caller is responsible for filling them later.
+
+    ``seed`` makes the programmatic half of the output reproducible: it seeds both
+    the numpy RNG behind ``DistributionGenerator`` and the stdlib RNG used for
+    pattern-based values. The LLM fill pass is not reproducible either way, so a
+    seeded run pins the numeric/enum/date/ID columns, not free-text ones.
     """
-    generator = DistributionGenerator()
+    generator = DistributionGenerator(seed=seed)
+    # Derived from `seed` rather than shared with the numpy RNG: the two draw
+    # different value kinds, and coupling them would make a change in one column's
+    # count shift the other's values.
+    pattern_rng = random.Random(seed) if seed is not None else None
 
     # Collect existing unique values to avoid duplicates
     existing_uniques: dict[str, set] = {}
@@ -382,7 +482,7 @@ def _generate_programmatic(
                     counter += 1
             elif field.pattern and (not sample_vals or _samples_match_pattern(sample_vals, field.pattern)):
                 # Schema has a pattern AND samples match it (or no samples) — use pattern
-                values = _generate_from_pattern(field.pattern, count, existing)
+                values = _generate_from_pattern(field.pattern, count, existing, pattern_rng)
             elif field.type == "integer":
                 max_id = 0
                 for v in existing:
@@ -398,7 +498,7 @@ def _generate_programmatic(
                     values.append(counter)
                     counter += 1
             elif field.pattern:
-                values = _generate_from_pattern(field.pattern, count, existing)
+                values = _generate_from_pattern(field.pattern, count, existing, pattern_rng)
             else:
                 prefix = entity_name[:3].upper()
                 counter = len(existing) + 1
@@ -539,13 +639,19 @@ def _fill_string_fields_with_llm(
 
 
 @tool
-def bulk_generation_agent(entity_schema_definitions: str, sample_records_json: str, target_count: str = "40") -> str:
+def bulk_generation_agent(
+    entity_schema_definitions: str,
+    sample_records_json: str,
+    target_count: str = "40",
+    seed: int | None = None,
+) -> str:
     """Generate bulk synthetic data (30-50 records per entity) based on schema and sample records.
 
     Args:
         entity_schema_definitions: JSON string of the inferred schema definitions.
         sample_records_json: JSON string of the approved sample records.
         target_count: Target number of records per entity (e.g., "40").
+        seed: optional RNG seed making the programmatic columns reproducible.
 
     Returns:
         JSON mapping of entity names to lists of generated records (including original samples).
@@ -589,7 +695,8 @@ def bulk_generation_agent(entity_schema_definitions: str, sample_records_json: s
             logger.info("Bulk generation — entity '%s': using programmatic (numpy/scipy) generation",
                         entity_name)
             new_records = _generate_programmatic(
-                entity_name, entity_schema, remaining, all_records, all_data, defer_llm=True
+                entity_name, entity_schema, remaining, all_records, all_data,
+                defer_llm=True, seed=_entity_seed(seed, entity_name),
             )
             all_records.extend(new_records)
             logger.info("Bulk generation — entity '%s': programmatic generation produced %d records",
