@@ -277,33 +277,46 @@ next multi-milestone PR. Not actionable on #15.
 
 ## Execution order
 
-1. **Push `e025792`** — resolves §0 (three items) with zero new work; shrinks the review surface first.
-2. **Get the user's naming decision** (§1a–1c) — blocks a large mechanical rename; nothing else depends on it, so it can run in parallel with 3–5.
-3. **§2 must-fix** (anchored patterns) **+ §4 `fullmatch`** together — they interact.
-4. **§3** character-class ranges + cascade fallback.
-5. **§4** remaining validator gaps; re-run the full suite and reconcile shifted assertions.
-6. **§5** circular import, `--seed` plumbing.
-7. **§1e** JSON Schema docs section.
-8. **§1a–1c renames** once approved (code → tests → docs; keep deprecated aliases).
-9. **§6** open the follow-up issue.
-10. Full verification before any push: `ruff check .`, full suite, base-install
-    (no-extras) suite, wheel smoke, and all seven CLI `--help` surfaces byte-identical
-    to `main`.
+1. ~~**Push `e025792`**~~ — **done**, resolves §0 (three items).
+2. ~~**Get the user's naming decision** (§1a–1c)~~ — **done**: `plan` / `plan_and_generate`,
+   CLI renamed too, deprecated aliases kept.
+3. ~~**§2 must-fix** (anchored patterns) **+ §4 `fullmatch`**~~ — **done**.
+4. ~~**§3** character-class ranges + cascade fallback~~ — **done**.
+5. ~~**§4** remaining validator gaps~~ — **done** (uniqueness scan + corrector branch,
+   non-integral integers, `pattern` enforced whenever set).
+6. ~~**§5** circular import, `--seed` plumbing~~ — **done** (`model_registry.py` leaf module;
+   `--seed` on `generate-structured` and `plan-and-generate`).
+7. ~~**§1e** JSON Schema docs section~~ — **done**: "Relationship to JSON Schema" in
+   `docs/docs/Guides/plan.md`. Round-trip limits were measured, not assumed — export is
+   single-entity and loses `distribution`, `generation_guidance`, `reference_samples`,
+   `unique`, `default`, and `structured_relationships`.
+8. ~~**§1a–1c renames**~~ — **done** (code → tests → docs; `ingest` / `run` kept as
+   deprecated aliases on both the Python and CLI surfaces; `docs/docs/Guides/ingest.md`
+   renamed to `plan.md`).
+9. ~~**§6** open the follow-up issue~~ — **done**:
+   [#21](https://github.com/awslabs/synthetically_engineered_evaluation_data/issues/21).
+10. Full verification: **done** — `ruff check .` clean, 501 tests passing, docs build
+    `--strict` clean, wheel smoke on a clean Python 3.13 venv (base install confirmed
+    lean: no pandas), and the three CLI surfaces that shipped in v0.0.6
+    (`clone-schema-library`, `packet`, `infer-schema`) verified **byte-identical** to the
+    `v0.0.6` tag. Note the original checklist said "all seven `--help` surfaces vs
+    `main`" — only three existed in v0.0.6; the other four are new on this branch, and
+    two of those (`generate-structured`, `plan-and-generate`) legitimately differ by the
+    added `--seed` line.
 
-**Nothing is pushed until the user approves.** Steps 3–7 are unambiguous fixes to
-verified bugs and can proceed on the user's go-ahead; step 8 additionally needs the
-naming decision from @sromoam.
+**Nothing is pushed until the user approves.**
 
 ---
 
 ## Open questions for the user
 
-1. **Naming (§1a–1c)** — accept `plan` + `plan_and_generate` for the two new verbs? For
-   `Generator`, confirm the reply should note it's @sromoam's own pre-v0.0.6 name and
-   propose handling any rename in a separate breaking-change PR rather than here. And
-   should the **CLI** `seed-data ingest` be renamed too, or stay `ingest` while only the
-   Python method changes?
+1. ~~**Naming (§1a–1c)**~~ — **resolved.** `plan` + `plan_and_generate` for the two new
+   verbs, and the **CLI** renamed in lockstep (`seed-data plan`,
+   `seed-data plan-and-generate`), with `ingest` / `run` dispatchable as deprecated
+   aliases on both surfaces. `Generator` keeps its name; the reply notes it is @sromoam's
+   own pre-v0.0.6 name and proposes any rename as a separate breaking-change PR.
 2. **Where do the fixes land** — new commits on `hp/structured-hardening` pushed into
    this PR, or a separate stacked PR so @sromoam can review the fixes independently of
-   the 90-file original?
+   the 90-file original? **Still open** — nothing is pushed.
 3. **Planning docs (§5)** — keep in-repo as the historical record, or archive them?
+   **Still open**; current state keeps them, including this doc.
