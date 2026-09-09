@@ -8,7 +8,7 @@ import shutil
 from strands.models import BedrockModel
 from botocore.config import Config
 
-from seed_data import MODELS
+from seed_data.model_registry import MODELS
 from seed_data.session import get_boto_session
 
 # GitHub location of the schema library, for docs and CLI messaging.
@@ -64,13 +64,18 @@ def sha256_file(path: str) -> str:
 
 
 def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
-               session=None) -> BedrockModel:
+               session=None, temperature: float | None = None) -> BedrockModel:
     """Create a BedrockModel from a MODELS key or raw model ID.
 
     ``model_key`` may be a key in ``MODELS`` or a raw Bedrock model ID (for region
     portability, e.g. an EU/GovCloud inference profile). ``session`` is an optional
     boto3 Session for in-process use (containers, Lambda, AgentCore); if omitted,
     one is resolved from the environment via ``get_boto_session``.
+
+    ``temperature`` is optional so the structured/ingest agents — which each run at
+    their own sampling temperature — can come through this factory rather than
+    constructing ``BedrockModel`` themselves. This is the only place ``boto_session``
+    is wired, so a call site that bypasses it silently ignores the caller's session.
     """
     import warnings
 
@@ -97,6 +102,9 @@ def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
         "boto_client_config": BOTO_CONFIG,
         "max_tokens": max_tokens,
     }
+
+    if temperature is not None:
+        kwargs["temperature"] = temperature
 
     # Some models don't support streaming with tool use
     if entry and entry.get("streaming") is False:

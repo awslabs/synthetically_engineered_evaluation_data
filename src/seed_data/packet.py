@@ -158,8 +158,6 @@ def resolve_shared_context(
     Returns:
         Dictionary of shared context field names → generated values.
     """
-    from pydantic import BaseModel, Field
-    from strands import Agent
 
     # Gather schema summaries for the LLM
     schema_summaries = _collect_schema_summaries(config)
@@ -288,7 +286,7 @@ def _parse_json_from_response(text: str) -> dict[str, Any]:
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
         # Remove first line (```json) and last line (```)
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         cleaned = "\n".join(lines)
     try:
         return json.loads(cleaned)
