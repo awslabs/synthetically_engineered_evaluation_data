@@ -160,6 +160,16 @@ def critique_structured(
             structured_output_model=StructuredCritiqueResult,
         )
         critique = result.structured_output
+        if critique is None:
+            # A guardrail or content-filter refusal returns None here rather than
+            # raising. Inside the `try` so it takes the same error path as a
+            # transport failure: this function's contract is that an unreachable or
+            # unwilling reviewer yields verdict="error", never an exception, and
+            # `critique.score` below would have raised AttributeError past it.
+            raise ValueError(
+                "the reviewer returned no structured output (likely a "
+                "content-filter or guardrail refusal)"
+            )
     except Exception as e:
         return {
             "score": 0,

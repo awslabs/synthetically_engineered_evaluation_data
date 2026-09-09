@@ -34,6 +34,23 @@ logger = logging.getLogger(__name__)
 MAX_GENERATION_RETRIES = 3
 MAX_SCHEMA_REVISIONS = 2
 
+# Node-execution budget, derived rather than guessed. Strands stops the graph
+# silently once the cap is hit, so a cap below the graph's own retry budget cut the
+# run off mid-loop: the `evaluate` that would have set `quality_passed = True`
+# never ran, `export` never ran, and the run reported "No data exported" instead of
+# the best-effort dataset it had decided to accept.
+#
+#   attempt        = bulk_generation + evaluate                            = 2
+#   pass           = distribution_inference + sample_generation + attempts = 2 + 3*2 = 8
+#   revision       = schema_revision + a full pass                         = 1 + 8   = 9
+#   worst case     = first pass + 2 revisions + export        = 8 + 2*9 + 1 = 27
+_EXECUTIONS_PER_ATTEMPT = 2
+_EXECUTIONS_PER_PASS = 2 + MAX_GENERATION_RETRIES * _EXECUTIONS_PER_ATTEMPT
+_EXECUTIONS_PER_REVISION = 1 + _EXECUTIONS_PER_PASS
+MAX_NODE_EXECUTIONS = (
+    _EXECUTIONS_PER_PASS + MAX_SCHEMA_REVISIONS * _EXECUTIONS_PER_REVISION + 1
+)
+
 
 # ---------------------------------------------------------------------------
 # FunctionNode — wraps a plain function as a graph node
@@ -67,23 +84,24 @@ class FunctionNode(MultiAgentBase):
 # ---------------------------------------------------------------------------
 
 
-def _get_tool_func(tool_name: str):
-    """Get the raw function from a @tool decorated function."""
-    import importlib
+def _accept_schema(candidate: str, current: str, step: str) -> str:
+    """Return ``candidate`` if it is a usable schema, else keep ``current``.
 
-    _TOOL_MODULES = {
-        "schema_extraction_agent": "seed_data.ingest.extract",
-        "distribution_inference_agent": "seed_data.structured.distributions.inference",
-        "sample_generation_agent": "seed_data.structured.sampling",
-        "bulk_generation_agent": "seed_data.structured.generation",
-        "export_data": "seed_data.structured.exporter",
-    }
-
-    module = importlib.import_module(_TOOL_MODULES[tool_name])
-    tool_obj = getattr(module, tool_name)
-    if hasattr(tool_obj, "_tool_func"):
-        return tool_obj._tool_func
-    return tool_obj
+    Every step that reassigns ``PipelineState.schema_json`` overwrites the *only*
+    copy of the schema, so a step that returns something unusable — a refusal, a
+    truncated response, an entity-less shell — loses the real schema and every
+    later stage generates against nothing. Refusing the replacement keeps the run
+    on the last known-good schema instead.
+    """
+    try:
+        parsed = InferredSchema.model_validate_json(candidate)
+    except Exception as e:
+        logger.warning("%s returned an unusable schema (%s) — keeping the previous one", step, e)
+        return current
+    if not parsed.entities:
+        logger.warning("%s returned a schema with no entities — keeping the previous one", step)
+        return current
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -149,11 +167,13 @@ def build_graph_pipeline(
     export_format: str = "json",
     target_count: int = 40,
     seed: int | None = None,
+    model: str | None = None,
+    session=None,
 ):
     """Build a graph pipeline with conditional retry loops and schema revision.
 
     Takes an already-resolved :class:`InferredSchema` (schema extraction is the
-    ``ingest`` step, kept separate). The graph starts at distribution inference.
+    ``plan`` step, kept separate). The graph starts at distribution inference.
 
     ``seed`` is forwarded to bulk generation, making the programmatic columns
     reproducible. Each generation attempt offsets it by the attempt number: a
@@ -161,41 +181,49 @@ def build_graph_pipeline(
     way forever, so the retry loop needs fresh draws while the run as a whole
     stays reproducible.
 
+    ``model`` and ``session`` reach the agents through their plain implementation
+    functions rather than the ``@tool`` wrappers, whose signatures deliberately
+    exclude both.
+
     Returns:
         (graph, task_context, state) — invoke with ``graph(task_context)``; the
         shared :class:`PipelineState` carries the final data/scores after the run.
     """
+    from seed_data.ingest.extract import extract_schema
+    from seed_data.structured.distributions.inference import infer_distributions
+    from seed_data.structured.exporter import export_data
+    from seed_data.structured.generation import generate_bulk
+    from seed_data.structured.sampling import generate_samples
+
     ps = PipelineState()
     ps.schema_json = schema.model_dump_json()
 
-    # Load tool functions
-    _dist_infer = _get_tool_func("distribution_inference_agent")
-    _sample_gen = _get_tool_func("sample_generation_agent")
-    _bulk_gen = _get_tool_func("bulk_generation_agent")
-    _export = _get_tool_func("export_data")
+    _export = export_data._tool_func if hasattr(export_data, "_tool_func") else export_data
 
     # --- Node functions ---
 
     def distribution_step(task_text):
         logger.info("Graph: distribution inference")
-        result = _dist_infer(schema_input=ps.schema_json)
-        ps.schema_json = result
+        result = infer_distributions(ps.schema_json, model=model, session=session)
+        ps.schema_json = _accept_schema(result, ps.schema_json, "Distribution inference")
         return result
 
     def sample_step(task_text):
         logger.info("Graph: sample generation")
-        result = _sample_gen(entity_schema_definitions=ps.schema_json)
+        result = generate_samples(ps.schema_json, model=model, session=session)
         ps.sample_json = result
         return result
 
     def generation_step(task_text):
         ps.generation_attempts += 1
         logger.info("Graph: bulk generation (attempt %d/%d)", ps.generation_attempts, MAX_GENERATION_RETRIES)
-        result = _bulk_gen(
+        result = generate_bulk(
             entity_schema_definitions=ps.schema_json,
             sample_records_json=ps.sample_json,
             target_count=str(target_count),
             seed=None if seed is None else seed + ps.generation_attempts,
+            model=model,
+            session=session,
         )
         ps.gen_result_json = result
         return result
@@ -315,10 +343,6 @@ def build_graph_pipeline(
         issues_text = "; ".join(ps.evaluation_issues[:5]) if ps.evaluation_issues else "quality thresholds not met"
         scores_text = ", ".join(f"{k}={v:.2f}" for k, v in ps.evaluation_scores.items())
 
-        # Use schema override tool to fix issues
-        from seed_data.ingest.extract import schema_extraction_agent as _se_tool
-        _schema_revise = _se_tool._tool_func
-
         revision_instructions = (
             f"The generated data failed quality evaluation (scores: {scores_text}). "
             f"Issues: {issues_text}. "
@@ -327,12 +351,19 @@ def build_graph_pipeline(
             "allow sufficient variety, and verify relationships are correctly defined."
         )
 
-        result = _schema_revise(
-            schema_input=ps.schema_json,
-            schema_format="json_schema",
+        # `current_schema`, not `schema_input`: the schema being revised is an
+        # InferredSchema dump (a top-level `entities` list), and `schema_input` means
+        # a *source* definition — a JSON Schema or SQL DDL — to extract from. Sent as
+        # the latter it was both mislabelled and, before this, dropped from the prompt
+        # entirely, so the reviser saw only "loosen overly tight constraints…" with no
+        # schema attached and its invention replaced the real one.
+        result = extract_schema(
+            current_schema=ps.schema_json,
             override_instructions=revision_instructions,
+            model=model,
+            session=session,
         )
-        ps.schema_json = result
+        ps.schema_json = _accept_schema(result, ps.schema_json, "Schema revision")
         return result
 
     def export_step(task_text):
@@ -373,8 +404,7 @@ def build_graph_pipeline(
 
     builder.set_entry_point("distribution_inference")
     builder.set_execution_timeout(3600)
-    # Enough for: 4 linear + 3 retries + 2 schema revisions × (3 retries each) = ~20 max
-    builder.set_max_node_executions(25)
+    builder.set_max_node_executions(MAX_NODE_EXECUTIONS)
     builder.reset_on_revisit(False)
 
     task_context = _build_task_context(schema, output_dir, export_format, target_count)
@@ -392,6 +422,8 @@ def run_graph_pipeline(
     export_format: str = "json",
     target_count: int = 40,
     seed: int | None = None,
+    model: str | None = None,
+    session=None,
 ) -> tuple[str, "PipelineState"]:
     """Run the graph-based pipeline end-to-end.
 
@@ -401,12 +433,14 @@ def run_graph_pipeline(
         export_format: Export format.
         target_count: Target records per entity.
         seed: optional RNG seed for the programmatic generation columns.
+        model: optional model key for the pipeline's agents.
+        session: optional boto3 Session for the pipeline's agents.
 
     Returns:
         (summary_string, final_pipeline_state).
     """
     graph, task_context, ps = build_graph_pipeline(
-        schema, output_dir, export_format, target_count, seed
+        schema, output_dir, export_format, target_count, seed, model, session,
     )
 
     logger.info("Starting graph pipeline")

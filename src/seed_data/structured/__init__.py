@@ -37,10 +37,10 @@ def run_structured(
         target_count: target records per entity.
         export_format: one of ``json`` / ``csv`` / ``excel`` / ``parquet``.
         output_dir: directory to write output files to.
-        models: optional ``ModelConfig`` (currently advisory; the pipeline agents
-            build their own Bedrock models from ``common.config``).
+        models: optional ``ModelConfig``; its ``data`` key selects the model for the
+            pipeline's agents.
         threshold: quality threshold carried from the Generator (advisory).
-        session: optional boto3 Session.
+        session: optional boto3 Session, honoured by every agent in the pipeline.
         seed: optional RNG seed. Pins the programmatic columns (numeric, enum,
             date, ID, pattern) so a re-run reproduces them. The LLM fill pass for
             free-text fields is not seedable, so a seeded run is reproducible in
@@ -51,7 +51,12 @@ def run_structured(
         ``StructuredResult`` with output paths, per-entity row counts, and scores.
     """
     from seed_data.api import StructuredResult
+    from seed_data.logs import configure_progress_logging
     from seed_data.structured.pipeline import run_graph_pipeline
+
+    # The pipeline reports progress through `logger.info`; without a handler those
+    # records were dropped and a multi-minute run printed nothing at all.
+    configure_progress_logging(verbose)
 
     try:
         _summary, ps = run_graph_pipeline(
@@ -60,6 +65,8 @@ def run_structured(
             export_format=export_format,
             target_count=target_count,
             seed=seed,
+            model=getattr(models, "data", None),
+            session=session,
         )
     except Exception as e:  # noqa: BLE001 - surface failures as a typed result
         logger.exception("Structured generation failed")

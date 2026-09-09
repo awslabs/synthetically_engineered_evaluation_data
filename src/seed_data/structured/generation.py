@@ -6,10 +6,9 @@ import string
 import zlib
 
 from strands import Agent, tool
-from strands.models.bedrock import BedrockModel
 
 from seed_data.structured.distributions.generator import DistributionGenerator
-from seed_data.common.config import BEDROCK_CLIENT_CONFIG, MAX_TOKENS, MODEL_ID, TEMPERATURE_BULK_GENERATION
+from seed_data.common.config import MODEL_KEY, TEMPERATURE_BULK_GENERATION
 from seed_data.schema.models import EntitySchema, FieldDefinition, GeneratedSamples, InferredSchema
 from seed_data import prompts
 
@@ -201,6 +200,60 @@ def _expand_char_class(char_class: str) -> str:
     return pool
 
 
+# Upper bound substituted for an unbounded quantifier (`+`, `*`, `{n,}`). The regex
+# admits arbitrarily long values; a generated ID has to stop somewhere, and the
+# alternative — emitting the quantifier as a literal character — produces values
+# that do not match their own pattern.
+_UNBOUNDED_REPEAT_CAP = 8
+
+
+def _read_quantifier(pattern: str, i: int) -> tuple[int, int, int]:
+    """Read the quantifier at ``pattern[i]``, returning ``(low, high, next_index)``.
+
+    Supports ``{n}``, ``{n,m}``, ``{n,}``, ``+``, ``*``, ``?``, and the absence of a
+    quantifier (``(1, 1, i)``). Ranges are returned rather than a single count so the
+    caller can draw a fresh length per generated value, which is what makes ``{2,4}``
+    span its whole space instead of pinning every value to one length.
+
+    A malformed or unterminated ``{...}`` is not a quantifier: the brace is left for
+    the caller to treat as a literal. Previously the contents were passed straight to
+    ``int()``, so ``[A-Z]{2,4}`` — which ``prompts/distribution_inference.j2`` asks
+    the model for routinely — aborted the whole run with
+    ``ValueError: invalid literal for int() with base 10: '2,4'``.
+    """
+    if i >= len(pattern):
+        return 1, 1, i
+
+    char = pattern[i]
+    if char == "+":
+        return 1, _UNBOUNDED_REPEAT_CAP, i + 1
+    if char == "*":
+        return 0, _UNBOUNDED_REPEAT_CAP, i + 1
+    if char == "?":
+        return 0, 1, i + 1
+    if char != "{":
+        return 1, 1, i
+
+    end = pattern.find("}", i)
+    if end == -1:
+        return 1, 1, i
+
+    body = pattern[i + 1:end]
+    low_text, _, high_text = body.partition(",")
+    if not low_text.isdigit():
+        return 1, 1, i
+    low = int(low_text)
+    if "," not in body:
+        high = low
+    elif high_text.isdigit():
+        high = int(high_text)
+    else:
+        high = max(low, _UNBOUNDED_REPEAT_CAP)
+    if high < low:
+        low, high = high, low
+    return low, high, end + 1
+
+
 def _entity_seed(seed: int | None, entity_name: str) -> int | None:
     """Derive a per-entity seed from the run seed.
 
@@ -225,6 +278,8 @@ def _generate_from_pattern(
       - "[A-Z]{3}-[0-9]{4}"  → "ABC-1234"
       - "[A-HJ-NPR-Z0-9]{17}" → realistic VIN-like strings
       - "QI-[0-9]{6}" → "QI-012345"
+      - "[A-Z]{2,4}" → a fresh length per value, drawn from the whole range
+      - "[0-9]+" → an unbounded quantifier, capped at _UNBOUNDED_REPEAT_CAP
       - Literal characters are kept as-is
 
     Anchors are stripped before parsing. JSON Schema ``pattern`` values are
@@ -244,44 +299,43 @@ def _generate_from_pattern(
     if pattern.endswith("$") and not pattern.endswith(r"\$"):
         pattern = pattern[:-1]
 
-    # Parse pattern into segments: (chars_to_pick_from, repeat_count) or (literal, 1)
-    segments: list[tuple[str, int]] = []
+    # Parse pattern into segments: (chars_to_pick_from, min_repeat, max_repeat).
+    # The repeat bounds are kept rather than a fixed count so a ranged quantifier
+    # draws a fresh length for every value.
+    segments: list[tuple[str, int, int]] = []
     i = 0
     while i < len(pattern):
         if pattern[i] == "[":
-            # Find the closing bracket
-            end = pattern.index("]", i)
+            end = pattern.find("]", i)
+            if end == -1:
+                # Unterminated class — the bracket is a literal, not a parse error.
+                segments.append((pattern[i], 1, 1))
+                i += 1
+                continue
             char_class = pattern[i:end + 1]
-            i = end + 1
-            # Check for quantifier {n}
-            repeat = 1
-            if i < len(pattern) and pattern[i] == "{":
-                q_end = pattern.index("}", i)
-                repeat = int(pattern[i + 1:q_end])
-                i = q_end + 1
+            low, high, i = _read_quantifier(pattern, end + 1)
             chars = _expand_char_class(char_class)
             if not chars:
                 # Degenerate class (e.g. "[]") — nothing to draw from.
                 continue
-            segments.append((chars, repeat))
+            segments.append((chars, low, high))
         elif pattern[i] == "\\":
             # Escaped char like \d
             i += 1
             if i < len(pattern) and pattern[i] == "d":
-                repeat = 1
+                low, high, i = _read_quantifier(pattern, i + 1)
+                segments.append((string.digits, low, high))
+            elif i < len(pattern):
+                segments.append((pattern[i], 1, 1))
                 i += 1
-                if i < len(pattern) and pattern[i] == "{":
-                    q_end = pattern.index("}", i)
-                    repeat = int(pattern[i + 1:q_end])
-                    i = q_end + 1
-                segments.append((string.digits, repeat))
             else:
-                segments.append((pattern[i], 1))
-                i += 1
+                # Trailing backslash — nothing to escape.
+                break
         else:
-            # Literal character
-            segments.append((pattern[i], 1))
-            i += 1
+            # Literal character, which a quantifier may still repeat ("A{3}").
+            char = pattern[i]
+            low, high, i = _read_quantifier(pattern, i + 1)
+            segments.append((char, low, high))
 
     values: list[str] = []
     attempts = 0
@@ -289,7 +343,8 @@ def _generate_from_pattern(
     while len(values) < count and attempts < max_attempts:
         attempts += 1
         val = ""
-        for chars, repeat in segments:
+        for chars, low, high in segments:
+            repeat = low if low == high else picker.randint(low, high)
             if len(chars) == 1:
                 val += chars * repeat
             else:
@@ -390,6 +445,23 @@ def _needs_llm(field: FieldDefinition, fk_fields: set[str]) -> bool:
     return field.type not in ("object", "array")
 
 
+def _bulk_generation_model(model: str | None = None, session=None):
+    """Build the Bedrock model for the LLM halves of bulk generation.
+
+    Via ``utils.make_model`` — the only place ``boto_session`` is wired. The two
+    call sites here previously constructed ``BedrockModel`` directly, so an
+    in-process host passing ``Generator(session=...)`` an explicit profile/region
+    got ambient environment credentials for generation while the document path and
+    ``critique_structured`` honoured the session.
+    """
+    from seed_data.utils import make_model
+
+    return make_model(
+        model or MODEL_KEY, role="data", session=session,
+        temperature=TEMPERATURE_BULK_GENERATION,
+    )
+
+
 def _generate_programmatic(
     entity_name: str,
     entity_schema: EntitySchema,
@@ -398,6 +470,8 @@ def _generate_programmatic(
     all_data: dict[str, list[dict]],
     defer_llm: bool = False,
     seed: int | None = None,
+    model: str | None = None,
+    session=None,
 ) -> list[dict]:
     """Generate records using hybrid approach: numpy/scipy for structured fields, LLM for free-text.
 
@@ -536,7 +610,8 @@ def _generate_programmatic(
     # When called with defer_llm=True (from parallel path), skip LLM here
     if llm_fields and not defer_llm:
         records = _fill_string_fields_with_llm(
-            entity_name, entity_schema, records, existing_records, llm_fields
+            entity_name, entity_schema, records, existing_records, llm_fields,
+            model=model, session=session,
         )
 
     return records
@@ -548,6 +623,8 @@ def _fill_string_fields_with_llm(
     partial_records: list[dict],
     existing_records: list[dict],
     fields_to_fill: list[str],
+    model: str | None = None,
+    session=None,
 ) -> list[dict]:
     """Call LLM to generate contextually-appropriate string values.
 
@@ -555,18 +632,8 @@ def _fill_string_fields_with_llm(
     the LLM can generate string values that make sense in context — e.g.,
     a line with capacity=25 gets named "Prototype Line" not "High-Volume Assembly".
     """
-    from strands import Agent
-    from strands.models.bedrock import BedrockModel
-
-    model = BedrockModel(
-        model_id=MODEL_ID,
-        temperature=TEMPERATURE_BULK_GENERATION,
-        max_tokens=MAX_TOKENS,
-        boto_client_config=BEDROCK_CLIENT_CONFIG,
-    )
-
     agent = Agent(
-        model=model,
+        model=_bulk_generation_model(model, session),
         system_prompt=prompts.render("string_field_fill"),
         tools=[],
         callback_handler=None,
@@ -638,20 +705,28 @@ def _fill_string_fields_with_llm(
     return partial_records
 
 
-@tool
-def bulk_generation_agent(
+def generate_bulk(
     entity_schema_definitions: str,
     sample_records_json: str,
     target_count: str = "40",
     seed: int | None = None,
+    *,
+    model: str | None = None,
+    session=None,
 ) -> str:
-    """Generate bulk synthetic data (30-50 records per entity) based on schema and sample records.
+    """Generate bulk synthetic data (30-50 records per entity) from schema and samples.
+
+    The implementation behind the :func:`bulk_generation_agent` tool; in-process
+    callers use this so they can pass ``model`` / ``session``, which must stay off the
+    tool signature.
 
     Args:
         entity_schema_definitions: JSON string of the inferred schema definitions.
         sample_records_json: JSON string of the approved sample records.
         target_count: Target number of records per entity (e.g., "40").
         seed: optional RNG seed making the programmatic columns reproducible.
+        model: model key for the LLM halves (defaults to ``MODEL_KEY``).
+        session: optional boto3 Session.
 
     Returns:
         JSON mapping of entity names to lists of generated records (including original samples).
@@ -697,6 +772,7 @@ def bulk_generation_agent(
             new_records = _generate_programmatic(
                 entity_name, entity_schema, remaining, all_records, all_data,
                 defer_llm=True, seed=_entity_seed(seed, entity_name),
+                model=model, session=session,
             )
             all_records.extend(new_records)
             logger.info("Bulk generation — entity '%s': programmatic generation produced %d records",
@@ -712,13 +788,8 @@ def bulk_generation_agent(
             # Fall back to LLM-based batch generation
             logger.info("Bulk generation — entity '%s': using LLM-based generation (no distributions)",
                         entity_name)
-            model = BedrockModel(
-                model_id=MODEL_ID,
-                temperature=TEMPERATURE_BULK_GENERATION,
-                max_tokens=MAX_TOKENS,
-            )
             agent = Agent(
-                model=model,
+                model=_bulk_generation_model(model, session),
                 system_prompt=BULK_GENERATION_PROMPT,
                 tools=[],
                 callback_handler=None,
@@ -794,7 +865,13 @@ def bulk_generation_agent(
             llm_fields = [f.name for f in ent_schema.fields if _needs_llm(f, fk_fields)]
             # Only pass records that need filling (the new ones, not the original samples)
             new_records = records[len(samples):]
-            filled = _fill_string_fields_with_llm(ent_name, ent_schema, new_records, samples, llm_fields)
+            # `model`/`session` are closed over rather than resolved in the worker:
+            # they belong to the caller, and a thread has no access to anything the
+            # submitting frame did not hand it.
+            filled = _fill_string_fields_with_llm(
+                ent_name, ent_schema, new_records, samples, llm_fields,
+                model=model, session=session,
+            )
             return ent_name, samples + filled
 
         logger.info("Bulk generation — Phase 2: filling string fields in parallel for %d entities",
@@ -818,6 +895,29 @@ def bulk_generation_agent(
 
     result_obj = GeneratedSamples(data=all_data)
     return result_obj.model_dump_json(indent=2)
+
+
+@tool
+def bulk_generation_agent(
+    entity_schema_definitions: str,
+    sample_records_json: str,
+    target_count: str = "40",
+    seed: int | None = None,
+) -> str:
+    """Generate bulk synthetic data (30-50 records per entity) based on schema and sample records.
+
+    Args:
+        entity_schema_definitions: JSON string of the inferred schema definitions.
+        sample_records_json: JSON string of the approved sample records.
+        target_count: Target number of records per entity (e.g., "40").
+        seed: optional RNG seed making the programmatic columns reproducible.
+
+    Returns:
+        JSON mapping of entity names to lists of generated records (including original samples).
+    """
+    return generate_bulk(
+        entity_schema_definitions, sample_records_json, target_count, seed,
+    )
 
 
 def _resolve_generation_order(samples: dict[str, list], schema_json: str) -> list[str]:

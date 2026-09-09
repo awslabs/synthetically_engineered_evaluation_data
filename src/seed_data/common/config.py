@@ -22,9 +22,16 @@ from seed_data.model_registry import MODELS
 # Default model for structured generation / ingest agents. Nova 2 Lite handles
 # document + image blocks and is fast/cheap for the tabular pipeline. Resolved
 # through the shared MODELS registry so the id stays in one place.
-_DEFAULT_MODEL_KEY = "nova2-lite"
-MODEL_ID = MODELS[_DEFAULT_MODEL_KEY]["model_id"]
-MAX_TOKENS = MODELS[_DEFAULT_MODEL_KEY]["max_tokens"]
+#
+# ``MODEL_KEY`` is the registry *key*, and it is what the agents pass to
+# ``utils.make_model`` — the factory takes a key (or raw id) and is the only place
+# ``boto_session`` gets wired, so going through it is what makes a caller-supplied
+# session reach these agents. ``MODEL_ID`` / ``MAX_TOKENS`` remain for callers that
+# want the resolved values.
+MODEL_KEY = "nova2-lite"
+_DEFAULT_MODEL_KEY = MODEL_KEY  # retained: existing name, same value
+MODEL_ID = MODELS[MODEL_KEY]["model_id"]
+MAX_TOKENS = MODELS[MODEL_KEY]["max_tokens"]
 
 # Bedrock client config: long read timeout for large generations + bounded retries.
 BEDROCK_READ_TIMEOUT = 300  # seconds
@@ -52,8 +59,8 @@ TEMPERATURE_DISTRIBUTION_INFERENCE = 0.3
 # drift and high enough to catch a genuine collapse.
 #
 # Every consumer iterates this dict, so a new dimension here must also be
-# computed at each evaluation site (structured/pipeline.py, structured/loop.py) —
-# an absent key reads as 0.0 and would fail the gate on every attempt.
+# computed at each evaluation site (structured/pipeline.py) — an absent key reads
+# as 0.0 and would fail the gate on every attempt.
 QUALITY_THRESHOLDS = {
     "diversity": 0.5,
     "fidelity": 0.6,
@@ -61,15 +68,13 @@ QUALITY_THRESHOLDS = {
     "structural": 0.7,
     "completeness": 0.75,
 }
-MAX_GENERATION_ATTEMPTS = 3
 
 
 def completeness_score(row_count: int, target_count: int) -> float:
     """Row count as a fraction of target, clamped to ``[0.0, 1.0]``.
 
-    Lives beside :data:`QUALITY_THRESHOLDS` so the two evaluation sites that gate
-    on ``completeness`` score it identically, without either engine module having
-    to import the other.
+    Lives beside :data:`QUALITY_THRESHOLDS` so the gate and its threshold stay
+    together, without the engine modules having to import each other.
 
     Clamped above 1.0 so overshooting cannot inflate a mean of the quality
     dimensions and mask a genuinely low score elsewhere. A non-positive target is

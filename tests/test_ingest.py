@@ -81,9 +81,9 @@ def test_run_ingest_free_text_calls_extraction_agent(monkeypatch):
         captured.update(kwargs)
         return _fake_schema("Customer").model_dump_json()
 
-    # Patch the raw tool func the pipeline pulls off the @tool object.
-    import seed_data.ingest.extract as extract_mod
-    monkeypatch.setattr(extract_mod.schema_extraction_agent, "_tool_func", fake_extract)
+    # Patch the plain implementation the pipeline calls, not the @tool wrapper —
+    # the wrapper's signature deliberately omits model/session.
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
 
     schema = run_ingest("Generate customers with names", name="dataset", verbose=False)
 
@@ -105,8 +105,7 @@ def test_run_ingest_merges_multiple_inputs(monkeypatch):
             return _fake_schema("FromSchema").model_dump_json()
         return _fake_schema("Other").model_dump_json()
 
-    import seed_data.ingest.extract as extract_mod
-    monkeypatch.setattr(extract_mod.schema_extraction_agent, "_tool_func", fake_extract)
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
 
     schema = run_ingest(
         "a free text description",
@@ -140,11 +139,208 @@ def test_run_ingest_erd_format_detection(monkeypatch):
         captured.update(kwargs)
         return _fake_schema("Node").model_dump_json()
 
-    import seed_data.ingest.extract as extract_mod
-    monkeypatch.setattr(extract_mod.schema_extraction_agent, "_tool_func", fake_extract)
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
 
     run_ingest("diagram.mmd", verbose=False)
     assert captured.get("erd_format") == "mermaid"
+
+
+def test_run_ingest_passes_data_model_to_extraction(monkeypatch):
+    """Regression: `--data-model` / `ModelConfig.data` was documented on
+    `run_ingest` and never read, so the extraction agent always used the
+    `common.config` default and the flag was a no-op for ingest."""
+    from seed_data.api import ModelConfig
+
+    captured = {}
+
+    def fake_extract(**kwargs):
+        captured.update(kwargs)
+        return _fake_schema("Customer").model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+
+    run_ingest("some customers", models=ModelConfig(data="sonnet"), verbose=False)
+    assert captured["model"] == "sonnet"
+
+
+def test_run_ingest_explicit_model_beats_model_config(monkeypatch):
+    from seed_data.api import ModelConfig
+
+    captured = {}
+
+    def fake_extract(**kwargs):
+        captured.update(kwargs)
+        return _fake_schema("Customer").model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+
+    run_ingest(
+        "some customers", models=ModelConfig(data="sonnet"), model="nova2-lite",
+        verbose=False,
+    )
+    assert captured["model"] == "nova2-lite"
+
+
+def test_run_ingest_forwards_session_to_extraction(monkeypatch):
+    """Regression: `Generator(session=...)` was silently dropped on the ingest
+    path, so an in-process host's explicit profile/region fell back to ambient
+    environment credentials."""
+    captured = {}
+    sentinel = object()
+
+    def fake_extract(**kwargs):
+        captured.update(kwargs)
+        return _fake_schema("Customer").model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+
+    run_ingest("some customers", session=sentinel, verbose=False)
+    assert captured["session"] is sentinel
+
+
+# --- extract_schema prompt assembly -----------------------------------------
+
+class _StubAgent:
+    """Captures the user content and returns a fixed InferredSchema."""
+
+    def __init__(self, entity_name="Captured"):
+        self.calls = []
+        self._entity_name = entity_name
+
+    def __call__(self, user_content, **kwargs):
+        self.calls.append(user_content)
+        from seed_data.schema.flat import flat_inferred_schema
+
+        flat = flat_inferred_schema()
+        return type("R", (), {
+            "structured_output": flat.model_validate({
+                "entities": [{
+                    "entity_name": self._entity_name,
+                    "fields": [{"name": "id", "type": "integer"}],
+                }],
+            })
+        })()
+
+    @property
+    def prompt_text(self) -> str:
+        return "\n".join(
+            block["text"] for block in self.calls[0] if "text" in block
+        )
+
+
+@pytest.fixture
+def stub_agent(monkeypatch):
+    agent = _StubAgent()
+    monkeypatch.setattr(
+        "seed_data.ingest.extract._build_schema_agent",
+        lambda model=None, session=None: agent,
+    )
+    return agent
+
+
+def test_schema_input_text_reaches_the_model(stub_agent):
+    """Regression (blocking): the prompt named the format and pointed at
+    `parse_schema_definition` — a tool whose text argument only the model can
+    supply, and it had never seen the DDL. The model got a label and no schema,
+    so it invented one unrelated to the input."""
+    from seed_data.ingest.extract import extract_schema
+
+    ddl = "CREATE TABLE orders (id INT PRIMARY KEY, total DECIMAL(10,2));"
+    extract_schema(schema_input=ddl, schema_format="sql_ddl")
+
+    assert ddl in stub_agent.prompt_text
+    assert "SQL DDL" in stub_agent.prompt_text
+
+
+def test_erd_input_text_reaches_the_model(stub_agent):
+    from seed_data.ingest.extract import extract_schema
+
+    dbml = "Table users {\n  id int [pk]\n}"
+    extract_schema(erd_input=dbml, erd_format="dbml")
+
+    assert dbml in stub_agent.prompt_text
+    assert "DBML" in stub_agent.prompt_text
+
+
+def test_current_schema_reaches_the_model_for_revision(stub_agent):
+    """Regression (blocking): schema revision sent the schema as `schema_input`,
+    which was both dropped from the prompt and the wrong label — an
+    InferredSchema dump is not a source JSON Schema."""
+    from seed_data.ingest.extract import extract_schema
+
+    current = _fake_schema("Widget").model_dump_json()
+    extract_schema(current_schema=current, override_instructions="loosen ranges")
+
+    prompt = stub_agent.prompt_text
+    assert "Widget" in prompt
+    assert "loosen ranges" in prompt
+
+
+def test_extract_schema_raises_on_refusal(monkeypatch):
+    """A guardrail refusal returns structured_output=None; `to_canonical(None)`
+    raised an opaque AttributeError from inside the converter."""
+    from seed_data.ingest.extract import extract_schema
+
+    class _RefusingAgent:
+        def __call__(self, user_content, **kwargs):
+            return type("R", (), {"structured_output": None})()
+
+    monkeypatch.setattr(
+        "seed_data.ingest.extract._build_schema_agent",
+        lambda model=None, session=None: _RefusingAgent(),
+    )
+
+    with pytest.raises(ValueError, match="no structured schema"):
+        extract_schema(text_description="anything")
+
+
+def test_extract_schema_builds_model_through_make_model(monkeypatch):
+    """The session only reaches Bedrock via `utils.make_model`; a direct
+    `BedrockModel(...)` here ignored it."""
+    from seed_data.ingest import extract as extract_mod
+
+    captured = {}
+    sentinel = object()
+
+    def fake_make_model(model_key, **kwargs):
+        captured["model_key"] = model_key
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("seed_data.utils.make_model", fake_make_model)
+    monkeypatch.setattr(extract_mod, "Agent", lambda **kwargs: object())
+
+    extract_mod._build_schema_agent(model="sonnet", session=sentinel)
+
+    assert captured["model_key"] == "sonnet"
+    assert captured["session"] is sentinel
+
+
+def test_only_the_reading_tool_is_registered():
+    """The parse helpers echo their text argument back, and that text is inlined
+    now — registered, the model could call them with the empty string it used to be
+    handed, which is blocker 1's failure by another route. The system prompt must
+    name exactly what is registered: it previously advertised `read_document` and
+    `read_erd_image`, neither of which was ever available (both are now deleted)."""
+    from seed_data.ingest.extract import SCHEMA_EXTRACTION_PROMPT, _SCHEMA_TOOLS
+
+    names = {getattr(t, "tool_name", getattr(t, "__name__", "")) for t in _SCHEMA_TOOLS}
+    assert names == {"analyze_example_data"}
+    for absent in ("read_document", "read_erd_image", "parse_schema_definition",
+                   "parse_erd", "apply_schema_overrides"):
+        assert absent not in SCHEMA_EXTRACTION_PROMPT
+
+
+def test_parse_schema_definition_does_not_mislabel_unknown_formats():
+    """`json_schema else "SQL DDL"` told the model an unrecognized format was
+    SQL DDL."""
+    import json
+
+    from seed_data.ingest.tools import parse_schema_definition
+
+    payload = json.loads(parse_schema_definition("whatever", "protobuf"))
+    assert "SQL DDL" not in payload["format_label"]
+    assert "protobuf" in payload["format_label"]
 
 
 # --- _load_data: file readers -----------------------------------------------

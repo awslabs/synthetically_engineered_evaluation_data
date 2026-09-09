@@ -79,6 +79,20 @@ def test_critique_structured_rejects_below_threshold():
     assert result["verdict"] == "rejected"
 
 
+def test_critique_structured_refusal_yields_error_verdict():
+    """Regression: a guardrail refusal returns structured_output=None, and the
+    `critique.score` comparison sat outside the try — so an AttributeError escaped
+    and broke this function's documented contract that an unreachable or unwilling
+    reviewer yields verdict="error" rather than crashing a finished run."""
+    with patch("strands.Agent", return_value=_mock_agent(None)), \
+         patch("seed_data.utils.make_model", return_value=object()):
+        result = critique_structured({"Order": [{"order_id": "A1"}]}, _schema())
+
+    assert result["verdict"] == "error"
+    assert result["score"] == 0
+    assert "no structured output" in result["error"]
+
+
 def test_critique_structured_accepts_json_path(tmp_path):
     data_file = tmp_path / "data.json"
     data_file.write_text(json.dumps({"Order": [{"order_id": "A1", "total": 5.0}]}))

@@ -2,7 +2,6 @@
 
 from seed_data.common.config import (
     BEDROCK_CLIENT_CONFIG,
-    MAX_GENERATION_ATTEMPTS,
     MAX_TOKENS,
     MODEL_ID,
     QUALITY_THRESHOLDS,
@@ -16,7 +15,6 @@ from seed_data.common.config import (
 
 __all__ = [
     "BEDROCK_CLIENT_CONFIG",
-    "MAX_GENERATION_ATTEMPTS",
     "MAX_TOKENS",
     "MODEL_ID",
     "QUALITY_THRESHOLDS",

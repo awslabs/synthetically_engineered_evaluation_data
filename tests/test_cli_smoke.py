@@ -181,6 +181,25 @@ def test_generate_structured_bad_format_errors():
     assert "invalid choice" in r.stderr.lower()
 
 
+def test_generate_structured_missing_schema_file_has_no_traceback(tmp_path):
+    """Regression: `_generate_structured` called into the API bare, so a typo'd
+    path printed a raw FileNotFoundError traceback while every other subcommand
+    printed the message. Runs from tmp_path so the argument cannot resolve to a
+    real file in the repo."""
+    r = _run("generate-structured", "definitely-not-here.json", cwd=str(tmp_path))
+    assert r.returncode == 1
+    assert "Traceback" not in r.stderr
+    assert r.stderr.strip()
+
+
+def test_generate_structured_unparseable_schema_has_no_traceback(tmp_path):
+    bad = tmp_path / "schema.json"
+    bad.write_text("{not valid json")
+    r = _run("generate-structured", str(bad))
+    assert r.returncode == 1
+    assert "Traceback" not in r.stderr
+
+
 # --- generate-documents subcommand parses (no Bedrock) ---------------------
 
 def test_generate_documents_help_exits_clean():

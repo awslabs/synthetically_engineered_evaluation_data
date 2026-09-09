@@ -300,9 +300,12 @@ def _generate_structured(argv):
             args.schema, rows=args.rows, format=args.format, seed=args.seed,
             verbose=not args.quiet,
         )
-    except ImportError as e:
-        # The [structured] extra is missing. Print the guidance plainly instead of
-        # letting a traceback bury it — this is a setup step for the user, not a bug.
+    except (ImportError, FileNotFoundError, KeyError, ValueError, OSError) as e:
+        # A missing [structured] extra, an unreadable schema path, or a schema that
+        # does not parse are all setup mistakes the user can fix. Printed plainly
+        # rather than left as a traceback, matching every other subcommand — before
+        # this, `seed-data generate-structured typo.json` printed a raw
+        # FileNotFoundError stack.
         print(e, file=sys.stderr)
         sys.exit(1)
 
@@ -517,10 +520,14 @@ def _plan_and_generate(argv):
         print(f"Wrote InferredSchema to: {args.save_schema}")
 
     if args.output == "structured":
-        result = gen.generate_structured(
-            schema, rows=args.rows, format=args.format, seed=args.seed,
-            verbose=verbose,
-        )
+        try:
+            result = gen.generate_structured(
+                schema, rows=args.rows, format=args.format, seed=args.seed,
+                verbose=verbose,
+            )
+        except (ImportError, FileNotFoundError, KeyError, ValueError, OSError) as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
         print(f"\n{'=' * 60}")
         if result.success:
             for entity, count in result.row_counts.items():
@@ -534,13 +541,26 @@ def _plan_and_generate(argv):
             sys.exit(1)
         return
 
-    # documents
-    if args.count > 1:
-        scenario = args.scenario or "Generate diverse, realistic documents"
-        batch = gen.generate_batch(
-            schema, count=args.count, scenario=scenario,
-            entity=args.entity, seed=args.seed, verbose=verbose,
-        )
+    # documents. Wrapped for the same reason as the structured branch and
+    # `generate-documents`: an `--entity` that is not in the schema surfaced as a
+    # raw KeyError traceback.
+    try:
+        batch = None
+        if args.count > 1:
+            scenario = args.scenario or "Generate diverse, realistic documents"
+            batch = gen.generate_batch(
+                schema, count=args.count, scenario=scenario,
+                entity=args.entity, seed=args.seed, verbose=verbose,
+            )
+        else:
+            doc = gen.generate(
+                schema, scenario=args.scenario, entity=args.entity, verbose=verbose,
+            )
+    except (FileNotFoundError, KeyError, ValueError, OSError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    if batch is not None:
         print(f"\n{'=' * 60}")
         print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
         for d in batch.documents:
@@ -549,9 +569,6 @@ def _plan_and_generate(argv):
         if batch.count_succeeded == 0:
             sys.exit(1)
     else:
-        doc = gen.generate(
-            schema, scenario=args.scenario, entity=args.entity, verbose=verbose,
-        )
         print(f"\n{'=' * 60}")
         if doc.success:
             print(f"PDF:     {doc.pdf_path}")

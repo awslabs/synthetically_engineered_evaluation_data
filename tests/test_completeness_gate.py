@@ -22,8 +22,8 @@ def test_completeness_score_is_a_ratio():
 def test_completeness_score_clamps_overshoot():
     """Overshooting must not exceed 1.0.
 
-    `loop.py` averages the dimensions to rank attempts; an unclamped 2.0 would let
-    a run that returned double the rows outvote genuinely bad diversity.
+    The score is compared against a threshold in `[0, 1]`; an unclamped 2.0 would
+    let a run that returned double the rows mask genuinely bad row counts elsewhere.
     """
     assert completeness_score(40, 20) == 1.0
 
@@ -47,10 +47,10 @@ def test_completeness_is_a_registered_quality_dimension():
     assert 0.0 < QUALITY_THRESHOLDS["completeness"] < 1.0
 
 
-def test_every_threshold_dimension_is_computed_by_both_evaluators():
-    """A new dimension in QUALITY_THRESHOLDS must be scored at every gate site.
+def test_every_threshold_dimension_is_computed_by_the_evaluator():
+    """A new dimension in QUALITY_THRESHOLDS must be scored at the gate site.
 
-    Both evaluators iterate the dict and read `scores.get(dim, 0.0)`, so a
+    The evaluator iterates the dict and reads `scores.get(dim, 0.0)`, so a
     dimension added to the config but not computed reads as 0.0 and fails every
     attempt forever. This test is the tripwire for that.
     """
@@ -58,14 +58,13 @@ def test_every_threshold_dimension_is_computed_by_both_evaluators():
 
     import inspect
 
-    from seed_data.structured import loop, pipeline
+    from seed_data.structured import pipeline
 
-    for module in (loop, pipeline):
-        src = inspect.getsource(module)
-        for dim in QUALITY_THRESHOLDS:
-            assert f'"{dim}"' in src, (
-                f"{module.__name__} never computes '{dim}', but the gate requires it"
-            )
+    src = inspect.getsource(pipeline)
+    for dim in QUALITY_THRESHOLDS:
+        assert f'"{dim}"' in src, (
+            f"the graph pipeline never computes '{dim}', but the gate requires it"
+        )
 
 
 # --- the gate in the graph pipeline -----------------------------------------

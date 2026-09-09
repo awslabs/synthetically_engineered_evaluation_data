@@ -78,6 +78,59 @@ def test_default_generation_no_distribution():
     assert all(0.0 <= v <= 1.0 for v in values)
 
 
+# --- model-supplied distribution parameters ---------------------------------
+# `prompts/distribution_inference.j2` asks the LLM for these params and nothing
+# validated the answer, so a plausible-looking response aborted the run.
+
+@pytest.mark.parametrize("weights", [
+    [0, 0, 0],                  # ZeroDivisionError normalizing by the sum
+    [-1, 2, 3],                 # ValueError from rng.choice(p=...)
+    [0.5, 0.5],                 # wrong length
+    [float("inf"), 1, 1],       # probabilities that never sum to 1
+    [float("nan"), 1, 1],
+])
+def test_bad_categorical_weights_fall_back_to_uniform(weights):
+    field = FieldDefinition(
+        name="status", type="enum", enum_values=["a", "b", "c"],
+        distribution=DistributionSpec(type=DistributionType.CATEGORICAL_WEIGHTED,
+                                      params={"weights": weights}),
+    )
+    values = DistributionGenerator(seed=7).generate_categorical(field, 60)
+    assert len(values) == 60
+    assert set(values) <= {"a", "b", "c"}
+
+
+@pytest.mark.parametrize("params", [{"lambda": 0}, {"lambda": -2}, {"lambda": [1, 2]}])
+def test_zero_lambda_does_not_divide_by_zero(params):
+    field = FieldDefinition(
+        name="wait", type="float", min_value=0, max_value=100,
+        distribution=DistributionSpec(type=DistributionType.EXPONENTIAL, params=params),
+    )
+    assert len(DistributionGenerator(seed=3).generate_numeric(field, 20)) == 20
+
+
+@pytest.mark.parametrize("params", [{"lambda": 0}, {"mean": 5, "std": 0}])
+def test_bad_date_params_do_not_raise(params):
+    dist_type = (
+        DistributionType.EXPONENTIAL if "lambda" in params else DistributionType.NORMAL
+    )
+    field = FieldDefinition(
+        name="created", type="date",
+        distribution=DistributionSpec(type=dist_type, params=params),
+    )
+    assert len(DistributionGenerator(seed=3).generate_dates(field, 15)) == 15
+
+
+def test_inverted_uniform_range_stays_in_range():
+    field = FieldDefinition(
+        name="v", type="float", min_value=0, max_value=10,
+        distribution=DistributionSpec(type=DistributionType.UNIFORM,
+                                      params={"low": 9, "high": 1}),
+    )
+    values = DistributionGenerator(seed=3).generate_numeric(field, 30)
+    assert all(1 <= v <= 9 for v in values)
+
+
 # --- pattern generation -----------------------------------------------------
 
 def test_anchored_pattern_produces_self_matching_values():
@@ -197,6 +250,53 @@ def test_pattern_generation_is_seedable():
     assert seeded == again
 
 
+# --- pattern quantifiers ----------------------------------------------------
+
+@pytest.mark.parametrize("pattern", [
+    r"[A-Z]{2,4}",
+    r"ORD-[0-9]{4,6}",
+    r"[0-9]+",
+    r"[A-Z]*",
+    r"x?[0-9]{3}",
+    r"[A-Z]{2,}",
+    r"\d{2,4}",
+])
+def test_ranged_quantifiers_do_not_raise(pattern):
+    """Regression: the quantifier body went straight to `int()`, so `[A-Z]{2,4}`
+    aborted the whole run with `invalid literal for int() with base 10: '2,4'` —
+    and `prompts/distribution_inference.j2` asks the model for a pattern on every
+    unique field."""
+    values = _generate_from_pattern(pattern, 5, set(), random.Random(11))
+    assert len(values) == 5
+    assert all(re.fullmatch(pattern, v) for v in values)
+
+
+def test_ranged_quantifier_spans_its_range():
+    """A range drawn once per *segment* would pin every value to one length,
+    collapsing the space the pattern actually allows."""
+    values = _generate_from_pattern(r"[A-Z]{2,5}", 40, set(), random.Random(5))
+    assert len({len(v) for v in values}) > 1
+
+
+def test_unbounded_quantifier_is_capped():
+    from seed_data.structured.generation import _UNBOUNDED_REPEAT_CAP
+
+    values = _generate_from_pattern(r"[0-9]+", 20, set(), random.Random(5))
+    assert all(1 <= len(v) <= _UNBOUNDED_REPEAT_CAP for v in values)
+
+
+def test_literal_quantifier_repeats_the_literal():
+    values = _generate_from_pattern(r"A{3}-[0-9]{2}", 3, set(), random.Random(5))
+    assert all(v.startswith("AAA-") for v in values)
+
+
+@pytest.mark.parametrize("pattern", [r"[A-Z", r"[0-9]{", r"[0-9]{x}", "\\"])
+def test_malformed_patterns_do_not_raise(pattern):
+    """An unterminated class or a non-numeric quantifier is a malformed pattern,
+    not a reason to abort a generation run."""
+    assert len(_generate_from_pattern(pattern, 3, set(), random.Random(5))) == 3
+
+
 def test_entity_seeds_are_derived_and_independent():
     """One seed shared across entities would make them draw identical values —
     a correlation the schema never asked for. Derivation must be stable across
@@ -206,37 +306,29 @@ def test_entity_seeds_are_derived_and_independent():
     assert _entity_seed(None, "Alpha") is None
 
 
-def test_seed_reaches_bulk_generation_from_the_pipeline():
+def test_seed_reaches_bulk_generation_from_the_pipeline(monkeypatch):
     """The wiring itself: build_graph_pipeline must forward its seed to
-    bulk_generation_agent, offset per attempt so a retry redraws."""
+    bulk generation, offset per attempt so a retry redraws."""
     from seed_data.structured import pipeline as pipeline_mod
 
     calls = []
 
-    def _fake_tool(name):
-        if name != "bulk_generation_agent":
-            return lambda **kwargs: "{}"
+    def _bulk(**kwargs):
+        calls.append(kwargs.get("seed"))
+        return json.dumps({"data": {}})
 
-        def _bulk(**kwargs):
-            calls.append(kwargs.get("seed"))
-            return json.dumps({"data": {}})
-        return _bulk
+    monkeypatch.setattr("seed_data.structured.generation.generate_bulk", _bulk)
 
-    original = pipeline_mod._get_tool_func
-    pipeline_mod._get_tool_func = _fake_tool
-    try:
-        schema = InferredSchema(entities=[EntitySchema(
-            entity_name="Widget",
-            fields=[FieldDefinition(name="qty", type="integer")],
-        )])
-        _graph, _ctx, ps = pipeline_mod.build_graph_pipeline(schema, seed=1234)
-        # Reach the generation node directly rather than executing the graph,
-        # which would need Bedrock for the surrounding nodes.
-        node = _graph.nodes["bulk_generation"].executor
-        node.func("")
-        node.func("")
-    finally:
-        pipeline_mod._get_tool_func = original
+    schema = InferredSchema(entities=[EntitySchema(
+        entity_name="Widget",
+        fields=[FieldDefinition(name="qty", type="integer")],
+    )])
+    _graph, _ctx, ps = pipeline_mod.build_graph_pipeline(schema, seed=1234)
+    # Reach the generation node directly rather than executing the graph,
+    # which would need Bedrock for the surrounding nodes.
+    node = _graph.nodes["bulk_generation"].executor
+    node.func("")
+    node.func("")
 
     # Attempt 1 → 1235, attempt 2 → 1236: reproducible overall, but a retry does
     # not redraw the identical values that just failed the gate.
@@ -598,6 +690,213 @@ def test_pipeline_state_defaults():
     assert ps.export_json == ""
 
 
+def test_node_execution_budget_covers_the_worst_case_path():
+    """Regression: the cap was 25 while the graph's own retry budget needs 27.
+    Strands stops silently at the cap, so the `evaluate` that sets
+    quality_passed never ran and the run reported "No data exported" instead of
+    the best-effort dataset it had decided to accept.
+
+    Counted from the graph's own constants rather than restating a number, so
+    raising MAX_GENERATION_RETRIES or MAX_SCHEMA_REVISIONS cannot silently
+    reintroduce the truncation."""
+    from seed_data.structured import pipeline as pipeline_mod
+
+    per_attempt = 2                                       # bulk_generation + evaluate
+    per_pass = 2 + pipeline_mod.MAX_GENERATION_RETRIES * per_attempt
+    worst_case = (
+        per_pass
+        + pipeline_mod.MAX_SCHEMA_REVISIONS * (1 + per_pass)
+        + 1                                               # export
+    )
+    assert pipeline_mod.MAX_NODE_EXECUTIONS >= worst_case
+
+
+def test_schema_revision_passes_the_schema_it_is_revising(monkeypatch):
+    """Regression (blocking): the reviser was handed the schema as `schema_input`,
+    which `extract.py` dropped from the prompt entirely — so it saw only "loosen
+    overly tight constraints…" and its invention replaced the real schema."""
+    from seed_data.structured import pipeline as pipeline_mod
+
+    captured = {}
+
+    def fake_extract(**kwargs):
+        captured.update(kwargs)
+        return _schema_with_constraints().model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+
+    _graph, _ctx, ps = pipeline_mod.build_graph_pipeline(_schema_with_constraints())
+    _graph.nodes["schema_revision"].executor.func("")
+
+    assert "Customer" in captured["current_schema"]
+    # Not `schema_input`: that means a *source* JSON Schema / SQL DDL, and an
+    # InferredSchema dump is neither.
+    assert not captured.get("schema_input")
+    assert "loosen" in captured["override_instructions"]
+    assert ps.schema_revisions == 1
+
+
+@pytest.mark.parametrize("bad_result", [
+    "not json at all",
+    '{"entities": []}',          # parses, but has nothing to generate from
+])
+def test_a_bad_revision_does_not_destroy_the_schema(monkeypatch, bad_result):
+    """`ps.schema_json` is the only copy of the schema. A refusal or truncated
+    response must not replace it — every later stage would generate against
+    nothing."""
+    from seed_data.structured import pipeline as pipeline_mod
+
+    monkeypatch.setattr(
+        "seed_data.ingest.extract.extract_schema", lambda **kwargs: bad_result,
+    )
+
+    _graph, _ctx, ps = pipeline_mod.build_graph_pipeline(_schema_with_constraints())
+    original = ps.schema_json
+    _graph.nodes["schema_revision"].executor.func("")
+
+    assert ps.schema_json == original
+
+
+def test_a_bad_distribution_result_does_not_destroy_the_schema(monkeypatch):
+    from seed_data.structured import pipeline as pipeline_mod
+
+    monkeypatch.setattr(
+        "seed_data.structured.distributions.inference.infer_distributions",
+        lambda *a, **k: "garbage",
+    )
+
+    _graph, _ctx, ps = pipeline_mod.build_graph_pipeline(_schema_with_constraints())
+    original = ps.schema_json
+    _graph.nodes["distribution_inference"].executor.func("")
+
+    assert ps.schema_json == original
+
+
+def test_pipeline_forwards_model_and_session_to_its_agents(monkeypatch):
+    """Regression: `Generator(session=...)` was dropped on the structured path
+    while the document path and `critique_structured` honoured it."""
+    from seed_data.structured import pipeline as pipeline_mod
+
+    captured = {}
+    sentinel = object()
+
+    def fake_samples(schema_json, *, model=None, session=None):
+        captured["model"] = model
+        captured["session"] = session
+        return json.dumps({"data": {}})
+
+    monkeypatch.setattr("seed_data.structured.sampling.generate_samples", fake_samples)
+
+    _graph, _ctx, _ps = pipeline_mod.build_graph_pipeline(
+        _schema_with_constraints(), model="sonnet", session=sentinel,
+    )
+    _graph.nodes["sample_generation"].executor.func("")
+
+    assert captured == {"model": "sonnet", "session": sentinel}
+
+
+# --- refusals surface as explanations, not AttributeErrors -------------------
+
+def test_generate_samples_raises_on_refusal(monkeypatch):
+    from seed_data.structured import sampling
+
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: object())
+    monkeypatch.setattr(
+        sampling, "Agent",
+        lambda **kwargs: (lambda *a, **k: type("R", (), {"structured_output": None})()),
+    )
+
+    with pytest.raises(ValueError, match="no structured output"):
+        sampling.generate_samples("{}")
+
+
+def test_infer_distributions_raises_on_refusal(monkeypatch):
+    from seed_data.structured.distributions import inference
+
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: object())
+    monkeypatch.setattr(
+        inference, "Agent",
+        lambda **kwargs: (lambda *a, **k: type("R", (), {"structured_output": None})()),
+    )
+
+    with pytest.raises(ValueError, match="no structured output"):
+        inference.infer_distributions("{}")
+
+
+@pytest.mark.parametrize("module_name,func_name,arg", [
+    ("seed_data.structured.sampling", "generate_samples", "{}"),
+    ("seed_data.structured.distributions.inference", "infer_distributions", "{}"),
+])
+def test_agents_build_their_model_through_make_model(monkeypatch, module_name, func_name, arg):
+    """`utils.make_model` is the only place `boto_session` is wired; these agents
+    each constructed BedrockModel directly and dropped the caller's session."""
+    import importlib
+
+    module = importlib.import_module(module_name)
+    captured = {}
+    sentinel = object()
+
+    def fake_make_model(model_key, **kwargs):
+        captured["model_key"] = model_key
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("seed_data.utils.make_model", fake_make_model)
+    monkeypatch.setattr(
+        module, "Agent",
+        lambda **kwargs: (lambda *a, **k: type("R", (), {"structured_output": None})()),
+    )
+
+    with pytest.raises(ValueError):
+        getattr(module, func_name)(arg, model="sonnet", session=sentinel)
+
+    assert captured["model_key"] == "sonnet"
+    assert captured["session"] is sentinel
+
+
+def test_bulk_generation_model_goes_through_make_model(monkeypatch):
+    from seed_data.structured.generation import _bulk_generation_model
+
+    captured = {}
+    sentinel = object()
+
+    def fake_make_model(model_key, **kwargs):
+        captured["model_key"] = model_key
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("seed_data.utils.make_model", fake_make_model)
+    _bulk_generation_model("sonnet", sentinel)
+
+    assert captured["model_key"] == "sonnet"
+    assert captured["session"] is sentinel
+
+
+def test_run_structured_forwards_models_and_session(monkeypatch):
+    from seed_data import structured as structured_pkg
+    from seed_data.api import ModelConfig
+    from seed_data.structured.pipeline import PipelineState
+
+    captured = {}
+    sentinel = object()
+
+    def fake_run_graph_pipeline(sch, **kwargs):
+        captured.update(kwargs)
+        return "summary", PipelineState()
+
+    monkeypatch.setattr(
+        "seed_data.structured.pipeline.run_graph_pipeline", fake_run_graph_pipeline
+    )
+
+    structured_pkg.run_structured(
+        _schema_with_constraints(), models=ModelConfig(data="sonnet"),
+        session=sentinel, verbose=False,
+    )
+
+    assert captured["model"] == "sonnet"
+    assert captured["session"] is sentinel
+
+
 # --- run_structured facade (LLM graph mocked) -------------------------------
 
 def test_run_structured_parses_export_summary(monkeypatch):
@@ -606,7 +905,8 @@ def test_run_structured_parses_export_summary(monkeypatch):
 
     schema = _schema_with_constraints()
 
-    def fake_run_graph_pipeline(sch, *, output_dir, export_format, target_count, seed=None):
+    def fake_run_graph_pipeline(sch, *, output_dir, export_format, target_count, seed=None,
+                                model=None, session=None):
         ps = PipelineState()
         ps.export_json = json.dumps({
             "format": export_format,
@@ -655,7 +955,8 @@ def test_run_structured_empty_export_has_explanatory_error(monkeypatch):
 
     schema = _schema_with_constraints()
 
-    def fake_run_graph_pipeline(sch, *, output_dir, export_format, target_count, seed=None):
+    def fake_run_graph_pipeline(sch, *, output_dir, export_format, target_count, seed=None,
+                                model=None, session=None):
         ps = PipelineState()
         ps.export_json = json.dumps({"format": export_format, "files": [], "record_counts": {}})
         ps.evaluation_issues = ["Entity 'Customer' has no records"]

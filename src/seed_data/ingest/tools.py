@@ -1,8 +1,11 @@
-"""Schema extraction tools for the unified schema agent.
+"""Input handling for the unified schema extraction agent.
 
-Each tool handles one input modality (document, text, schema definition,
-example data, ERD) and returns a structured analysis that the schema agent
-uses to produce a final InferredSchema.
+One entry per input modality. Only :func:`analyze_example_data` is a *tool* — it
+reads a file the model cannot see, from a path the prompt names. The rest are
+plain functions: they take text the caller already has and return it with
+format-specific parsing instructions, which :mod:`seed_data.ingest.extract`
+inlines into the user message. As tools they were unusable, since only the model
+supplies tool arguments and it never saw the text.
 
 pandas is imported lazily (inside the example-data helpers) rather than at module
 level: free-text / document / schema ingestion must work in the lean base install
@@ -13,7 +16,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from strands import tool
@@ -26,50 +28,6 @@ logger = logging.getLogger(__name__)
 SUPPORTED_DOCUMENT_FORMATS = {"pdf", "csv", "doc", "docx", "xls", "xlsx", "html", "txt", "md"}
 
 
-@tool
-def read_document(file_path: str) -> str:
-    """Read a document file and return its raw bytes for analysis.
-
-    Supports: pdf, csv, doc, docx, xls, xlsx, html, txt, md.
-    The document content is passed directly to the LLM via a document block.
-
-    Args:
-        file_path: Path to the document file.
-
-    Returns:
-        JSON with document metadata and base64 content reference, or error message.
-    """
-    logger.info("read_document tool — file: %s", file_path)
-
-    if not os.path.isfile(file_path):
-        return json.dumps({"error": f"File not found: {file_path}"})
-
-    ext = Path(file_path).suffix.lstrip(".").lower()
-    if ext not in SUPPORTED_DOCUMENT_FORMATS:
-        return json.dumps({
-            "error": f"Unsupported format: .{ext}. Supported: {', '.join(sorted(SUPPORTED_DOCUMENT_FORMATS))}"
-        })
-
-    with open(file_path, "rb") as f:
-        file_bytes = f.read()
-
-    return {
-        "status": "success",
-        "content": [
-            {"text": f"Document loaded: {Path(file_path).name} ({len(file_bytes):,} bytes, format: {ext})"},
-            {
-                "document": {
-                    "format": ext,
-                    "name": Path(file_path).stem,
-                    "source": {"bytes": file_bytes},
-                }
-            },
-            {"text": "Analyze this document to extract all data entities, fields, relationships, and constraints."},
-        ],
-    }
-
-
-@tool
 def parse_schema_definition(schema_text: str, format: str) -> str:
     """Parse a JSON Schema or SQL DDL definition into structured information.
 
@@ -82,7 +40,12 @@ def parse_schema_definition(schema_text: str, format: str) -> str:
     """
     logger.info("parse_schema_definition tool — format: %s, length: %d", format, len(schema_text))
 
-    format_label = "JSON Schema" if format == "json_schema" else "SQL DDL"
+    # A lookup, not `json_schema else SQL DDL`: that binary labelled anything
+    # unrecognized "SQL DDL", so a mislabelled or novel format arrived at the model
+    # described as something it is not.
+    format_label = {"json_schema": "JSON Schema", "sql_ddl": "SQL DDL"}.get(
+        format, f"schema definition ({format})" if format else "schema definition"
+    )
 
     return json.dumps({
         "format": format,
@@ -144,7 +107,6 @@ def analyze_example_data(file_path: str) -> str:
     })
 
 
-@tool
 def parse_erd(erd_text: str, format: str) -> str:
     """Parse an ERD diagram definition into structured information.
 
@@ -182,50 +144,6 @@ def parse_erd(erd_text: str, format: str) -> str:
     })
 
 
-@tool
-def read_erd_image(file_path: str) -> str:
-    """Read an ERD image file for visual analysis.
-
-    Args:
-        file_path: Path to the ERD image (PNG, JPG, JPEG).
-
-    Returns:
-        Image content for the agent to analyze visually.
-    """
-    logger.info("read_erd_image tool — file: %s", file_path)
-
-    if not os.path.isfile(file_path):
-        return json.dumps({"error": f"File not found: {file_path}"})
-
-    ext = Path(file_path).suffix.lstrip(".").lower()
-    if ext not in ("png", "jpg", "jpeg"):
-        return json.dumps({"error": f"Unsupported image format: .{ext}. Use PNG or JPG."})
-
-    with open(file_path, "rb") as f:
-        image_bytes = f.read()
-
-    return {
-        "status": "success",
-        "content": [
-            {"text": f"ERD image loaded: {Path(file_path).name} ({len(image_bytes):,} bytes)"},
-            {
-                "image": {
-                    "format": ext if ext != "jpg" else "jpeg",
-                    "source": {"bytes": image_bytes},
-                }
-            },
-            {
-                "text": (
-                    "Analyze this ERD image. Extract all entities, fields with types and constraints, "
-                    "and all relationships with structured_relationships "
-                    "(source_entity, source_field, target_entity, target_field, cardinality)."
-                )
-            },
-        ],
-    }
-
-
-@tool
 def apply_schema_overrides(current_schema_text: str, override_instructions: str) -> str:
     """Apply user modifications to an existing schema.
 

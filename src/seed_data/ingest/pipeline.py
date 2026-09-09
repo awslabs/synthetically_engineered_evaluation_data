@@ -10,6 +10,7 @@ to the existing vision path (:func:`seed_data.infer.infer_schema`), enriching th
 import logging
 
 from seed_data.ingest.detect import InputType, detect_input_type
+from seed_data.logs import configure_progress_logging
 from seed_data.schema.models import InferredSchema
 
 logger = logging.getLogger(__name__)
@@ -45,13 +46,19 @@ def run_ingest(
     if not inputs:
         raise ValueError("run_ingest requires at least one input.")
 
+    configure_progress_logging(verbose)
+
+    # `model` wins over `models.data` so an explicit override beats the facade's
+    # default. Previously neither was read and the extraction agent always used
+    # `common.config`'s default, which made `--data-model` a no-op for ingest.
+    extraction_model = model or getattr(models, "data", None)
+
     # Group inputs by detected type.
     buckets: dict[InputType, list[str]] = {}
     for spec in inputs:
         itype = detect_input_type(spec)
         buckets.setdefault(itype, []).append(spec)
-        if verbose:
-            logger.info("Ingest: '%s' → %s", spec, itype.value)
+        logger.info("Ingest: '%s' → %s", spec, itype.value)
 
     entities = []
 
@@ -59,13 +66,15 @@ def run_ingest(
     doc_inputs = buckets.get(InputType.DOCUMENT, [])
     if doc_inputs:
         entities.extend(
-            _ingest_documents(doc_inputs, name=name, model=model, session=session, verbose=verbose)
+            _ingest_documents(
+                doc_inputs, name=name, model=model, session=session, verbose=verbose,
+            )
         )
 
     # Non-document inputs → the schema-extraction agent.
     for itype in (InputType.FREE_TEXT, InputType.EXAMPLE_DATA, InputType.SCHEMA, InputType.ERD):
         for spec in buckets.get(itype, []):
-            schema = _extract_one(itype, spec)
+            schema = _extract_one(itype, spec, model=extraction_model, session=session)
             entities.extend(schema.entities)
 
     return InferredSchema(entities=entities)
@@ -84,11 +93,20 @@ def _ingest_documents(specs, *, name, model, session, verbose):
     return inferred.entities
 
 
-def _extract_one(itype: InputType, spec: str) -> InferredSchema:
-    """Run the schema-extraction agent for a single non-document input."""
-    from seed_data.ingest.extract import schema_extraction_agent
+def _extract_one(
+    itype: InputType, spec: str, *, model: str | None = None, session=None
+) -> InferredSchema:
+    """Run the schema-extraction agent for a single non-document input.
 
-    extract = schema_extraction_agent._tool_func
+    Calls ``extract_schema`` rather than the ``@tool`` wrapper's ``_tool_func``:
+    ``model`` and ``session`` are deliberately absent from the tool signature (the
+    orchestrating LLM would be invited to fill them in), so they only exist on the
+    plain function.
+    """
+    from seed_data.ingest.extract import extract_schema
+
+    def extract(**kwargs):
+        return extract_schema(model=model, session=session, **kwargs)
 
     if itype is InputType.FREE_TEXT:
         result = extract(text_description=spec)
