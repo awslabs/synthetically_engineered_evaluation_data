@@ -47,6 +47,27 @@ _JSON_SCHEMA_HEADER = "http://json-schema.org/draft-07/schema#"
 #: emit; values are what draft-07 actually accepts. ``format`` is an annotation in
 #: draft-07 (not asserted by default), so it guides the generator without making
 #: otherwise-valid data fail validation.
+#: Inbound counterpart of :data:`_SEMANTIC_TYPES`: a draft-07 type name that is not
+#: already part of the semantic vocabulary -> the semantic name to store on
+#: ``FieldDefinition.type``.
+#:
+#: Only ``number`` needs translating. ``integer`` / ``string`` / ``boolean`` /
+#: ``object`` / ``array`` are spelled the same in both vocabularies, but ``number``
+#: is JSON Schema's name for what the generators call ``float`` — and every consumer
+#: matches the semantic name (``generation._needs_llm``,
+#: ``DistributionGenerator.generate_field_values``, ``validator._check_type`` and
+#: ``_check_constraints``, ``fidelity``, ``coverage``, ``structural``). Stored raw,
+#: a ``number`` field matched none of them: it was classified as free text, so the
+#: numeric generators, ``min``/``max`` enforcement, type conformance and seeded
+#: reproducibility all skipped it and the LLM wrote a string into a numeric column.
+#:
+#: Written as an explicit table rather than inverting ``_SEMANTIC_TYPES``, which is
+#: many-to-one (``float``/``double``/``decimal`` all emit ``number``) and so has no
+#: unique inverse. ``test_schema_io`` asserts the two stay consistent.
+_CANONICAL_TYPES: dict[str, str] = {
+    "number": "float",
+}
+
 _SEMANTIC_TYPES: dict[str, tuple[str, str | None]] = {
     "float": ("number", None),
     "double": ("number", None),
@@ -133,7 +154,13 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
     # `presence_probability` — folding either one into `nullable` would rewrite
     # the schema on the way back out (adding an `anyOf` null branch that the
     # source never had).
-    jtype = sub.get("type", "string")
+    # Two names for the same type, both needed. `jtype` is canonicalized to the
+    # semantic vocabulary the generators and validators match on; `raw_jtype` keeps
+    # the draft-07 spelling for `enum_base_type`, whose only job is to rebuild the
+    # original enum on the way back out (`_coerce_enum_values` casts on the JSON
+    # name, so handing it "float" would silently stop restoring numeric enums).
+    raw_jtype = sub.get("type", "string")
+    jtype = _CANONICAL_TYPES.get(raw_jtype, raw_jtype)
     description = prop.get("description") or sub.get("description") or ""
 
     # `required` (key presence) is orthogonal to `nullable` (value may be null):
@@ -167,7 +194,7 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
         # validator and make `model_dump_json` warn) and remember the values' real
         # JSON type so the enum rebuilds faithfully.
         if any(not isinstance(v, str) for v in sub["enum"] if v is not None):
-            field.enum_base_type = jtype
+            field.enum_base_type = raw_jtype
         field.enum_values = [
             str(v) if v is not None else "None" for v in sub["enum"]
         ]

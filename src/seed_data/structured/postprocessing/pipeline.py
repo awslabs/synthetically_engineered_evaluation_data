@@ -36,11 +36,17 @@ class PostProcessingResult(BaseModel):
 class PostProcessingPipeline:
     """Orchestrates validate → correct → filter → evaluate → quality gate."""
 
-    def __init__(self, schema: InferredSchema, config: PostProcessingConfig | None = None):
+    def __init__(self, schema: InferredSchema, config: PostProcessingConfig | None = None,
+                 seed: int | None = None):
+        """Args:
+            seed: forwarded to the corrector so repairs are reproducible. Without it,
+                correction drew from the unseeded global `random` and broke the
+                seed guarantee for any run where a violation had to be fixed.
+        """
         self.schema = schema
         self.config = config or PostProcessingConfig()
         self.validator = RecordValidator()
-        self.corrector = RecordCorrector()
+        self.corrector = RecordCorrector(seed=seed)
 
     def run(
         self,

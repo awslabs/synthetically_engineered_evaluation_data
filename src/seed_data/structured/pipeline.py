@@ -256,7 +256,9 @@ def build_graph_pipeline(
         # Post-process
         try:
             schema = InferredSchema.model_validate_json(ps.schema_json)
-            pp_pipeline = PostProcessingPipeline(schema, PostProcessingConfig())
+            # `seed` reaches post-processing too: correction rewrites the same
+            # programmatic columns generation seeded.
+            pp_pipeline = PostProcessingPipeline(schema, PostProcessingConfig(), seed=seed)
             pp_result = pp_pipeline.run(data)
             # run() already corrected and filtered on its own copy; take that
             # result directly. Re-deriving from pp_result.validation cannot work —

@@ -144,9 +144,39 @@ def test_from_json_schema_anyof_nullable():
     }
     inferred = from_json_schema(raw)
     field = inferred.entities[0].fields[0]
-    assert field.type == "number"            # non-null branch type
+    # Canonicalized to the semantic vocabulary, not the raw JSON Schema name. This
+    # previously asserted "number", which is what the generators, the validator and
+    # the range checks all fail to match — so the field was treated as free text and
+    # an LLM wrote a string into a numeric column. See `_CANONICAL_TYPES`.
+    assert field.type == "float"             # non-null branch type, canonicalized
     assert field.nullable is True            # anyOf null branch
     assert field.description == "the amount"
+
+    # ...and the JSON Schema name comes back on the way out, so the round trip is
+    # unchanged for consumers reading the exported schema.
+    from seed_data.schema.io import to_json_schema
+    out = to_json_schema(inferred)["properties"]["amount"]
+    assert out["anyOf"][0]["type"] == "number"
+
+
+def test_json_schema_number_reaches_the_numeric_generator():
+    """A `number` field must be generated programmatically, not sent to the LLM.
+
+    The regression this pins: `from_json_schema` stored the raw `number`, every
+    consumer matched on `float`, so all 54 numeric fields across the bundled schemas
+    were classified as free text — skipping seeded numeric generation, min/max
+    enforcement and type conformance.
+    """
+    from seed_data.structured.generation import _needs_llm
+
+    inferred = from_json_schema({
+        "title": "T", "type": "object", "required": ["amount"],
+        "properties": {"amount": {"type": "number", "minimum": 0, "maximum": 100}},
+    })
+    field = inferred.entities[0].fields[0]
+    assert field.type == "float"
+    assert field.min_value == 0 and field.max_value == 100
+    assert _needs_llm(field, set()) is False
 
 
 def test_from_json_schema_nested_array_of_objects():

@@ -88,10 +88,18 @@ class DistributionGenerator:
         if field.distribution is None:
             return self._generate_default(field, count)
 
-        if field.type in ("integer", "float"):
-            return self.generate_numeric(field, count)
-        elif field.enum_values:
+        # `enum_values` is tested before the numeric types, not after: an enum field
+        # is categorical whatever its underlying JSON type, and
+        # `prompts/distribution_inference.j2` asks the model for
+        # `categorical_weighted` on every enum field. Numeric-first, an integer enum
+        # fell through to `generate_numeric`, whose `_sample_distribution` has no
+        # CATEGORICAL_WEIGHTED branch — so it drew from a standard normal and
+        # `np.clip` pinned ~92% of rows to `min_value`, ignoring both the allowed
+        # values and their weights.
+        if field.enum_values:
             return self.generate_categorical(field, count)
+        elif field.type in ("integer", "float"):
+            return self.generate_numeric(field, count)
         elif field.type in ("date", "datetime"):
             return self.generate_dates(field, count)
         else:
@@ -132,7 +140,34 @@ class DistributionGenerator:
         # Map to field range
         return min_val + normalized * (max_val - min_val)
 
-    def generate_categorical(self, field: FieldDefinition, count: int) -> list[str]:
+    @staticmethod
+    def _coerce_enum(field: FieldDefinition, value: str):
+        """Cast an enum member back to the JSON type the source schema declared.
+
+        ``FieldDefinition.enum_values`` is ``list[str]`` for the extraction model's
+        benefit, so a schema's ``enum: [1, 2, 3]`` is stored as ``["1", "2", "3"]``
+        and ``enum_base_type`` remembers the real type. Without casting here, an
+        integer enum column exports Python strings, which then fail
+        ``validator._check_type`` on every row.
+        """
+        base = field.enum_base_type
+        if base is None:
+            return value
+        try:
+            if base == "integer":
+                return int(value)
+            if base == "number":
+                return float(value)
+            if base == "boolean":
+                return value.strip().lower() in ("true", "1")
+        except (TypeError, ValueError):
+            # A member that does not parse as its declared type is a schema defect,
+            # not a generation one; the string still round-trips to the validator,
+            # which reports it against the declared type rather than crashing here.
+            return value
+        return value
+
+    def generate_categorical(self, field: FieldDefinition, count: int) -> list:
         """Generate categorical values with specified weight distribution."""
         if not field.enum_values:
             return [""] * count
@@ -148,7 +183,7 @@ class DistributionGenerator:
             probs = uniform
 
         indices = self.rng.choice(len(field.enum_values), size=count, p=probs)
-        return [field.enum_values[i] for i in indices]
+        return [self._coerce_enum(field, field.enum_values[i]) for i in indices]
 
     def generate_dates(self, field: FieldDefinition, count: int) -> list[str]:
         """Generate date values following the specified distribution within range."""
@@ -218,7 +253,14 @@ class DistributionGenerator:
 
     def _generate_default(self, field: FieldDefinition, count: int) -> list:
         """Fallback generation when no distribution is specified."""
-        if field.type == "integer":
+        # Enum first, for the same reason as in `generate_field_values`: an integer
+        # enum reaching the numeric branch was drawn from `1..1000`, so every row was
+        # an enum_violation that the corrector then rewrote with `random.choice` —
+        # putting Python strings into an integer column.
+        if field.enum_values:
+            indices = self.rng.integers(0, len(field.enum_values), size=count)
+            return [self._coerce_enum(field, field.enum_values[i]) for i in indices]
+        elif field.type == "integer":
             low = int(field.min_value) if field.min_value is not None else 1
             high = int(field.max_value) if field.max_value is not None else 1000
             return self.rng.integers(low, high + 1, size=count).tolist()
@@ -226,9 +268,6 @@ class DistributionGenerator:
             low = field.min_value if field.min_value is not None else 0.0
             high = field.max_value if field.max_value is not None else 1000.0
             return [round(float(v), 2) for v in self.rng.uniform(low, high, size=count)]
-        elif field.enum_values:
-            indices = self.rng.integers(0, len(field.enum_values), size=count)
-            return [field.enum_values[i] for i in indices]
         elif field.type == "boolean":
             return [bool(v) for v in self.rng.integers(0, 2, size=count)]
         else:

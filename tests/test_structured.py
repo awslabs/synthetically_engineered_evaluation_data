@@ -1059,3 +1059,116 @@ def test_export_data_parquet_round_trips(tmp_path):
     written = tmp_path / "customer.parquet"
     assert written.exists()
     assert pd.read_parquet(written)["name"].tolist() == ["Acme", "Globex"]
+
+
+# --- review round 4: confirmed defects found by full-diff review ---------------
+
+def test_integer_enum_honours_its_enum_and_weights():
+    """An enum field is categorical whatever its JSON type.
+
+    `generate_field_values` tested integer/float *before* enum_values, and
+    `_sample_distribution` has no CATEGORICAL_WEIGHTED branch, so an integer enum
+    was drawn from a standard normal and np.clip pinned ~92% of rows to min_value.
+    """
+    from collections import Counter
+    from seed_data.schema.models import DistributionSpec, DistributionType, FieldDefinition
+    from seed_data.structured.distributions.generator import DistributionGenerator
+
+    field = FieldDefinition(
+        name="rating", type="integer", min_value=1, max_value=5,
+        enum_values=["1", "2", "3", "4", "5"], enum_base_type="integer",
+        distribution=DistributionSpec(
+            type=DistributionType.CATEGORICAL_WEIGHTED,
+            params={"weights": [0.1, 0.1, 0.2, 0.3, 0.3]},
+        ),
+    )
+    values = DistributionGenerator(seed=5).generate_field_values(field, 200)
+
+    assert set(values) <= {1, 2, 3, 4, 5}, "values must come from the enum"
+    assert all(isinstance(v, int) for v in values), "integer enum must not emit strings"
+    counts = Counter(values)
+    # The weights put 1 at ~10%; the bug put it at 92.5%.
+    assert counts[1] < 60, f"weights ignored: {sorted(counts.items())}"
+    assert counts[4] > counts[1], "heavier categories must dominate"
+
+
+def test_integer_enum_without_distribution_stays_in_range():
+    """`_generate_default` had the same ordering bug: integer enums drew 1..1000."""
+    from seed_data.schema.models import FieldDefinition
+    from seed_data.structured.distributions.generator import DistributionGenerator
+
+    field = FieldDefinition(name="rating", type="integer",
+                            enum_values=["1", "2", "3"], enum_base_type="integer")
+    values = DistributionGenerator(seed=5).generate_field_values(field, 30)
+    assert set(values) <= {1, 2, 3}
+    assert all(isinstance(v, int) for v in values)
+
+
+def test_self_referential_fk_is_filled():
+    """Phase 2 must use Phase 1's llm_fields, not recompute against a mutated all_data.
+
+    A self-referential FK is dangling in Phase 1 (the entity is not yet in all_data)
+    so it is routed to the LLM; recomputed in Phase 2 it looked live and was dropped
+    from llm_fields while still being skipped as an FK — filled by neither pass, so
+    the not-null filter discarded every generated row.
+    """
+    import json
+    from unittest.mock import patch
+    from seed_data.structured.generation import generate_bulk
+
+    schema = {"entities": [{"entity_name": "Employee", "description": "e", "fields": [
+        {"name": "id", "type": "string", "unique": True, "pattern": "EMP-[0-9]{4}",
+         "required": True},
+        {"name": "manager_id", "type": "string", "required": True},
+        {"name": "salary", "type": "float", "min_value": 50000, "max_value": 90000,
+         "distribution": {"type": "normal", "params": {"mean": 70000, "std": 5000}}},
+    ], "structured_relationships": [
+        {"source_entity": "Employee", "source_field": "manager_id",
+         "target_entity": "Employee", "target_field": "id", "cardinality": "one_to_many"}]}]}
+    samples = {"data": {"Employee": [
+        {"id": "EMP-0001", "manager_id": "EMP-0001", "salary": 70000}]}}
+
+    seen = {}
+
+    def fake_fill(ent, sch, partial, existing, fields, **kw):
+        seen["fields"] = list(fields)
+        for record in partial:
+            for name in fields:
+                record.setdefault(name, "EMP-9999")
+        return partial
+
+    with patch("seed_data.structured.generation._fill_string_fields_with_llm", fake_fill):
+        out = json.loads(generate_bulk(json.dumps(schema), json.dumps(samples), "6", seed=42))
+
+    rows = out["data"]["Employee"]
+    assert len(rows) == 6
+    assert seen["fields"] == ["manager_id"], "the self-referential FK must reach the LLM pass"
+    assert all("manager_id" in r for r in rows), "no row may be left without the FK"
+
+
+def test_corrections_are_reproducible_under_a_seed():
+    """The corrector drew from the unseeded global `random`, breaking `--seed`."""
+    from seed_data.schema.models import InferredSchema
+    from seed_data.structured.postprocessing.corrector import RecordCorrector
+    from seed_data.structured.postprocessing.validator import Violation
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "R", "description": "r", "fields": [
+            {"name": "rating", "type": "integer",
+             "enum_values": ["1", "2", "3", "4", "5"], "enum_base_type": "integer"},
+            {"name": "code", "type": "string", "pattern": "[A-Z]{3}-[0-9]{4}"}]}]})
+
+    def run(seed):
+        data = {"R": [{"rating": 806, "code": "bad"}, {"rating": 900, "code": "nope"}]}
+        violations = [
+            Violation(entity="R", record_index=i, field=f, violation_type=t,
+                      actual_value="x", constraint="c", fixable=True)
+            for i in (0, 1) for f, t in (("rating", "enum_violation"),
+                                         ("code", "pattern_violation"))
+        ]
+        return RecordCorrector(seed=seed).correct_dataset(data, violations, schema)["R"]
+
+    assert run(42) == run(42), "same seed must produce the same corrections"
+    assert run(7) != run(42), "a different seed must still vary them"
+    # And a corrected enum must match its declared JSON type, not stay a string.
+    assert all(isinstance(r["rating"], int) for r in run(42))

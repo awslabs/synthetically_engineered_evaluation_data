@@ -141,3 +141,24 @@ def load_schema_dir(schema_dir: str) -> tuple[dict, str, list[str]]:
     sample_pdfs = sorted(glob.glob(os.path.join(samples_dir, "*.pdf"))) if os.path.isdir(samples_dir) else []
 
     return schema, "\n\n---\n\n".join(steering_parts), sample_pdfs
+
+
+def safe_path_segment(name: str, fallback: str) -> str:
+    """Reduce a model-supplied name to a single safe path segment.
+
+    Any name that reaches the filesystem having come from a model is untrusted:
+    ``../../../../tmp/pwned`` joined onto an output directory escapes it, and
+    ``os.makedirs`` will happily create the result. Keeps only the basename, maps
+    anything outside ``[alnum]-_`` to ``-``, strips leading/trailing dots and
+    dashes, and substitutes ``fallback`` when nothing usable is left (an empty
+    segment would write into the parent instead of a subdirectory).
+
+    Shared by ``packet_infer`` (for ``schema_dir_name``, at inference time) and
+    ``packet`` (for ``document_class``, at generation time). Both are needed:
+    sanitizing only at inference leaves a hand-written or previously-generated
+    ``packet.json`` unguarded, so the check belongs at every point a name becomes
+    a path.
+    """
+    base = os.path.basename(name.strip().replace("\\", "/").rstrip("/"))
+    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in base).strip("-.")
+    return cleaned or fallback

@@ -28,14 +28,26 @@ class StructuralMetrics:
             source_df = all_data.get(rel.source_entity)
             target_df = all_data.get(rel.target_entity)
 
-            if source_df is None or target_df is None:
+            if source_df is None or source_df.empty:
                 continue
             if rel.source_field not in source_df.columns:
                 continue
-            if rel.target_field not in target_df.columns:
-                continue
 
             fk_values = source_df[rel.source_field].dropna()
+            if fk_values.empty:
+                continue
+
+            # An unresolvable target counts the references as *invalid* rather than
+            # skipping the relationship. Skipped, a declared FK whose parent entity
+            # produced no rows (or lacks the key column) left `total_refs == 0`, and
+            # the `return 1.0` below then reported perfect referential integrity for
+            # a dataset whose foreign keys were 100% dangling — which passed the
+            # quality gate. Every value here points at a row that does not exist,
+            # which is exactly what this metric is for.
+            if target_df is None or target_df.empty or rel.target_field not in target_df.columns:
+                total_refs += len(fk_values)
+                continue
+
             pk_values = set(target_df[rel.target_field].dropna().astype(str))
 
             for val in fk_values:
@@ -43,6 +55,8 @@ class StructuralMetrics:
                 if str(val) in pk_values:
                     valid_refs += 1
 
+        # Still 1.0 when nothing was *referenced* — no FK values at all is a vacuous
+        # truth, unlike FK values with no reachable parent.
         if total_refs == 0:
             return 1.0
         return valid_refs / total_refs

@@ -23,7 +23,7 @@ from typing import Any
 
 import pypdf
 
-from seed_data.utils import load_schema_dir, make_model
+from seed_data.utils import load_schema_dir, make_model, safe_path_segment
 
 
 # ---------------------------------------------------------------------------
@@ -528,9 +528,20 @@ def _generate_subdocuments(
         )
         combined_extra = "\n\n".join(filter(None, [extra, context_instructions]))
 
+        # `document_class` is model-supplied — `packet_infer` writes whatever the
+        # vision model labelled the segment straight into packet.json — and it is
+        # about to become a path component. Lowercasing and replacing spaces left
+        # separators and `..` intact, so a class of "../../../../tmp/pwned" escaped
+        # the output tree and the makedirs below created it. Its sibling
+        # `schema_dir_name` was already sanitized this way; this is the same
+        # treatment, applied here so a hand-written or previously-generated
+        # packet.json is guarded too.
         doc_output_dir = os.path.join(
             workspace_dir,
-            planned_doc.document_class.lower().replace(" ", "-"),
+            safe_path_segment(
+                planned_doc.document_class.lower().replace(" ", "-"),
+                f"document-{index + 1}",
+            ),
         )
         os.makedirs(doc_output_dir, exist_ok=True)
 

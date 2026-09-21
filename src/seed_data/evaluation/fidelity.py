@@ -3,7 +3,24 @@ import re
 
 import pandas as pd
 
+from seed_data.evaluation.diversity import _hashable
 from seed_data.schema.models import DistributionType, EntitySchema, FieldDefinition
+
+
+def _is_missing(value) -> bool:
+    """Scalar null test that tolerates nested values.
+
+    ``pd.isna`` on a list or dict returns an *elementwise array*, so the surrounding
+    ``if`` raised ``ValueError: The truth value of an array ... is ambiguous`` — which
+    ``run_evaluation``'s blanket ``except`` turned into a dropped entity, taking
+    diversity and coverage down with it. A populated list or dict is never missing,
+    which is the answer every caller here wants.
+    """
+    if isinstance(value, (list, dict, set, tuple)):
+        return False
+    result = pd.isna(value)
+    # An ndarray cell still yields an array; count it missing only if every element is.
+    return bool(result.all()) if hasattr(result, "all") else bool(result)
 
 
 class FidelityMetrics:
@@ -36,7 +53,7 @@ class FidelityMetrics:
             total_cells += len(series)
 
             for idx, value in series.items():
-                if pd.isna(value):
+                if _is_missing(value):
                     if field.requires_value:
                         violations += 1
                     continue
@@ -173,7 +190,7 @@ class FidelityMetrics:
                 weights_list = field.distribution.params.get("weights", [])
                 if field.enum_values and isinstance(weights_list, list):
                     expected = dict(zip(field.enum_values, weights_list))
-                    observed = series.dropna().value_counts().to_dict()
+                    observed = _hashable(series).dropna().value_counts().to_dict()
                     jsd = self.distribution_distance_jsd(observed, expected)
                     results["distribution_distances"][field.name] = {"jsd": jsd}
                     dist_scores.append(1.0 - jsd)

@@ -217,10 +217,11 @@ def _safe_dir_name(name: str, fallback: str) -> str:
     path separators / traversal and reject empties — otherwise ``..`` could
     escape output_dir or ``''`` could drop schema.json into the packet root.
     """
-    # keep only the basename, drop dots/separators that enable traversal
-    base = os.path.basename(name.strip().replace("\\", "/").rstrip("/"))
-    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in base).strip("-.")
-    return cleaned or fallback
+    # Delegates to the shared implementation so this and `packet`'s
+    # `document_class` sanitization cannot drift apart.
+    from seed_data.utils import safe_path_segment
+
+    return safe_path_segment(name, fallback)
 
 
 def _dedupe_names(segments: list[_Segment]) -> None:

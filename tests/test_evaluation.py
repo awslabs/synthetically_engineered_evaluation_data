@@ -136,3 +136,94 @@ def test_diversity_metric_more_diverse_scores_higher():
     diverse_score = scorer.overall_diversity_score(diverse, schema)["overall_score"]
     uniform_score = scorer.overall_diversity_score(uniform, schema)["overall_score"]
     assert diverse_score >= uniform_score
+
+
+# --- review round 4: the quality gate could not detect its own failures --------
+
+def test_dangling_fks_do_not_score_perfect_referential_integrity():
+    """100% dangling FKs scored 1.0 and passed the gate.
+
+    `referential_integrity_score` skipped any relationship whose parent frame was
+    empty or lacked the key column, then returned 1.0 because `total_refs == 0` —
+    reporting perfect integrity for the worst possible result.
+    """
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "Order", "description": "o",
+        "fields": [{"name": "id", "type": "integer"},
+                   {"name": "customer_id", "type": "integer"}],
+        "structured_relationships": [{
+            "source_entity": "Order", "source_field": "customer_id",
+            "target_entity": "Customer", "target_field": "id",
+            "cardinality": "one_to_many"}]}]})
+
+    # No Customer rows at all: every customer_id points at nothing.
+    report = run_evaluation({"Order": [{"id": 1, "customer_id": 99},
+                                       {"id": 2, "customer_id": 98}]}, schema)
+
+    assert report.structural["referential_integrity"] == 0.0
+    assert any("referential integrity" in i.lower() for i in report.issues)
+
+
+def test_no_fk_values_is_still_vacuously_perfect():
+    """The 1.0 for "nothing referenced" must survive — it is a different case."""
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "Order", "description": "o",
+        "fields": [{"name": "id", "type": "integer"},
+                   {"name": "customer_id", "type": "integer"}],
+        "structured_relationships": [{
+            "source_entity": "Order", "source_field": "customer_id",
+            "target_entity": "Customer", "target_field": "id",
+            "cardinality": "one_to_many"}]}]})
+
+    # Rows exist but every FK is null — nothing is referenced, so nothing is dangling.
+    report = run_evaluation({"Order": [{"id": 1, "customer_id": None}]}, schema)
+    assert report.structural["referential_integrity"] == 1.0
+
+
+def test_entropy_penalizes_unused_enum_values():
+    """Mode collapse was undetectable: entropy normalized by *observed* cardinality."""
+    import pandas as pd
+    from seed_data.evaluation.diversity import DiversityMetrics
+
+    metrics = DiversityMetrics()
+    two_of_three = pd.Series(["active"] * 500 + ["inactive"] * 500)
+
+    # 2 of 3 allowed values, perfectly balanced: previously exactly 1.0.
+    assert metrics.per_column_entropy(two_of_three, n_possible=3) < 0.95
+    # All three used: still maximal.
+    all_three = pd.Series(["a"] * 333 + ["b"] * 333 + ["c"] * 334)
+    assert metrics.per_column_entropy(all_three, n_possible=3) == pytest.approx(1.0, abs=1e-3)
+    # No declared domain: observed count is the only denominator available.
+    assert metrics.per_column_entropy(two_of_three) == pytest.approx(1.0, abs=1e-3)
+
+
+def test_nested_values_do_not_drop_every_metric():
+    """A list/dict cell raised, and the blanket except dropped 3 of 4 metric families.
+
+    `InferredSchema` supports nested object/array fields, so this is valid data;
+    it scored 0.25 overall and failed the gate.
+    """
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "Invoice", "description": "i", "fields": [
+            {"name": "id", "type": "integer"},
+            {"name": "line_items", "type": "array"},
+            {"name": "status", "type": "enum", "enum_values": ["open", "paid", "void"]}]}]})
+
+    report = run_evaluation({"Invoice": [
+        {"id": 1, "line_items": [{"sku": "a"}, {"sku": "b"}], "status": "open"},
+        {"id": 2, "line_items": [{"sku": "c"}], "status": "paid"},
+        {"id": 3, "line_items": [{"sku": "d"}], "status": "void"},
+    ]}, schema)
+
+    assert report.issues == [], f"nested data must evaluate cleanly, got {report.issues}"
+    assert report.overall_quality_score > 0.5
+    assert report.passes_quality_gate is True

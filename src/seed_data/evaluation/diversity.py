@@ -5,28 +5,66 @@ import pandas as pd
 from seed_data.schema.models import EntitySchema
 
 
+def _hashable(series: pd.Series) -> pd.Series:
+    """Make a column safe for ``value_counts`` / ``nunique`` / ``drop_duplicates``.
+
+    ``InferredSchema`` fully supports nested ``object`` and ``array`` fields, so a
+    cell can legitimately hold a list or a dict. Those are unhashable, and pandas
+    raises ``TypeError: unhashable type: 'list'`` — which ``run_evaluation``'s blanket
+    ``except`` then recorded as an "evaluation error", dropping diversity, fidelity
+    *and* coverage for the whole entity. Valid nested data scored 0.25 overall and
+    failed the quality gate.
+
+    Nested values are compared by their JSON form: two structurally identical lists
+    are one value, which is the right notion of "distinct" for every caller here.
+    """
+    if series.map(lambda v: isinstance(v, (list, dict, set))).any():
+        import json
+
+        return series.map(
+            lambda v: json.dumps(v, sort_keys=True, default=str)
+            if isinstance(v, (list, dict, set)) else v
+        )
+    return series
+
+
 class DiversityMetrics:
     """Measures value variation and uniqueness across generated data."""
 
-    def per_column_entropy(self, series: pd.Series) -> float:
-        """Shannon entropy normalized to [0, 1] by dividing by log(n_unique_possible).
+    def per_column_entropy(self, series: pd.Series, n_possible: int | None = None) -> float:
+        """Shannon entropy normalized to [0, 1].
 
-        Returns 1.0 for maximally diverse (uniform), 0.0 for all-same.
+        Args:
+            series: the column's values.
+            n_possible: how many distinct values the column is *allowed* to take
+                (an enum's cardinality). When given it is the normalizer, so a column
+                using only some of its allowed values scores below 1.0. When None — a
+                free-form column with no declared domain — the observed distinct count
+                is the only denominator available.
+
+        Returns 1.0 for maximally diverse, 0.0 for all-same.
         """
-        counts = series.dropna().value_counts()
+        counts = _hashable(series).dropna().value_counts()
         if len(counts) <= 1:
             return 0.0
         total = counts.sum()
         probs = counts / total
         entropy = -sum(p * math.log2(p) for p in probs if p > 0)
-        max_entropy = math.log2(len(counts))
+
+        # Normalized by the *possible* cardinality when the schema declares one, not
+        # by the observed distinct count. Observed-count normalization made the metric
+        # blind to what it exists to detect: a status column allowing three values but
+        # only ever emitting two, 50/50, scored exactly 1.0 — "maximally diverse" — so
+        # mode collapse could not lower the score at all.
+        denominator = max(n_possible or 0, len(counts))
+        max_entropy = math.log2(denominator)
         if max_entropy == 0:
             return 0.0
         return entropy / max_entropy
 
     def unique_ratio(self, series: pd.Series) -> float:
         """Fraction of unique values in the column. 1.0 = all unique, 1/n = all same."""
-        non_null = series.dropna()
+        non_null = _hashable(series).dropna()
         if len(non_null) == 0:
             return 0.0
         return non_null.nunique() / len(non_null)
@@ -84,7 +122,12 @@ class DiversityMetrics:
                 continue
             series = data[field.name]
 
-            ent = self.per_column_entropy(series)
+            # The enum's cardinality is the normalizer when the schema declares one:
+            # that is what makes a column using 2 of its 3 allowed values score below
+            # 1.0 instead of "maximally diverse".
+            ent = self.per_column_entropy(
+                series, n_possible=len(field.enum_values) if field.enum_values else None
+            )
             results["per_column_entropy"][field.name] = ent
             entropy_scores.append(ent)
 

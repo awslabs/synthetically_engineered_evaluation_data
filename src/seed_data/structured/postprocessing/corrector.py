@@ -1,12 +1,26 @@
 import random
 
 from seed_data.schema.models import FieldDefinition, InferredSchema
+from seed_data.structured.distributions.generator import DistributionGenerator
 
 from .validator import Violation
+
+#: Reuses the generator's coercion so a corrected enum matches a generated one.
+_coerce_enum = DistributionGenerator._coerce_enum
 
 
 class RecordCorrector:
     """Corrects fixable constraint violations in generated records."""
+
+    def __init__(self, seed: int | None = None):
+        """Args:
+            seed: seeds this corrector's RNG. Every random choice below went through
+                the *global* `random` module, which no seed reaches, so any repair
+                that fired rewrote the very programmatic columns `--seed` documents
+                as reproducible — two runs with the same seed and schema exported
+                different data whenever a violation needed correcting.
+        """
+        self.rng = random.Random(seed)
 
     def correct_dataset(
         self,
@@ -104,7 +118,10 @@ class RecordCorrector:
             if str_val in ev.lower() or ev.lower() in str_val:
                 return ev
 
-        return random.choice(field.enum_values)
+        # Coerced back to the enum's declared JSON type: `enum_values` is
+        # `list[str]`, so returning a member raw put a Python string into an
+        # integer column, which then failed `_check_type` on the corrected row.
+        return _coerce_enum(field, self.rng.choice(field.enum_values))
 
     def _correct_fk(self, violation: Violation, all_data: dict[str, list[dict]]):
         """Reassign FK to a random valid parent ID."""
@@ -126,7 +143,7 @@ class RecordCorrector:
         if not valid_ids:
             return None
 
-        return random.choice(valid_ids)
+        return self.rng.choice(valid_ids)
 
     def _correct_length(self, value, field: FieldDefinition):
         """Truncate string to max_length."""
@@ -154,7 +171,7 @@ class RecordCorrector:
             # _generate_from_pattern excludes anything in `existing` and falls
             # back to a suffixed base when the pattern space is exhausted, so a
             # value always comes back.
-            values = _generate_from_pattern(field.pattern, 1, set(existing))
+            values = _generate_from_pattern(field.pattern, 1, set(existing), rng=self.rng)
             if values:
                 return values[0]
 
@@ -176,5 +193,5 @@ class RecordCorrector:
         if not field.pattern:
             return value
         from seed_data.structured.generation import _generate_from_pattern
-        values = _generate_from_pattern(field.pattern, 1, set())
+        values = _generate_from_pattern(field.pattern, 1, set(), rng=self.rng)
         return values[0] if values else value

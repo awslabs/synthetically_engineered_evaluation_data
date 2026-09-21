@@ -2,6 +2,7 @@ from itertools import combinations
 
 import pandas as pd
 
+from seed_data.evaluation.diversity import _hashable
 from seed_data.schema.models import EntitySchema, FieldDefinition
 
 
@@ -15,7 +16,7 @@ class CoverageMetrics:
         """
         if not field.enum_values:
             return 1.0
-        observed = set(series.dropna().astype(str).unique())
+        observed = set(_hashable(series).dropna().astype(str).unique())
         covered = observed & set(field.enum_values)
         return len(covered) / len(field.enum_values)
 
@@ -47,7 +48,8 @@ class CoverageMetrics:
         columns with <= 20 unique values each to keep computation tractable.
         """
         eligible_cols = [
-            col for col in columns if col in data.columns and data[col].nunique() <= 20
+            col for col in columns
+            if col in data.columns and _hashable(data[col]).nunique() <= 20
         ]
 
         if len(eligible_cols) < n:
@@ -61,11 +63,11 @@ class CoverageMetrics:
                 coverage_scores.append(0.0)
                 continue
 
-            observed_combos = subset.drop_duplicates().shape[0]
+            observed_combos = subset.apply(_hashable).drop_duplicates().shape[0]
 
             max_possible = 1
             for col in cols:
-                max_possible *= data[col].nunique()
+                max_possible *= _hashable(data[col]).nunique()
 
             if max_possible == 0:
                 coverage_scores.append(1.0)

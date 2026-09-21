@@ -749,7 +749,9 @@ def generate_bulk(
     entity_order = _resolve_generation_order(samples, schema_json)
 
     # Phase 1: Programmatic generation (sequential — respects FK order, instant)
-    entities_needing_llm: list[tuple[str, EntitySchema, list[dict], list[dict]]] = []
+    entities_needing_llm: list[
+        tuple[str, EntitySchema, list[dict], list[dict], list[str]]
+    ] = []
 
     for entity_name in entity_order:
         sample_records = samples.get(entity_name, [])
@@ -783,7 +785,17 @@ def generate_bulk(
             fk_fields = set(_live_fk_values(entity_name, entity_schema.structured_relationships, all_data))
             llm_fields = [f.name for f in entity_schema.fields if _needs_llm(f, fk_fields)]
             if llm_fields:
-                entities_needing_llm.append((entity_name, entity_schema, all_records, sample_records))
+                # `llm_fields` travels with the entity rather than being recomputed in
+                # Phase 2. It is correct only here: `all_data[entity_name]` is assigned
+                # below, so a self-referential FK (Employee.manager_id -> Employee.id)
+                # is dangling at this point — routed to the LLM — but looks live once
+                # the entity is in `all_data`. Recomputed later it was dropped from
+                # `llm_fields` while still being skipped as an FK, so the column was
+                # filled by neither pass and every generated row was then discarded by
+                # the not-null filter.
+                entities_needing_llm.append(
+                    (entity_name, entity_schema, all_records, sample_records, llm_fields)
+                )
         else:
             # Fall back to LLM-based batch generation
             logger.info("Bulk generation — entity '%s': using LLM-based generation (no distributions)",
@@ -858,11 +870,10 @@ def generate_bulk(
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         def _fill_entity(args):
-            ent_name, ent_schema, records, samples = args
-            # Match Phase 1's live-FK set exactly, so the fields filled here are
-            # precisely the ones left unfilled there (dangling FKs included).
-            fk_fields = set(_live_fk_values(ent_name, ent_schema.structured_relationships, all_data))
-            llm_fields = [f.name for f in ent_schema.fields if _needs_llm(f, fk_fields)]
+            # `llm_fields` is Phase 1's own list, carried here rather than recomputed:
+            # `all_data` has since gained every generated entity, so recomputing the
+            # live-FK set no longer reproduces the decision Phase 1 actually made.
+            ent_name, ent_schema, records, samples, llm_fields = args
             # Only pass records that need filling (the new ones, not the original samples)
             new_records = records[len(samples):]
             # `model`/`session` are closed over rather than resolved in the worker:
