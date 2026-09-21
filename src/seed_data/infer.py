@@ -174,11 +174,13 @@ def write_schema_dir(schema: "Schema", dest: str) -> str:  # noqa: F821
             "Choose a different --output or remove it first."
         )
 
-    with open(schema_path, "w") as f:
+    with open(schema_path, "w", encoding="utf-8") as f:
         json.dump(schema.to_schema_dict(), f, indent=2)
         f.write("\n")
     if schema.generation_guidance:
-        with open(guidance_path, "w") as f:
+        # See `schema.io.to_schema_dir`: without an explicit encoding this raised
+        # UnicodeEncodeError on an em dash under a C/POSIX locale, losing the run.
+        with open(guidance_path, "w", encoding="utf-8") as f:
             f.write(schema.generation_guidance)
             if not schema.generation_guidance.endswith("\n"):
                 f.write("\n")

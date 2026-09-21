@@ -32,6 +32,7 @@ from seed_data.utils import make_model
 from seed_data.stages.base import ModelConfig
 from seed_data.stages.pipeline import (
     GeneratedDoc, build_context, build_pipeline_graph, result_from, PIPELINE_TASK,
+    _EMPTY_RESULT,
 )
 
 logger = logging.getLogger(__name__)
@@ -201,7 +202,19 @@ def generate_batch(
     graph, worker_names = build_batch_graph(
         contexts, max_attempts=max_attempts, timeout=timeout, augment=augment,
     )
-    result = graph(PIPELINE_TASK.format(doctype=contexts[0].doctype if contexts else "document"))
+    # Guarded: Strands' graph is fail-fast, so one worker raising cancels its
+    # siblings and the exception propagates out of `generate_batch` — losing every
+    # `GeneratedDoc`, including documents that had already rendered successfully.
+    # main's per-document try/except did not have this exposure. Falling through to
+    # the per-worker extraction below lets `result_from` report each context from the
+    # filesystem, so finished work survives a sibling's failure.
+    batch_error: str | None = None
+    try:
+        result = graph(PIPELINE_TASK.format(doctype=contexts[0].doctype if contexts else "document"))
+    except Exception as e:
+        logger.warning("Batch graph raised, recovering per-document results: %s", e)
+        batch_error = str(e)
+        result = _EMPTY_RESULT
 
     # Pull each worker's sub-result out of the outer result and extract it with
     # the same result_from() the single-document path uses.
@@ -214,6 +227,15 @@ def generate_batch(
         else:
             # Worker didn't run / no sub-result — fall back to inspecting its ctx.
             doc = result_from(ctx, _EMPTY_RESULT, augment=augment)
+        # A document with nothing on disk after a batch-level failure should name that
+        # failure. `result_from` has already set the generic "PDF was not created" by
+        # this point, so append rather than only filling an empty field — the batch
+        # error is the actual cause and the generic text is the symptom.
+        if batch_error and not doc.success:
+            detail = f"Batch run failed: {batch_error}"
+            doc = doc.model_copy(update={
+                "error": f"{doc.error} ({detail})" if doc.error else detail
+            })
         docs.append(doc)
         if on_document is not None:
             on_document(i, len(contexts), doc)
@@ -234,12 +256,3 @@ def _seeded_brief(brief: str, seed: int | None) -> str:
     if seed is None:
         return brief
     return f"{brief}\n\n[Deterministic seed: {seed}. Produce the same scenarios for this seed.]"
-
-
-class _EmptyResult:
-    """Stand-in with no node results, for a worker that produced nothing."""
-    results: dict = {}
-    execution_order: list = []
-
-
-_EMPTY_RESULT = _EmptyResult()

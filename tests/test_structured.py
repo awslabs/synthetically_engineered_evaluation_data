@@ -1172,3 +1172,114 @@ def test_corrections_are_reproducible_under_a_seed():
     assert run(7) != run(42), "a different seed must still vary them"
     # And a corrected enum must match its declared JSON type, not stay a string.
     assert all(isinstance(r["rating"], int) for r in run(42))
+
+
+def test_fk_copy_tolerates_a_non_numeric_parent_key():
+    """The float FK branch called `float(v)` unguarded; the integer branch guards.
+
+    A parent key is very often a string ("CUS-0001"), so this aborted the whole run
+    with a ValueError and returned no data at all.
+    """
+    from seed_data.structured.generation import _as_float
+
+    assert _as_float("CUS-0001") == "CUS-0001"   # left alone, reported by the validator
+    assert _as_float("3.5") == 3.5
+    assert _as_float(None) is None
+
+
+def test_scalar_distribution_params_tolerate_the_list_form():
+    """`params` is typed `float | list[float]`, so a scalar may arrive as a list.
+
+    `std`/`sigma`/`lambda` were guarded; `mean`, `mu`, `low`, `high` and `skewness`
+    went straight into `float()` and raised TypeError, killing the run.
+    """
+    from seed_data.schema.models import DistributionSpec, DistributionType, FieldDefinition
+    from seed_data.structured.distributions.generator import DistributionGenerator
+
+    cases = [
+        (DistributionType.NORMAL, {"mean": [50.0], "std": 10.0}),
+        (DistributionType.UNIFORM, {"low": [1.0], "high": [9.0]}),
+        (DistributionType.LOG_NORMAL, {"mu": [0.5], "sigma": 1.0}),
+        (DistributionType.SKEWED_RIGHT, {"skewness": [3.0]}),
+    ]
+    for dist_type, params in cases:
+        field = FieldDefinition(name="x", type="float", min_value=0, max_value=100,
+                                distribution=DistributionSpec(type=dist_type, params=params))
+        values = DistributionGenerator(seed=1).generate_field_values(field, 3)
+        assert len(values) == 3, f"{dist_type} produced nothing"
+        assert all(isinstance(v, float) for v in values)
+
+
+def test_pattern_wins_over_the_numeric_sample_heuristic():
+    """A declared pattern must outrank "the samples look numeric".
+
+    Tested second, `^[0-9]{4}$` was ignored whenever samples were all digits, and the
+    magnitude heuristic dropped zero padding — samples "0001"/"0002" produced
+    ['7', '41', ...], so every row was a pattern_violation.
+    """
+    import re
+    from seed_data.structured.generation import _generate_programmatic
+    from seed_data.schema.models import EntitySchema
+
+    schema = EntitySchema.model_validate({"entity_name": "T", "description": "t", "fields": [
+        {"name": "code", "type": "string", "unique": True, "pattern": "^[0-9]{4}$",
+         "required": True}]})
+    existing = [{"code": "0001"}, {"code": "0002"}]
+
+    records = _generate_programmatic("T", schema, 5, existing, {}, defer_llm=True, seed=7)
+    codes = [r["code"] for r in records]
+    assert all(re.fullmatch(r"[0-9]{4}", str(c)) for c in codes), codes
+    assert len(set(codes)) == len(codes), "unique field must stay unique"
+
+
+def test_distribution_on_a_text_field_still_reaches_the_llm():
+    """`_needs_llm` returned False for *any* distribution, but only some are honoured.
+
+    `DistributionGenerator` handles enum/numeric/date; anything else falls to
+    `[None] * count`, so a `categorical_weighted` attached to a plain text field was
+    filled by neither pass and every row was dropped by the not-null filter.
+    """
+    from seed_data.schema.models import DistributionSpec, DistributionType, FieldDefinition
+    from seed_data.structured.generation import _needs_llm
+
+    text = FieldDefinition(
+        name="notes", type="string", required=True,
+        distribution=DistributionSpec(type=DistributionType.CATEGORICAL_WEIGHTED,
+                                      params={"weights": [1.0]}))
+    assert _needs_llm(text, set()) is True
+
+    # A distribution a generator *can* honour must still bypass the LLM.
+    numeric = FieldDefinition(
+        name="amount", type="float",
+        distribution=DistributionSpec(type=DistributionType.NORMAL,
+                                      params={"mean": 5.0, "std": 1.0}))
+    assert _needs_llm(numeric, set()) is False
+
+
+def test_export_failure_message_is_not_replaced():
+    """`export_data` signals failure with plain text, not JSON.
+
+    `json.loads` swallowed it and substituted "all records may have been filtered by
+    validation", discarding the actionable "pip install pyarrow".
+    """
+    from unittest.mock import patch
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "T", "description": "t",
+        "fields": [{"name": "a", "type": "string"}]}]})
+
+    class _State:
+        export_json = "Parquet export needs a parquet engine. Install one: pip install pyarrow"
+        evaluation_issues: list = []
+        evaluation_scores: dict = {}
+        gen_result_json = ""
+        quality_passed = True
+
+    from seed_data.structured import run_structured
+    with patch("seed_data.structured.pipeline.run_graph_pipeline",
+               return_value=("summary", _State())):
+        result = run_structured(schema, verbose=False)
+
+    assert "pyarrow" in (result.error or ""), result.error
+    assert "filtered by validation" not in (result.error or "")

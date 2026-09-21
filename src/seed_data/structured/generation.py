@@ -143,6 +143,20 @@ def _get_entity_schema(entity_name: str, schema_json: str) -> EntitySchema | Non
     return None
 
 
+def _as_float(value):
+    """Best-effort float conversion that leaves unconvertible values alone.
+
+    FK columns copy their parent's key verbatim, and a parent key is very often a
+    string ("CUS-0001"). A bare ``float()`` there raised ValueError out of
+    generation and aborted the run; keeping the original value lets the validator
+    report a type_error on that one field instead of losing the dataset.
+    """
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def _has_distributions(entity_schema: EntitySchema) -> bool:
     """Check if an entity has any fields with distribution specs."""
     return any(f.distribution is not None for f in entity_schema.fields)
@@ -424,7 +438,14 @@ def _needs_llm(field: FieldDefinition, fk_fields: set[str]) -> bool:
     if field.unique:
         return False
     if field.distribution is not None:
-        return False
+        # ...but only when a programmatic generator can actually honour it.
+        # `DistributionGenerator` handles enum, integer/float and date/datetime; for
+        # anything else `_generate_default` returns `[None] * count`, so a
+        # `categorical_weighted` that inference attached to a plain text field was
+        # skipped by this pass *and* produced no value in the other — every row then
+        # failed the not-null check and the whole entity was filtered away.
+        if field.enum_values or field.type in ("integer", "float", "date", "datetime"):
+            return False
     if field.enum_values:
         return False
     if field.type in ("integer", "float", "boolean", "date", "datetime"):
@@ -522,7 +543,10 @@ def _generate_programmatic(
             if field.type == "integer":
                 selected = [int(v) if str(v).isdigit() else v for v in selected]
             elif field.type == "float":
-                selected = [float(v) for v in selected]
+                # Guarded like the integer branch above: a parent key is often a
+                # string ("CUS-0001"), and a bare float() raised ValueError out of
+                # _generate_programmatic, aborting the whole run with no data.
+                selected = [_as_float(v) for v in selected]
             column_values[field.name] = selected
         elif field.unique:
             existing = existing_uniques.get(field.name, set())
@@ -531,7 +555,20 @@ def _generate_programmatic(
             sample_vals = [r.get(field.name) for r in existing_records if r.get(field.name) is not None]
             all_numeric = sample_vals and all(str(v).isdigit() for v in sample_vals)
 
-            if all_numeric:
+            # A declared `pattern` is the schema's explicit statement of format, so it
+            # outranks the "samples look numeric" heuristic. Tested second, a pattern
+            # like "^[0-9]{4}$" was ignored whenever the samples happened to be all
+            # digits, and the magnitude heuristic dropped the zero padding: samples
+            # "0001"/"0002" produced ['7', '41', '26'], making every generated row a
+            # pattern_violation that `_correct_pattern` then regenerated with an empty
+            # `existing` set, so it could also mint duplicate primary keys.
+            use_pattern = field.pattern and (
+                not sample_vals or _samples_match_pattern(sample_vals, field.pattern)
+            )
+
+            if use_pattern:
+                values = _generate_from_pattern(field.pattern, count, existing, pattern_rng)
+            elif all_numeric:
                 # Samples are numeric — generate random unique IDs in a similar magnitude
                 int_vals = sorted(int(v) for v in sample_vals)
                 # Infer the ID range from samples (e.g., 101-105 → generate in 100-999)
@@ -554,9 +591,6 @@ def _generate_programmatic(
                         existing.add(str(counter))
                         values.append(counter if field.type == "integer" else str(counter))
                     counter += 1
-            elif field.pattern and (not sample_vals or _samples_match_pattern(sample_vals, field.pattern)):
-                # Schema has a pattern AND samples match it (or no samples) — use pattern
-                values = _generate_from_pattern(field.pattern, count, existing, pattern_rng)
             elif field.type == "integer":
                 max_id = 0
                 for v in existing:
@@ -646,6 +680,7 @@ def _fill_string_fields_with_llm(
     batch_size = 15  # Smaller batches since we're sending full record context
     filled_idx = 0
 
+    failed_batches = 0
     for batch_start in range(0, total_count, batch_size):
         batch = partial_records[batch_start:batch_start + batch_size]
 
@@ -682,14 +717,21 @@ def _fill_string_fields_with_llm(
                 logger.info("LLM string batch: filled %d records for %s (total: %d/%d)",
                             len(batch), entity_name, filled_idx, total_count)
             else:
+                # `continue`, not `break`: one bad batch is not a reason to abandon the
+                # remaining ones. Breaking left every later record unfilled, and the
+                # fallback below then fabricated `field_1..field_N` placeholders while
+                # the run still reported success.
                 logger.warning("LLM string batch returned no JSON list for %s", entity_name)
-                break
+                failed_batches += 1
+                continue
         except Exception as e:
             logger.warning("LLM string batch failed for %s: %s", entity_name, e)
-            break
+            failed_batches += 1
+            continue
 
     # Fallback for any unfilled records
     example_values = {fname: [r.get(fname) for r in existing_records if r.get(fname)] for fname in fields_to_fill}
+    fabricated = 0
     for i, record in enumerate(partial_records):
         for fname in fields_to_fill:
             if fname not in record or record[fname] is None:
@@ -698,6 +740,17 @@ def _fill_string_fields_with_llm(
                     record[fname] = examples[i % len(examples)]
                 else:
                     record[fname] = f"{fname}_{i + 1}"
+                    fabricated += 1
+
+    # Surfaced, not silent. `field_1..field_N` is a placeholder, not data; emitted
+    # quietly it was exported as though the LLM had written it, and a caller reading
+    # only `StructuredResult.success` had no way to tell.
+    if fabricated:
+        logger.warning(
+            "LLM string fill for %s: %d value(s) are synthetic placeholders after %d "
+            "failed batch(es) — these are not model-generated content",
+            entity_name, fabricated, failed_batches,
+        )
 
     logger.info("LLM filled string fields for %s: %d/%d records completed by LLM",
                 entity_name, filled_idx, total_count)

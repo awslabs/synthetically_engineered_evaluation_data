@@ -227,3 +227,80 @@ def test_nested_values_do_not_drop_every_metric():
     assert report.issues == [], f"nested data must evaluate cleanly, got {report.issues}"
     assert report.overall_quality_score > 0.5
     assert report.passes_quality_gate is True
+
+
+# --- review round 5: more "the gate cannot see its own failures" ---------------
+
+def test_data_sharing_no_columns_with_the_schema_fails_the_gate():
+    """Every "nothing examined" path returned a perfect score.
+
+    Data whose columns don't overlap the schema at all scored fidelity 1.0,
+    coverage 1.0 and type_conformance 1.0, passing the gate with no issue recorded.
+    """
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "Customer", "description": "c", "fields": [
+            {"name": "id", "type": "integer"},
+            {"name": "email", "type": "email"},
+            {"name": "age", "type": "integer"}]}]})
+
+    report = run_evaluation({"Customer": [{"foo": 1, "bar": "x"}, {"foo": 2, "bar": "y"}]}, schema)
+    assert report.passes_quality_gate is False
+    assert report.overall_quality_score < 0.5
+
+
+def test_non_numeric_cell_does_not_blind_the_distribution_check():
+    """`astype(float)` raised, and the blanket except dropped fidelity + coverage."""
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "T", "description": "t", "fields": [
+            {"name": "amount", "type": "float",
+             "distribution": {"type": "normal", "params": {"mean": 10, "std": 2}}}]}]})
+
+    report = run_evaluation({"T": [{"amount": 10.0}, {"amount": 9.0}, {"amount": ""}]}, schema)
+    assert report.issues == [], f"should not error out, got {report.issues}"
+    assert report.overall_fidelity_score > 0.0
+
+
+def test_degenerate_distribution_scores_an_exact_match_as_perfect():
+    """`std == 0` pinned the theoretical CDF at 0.5, so exact data scored KS 0.5."""
+    from seed_data.evaluation.fidelity import FidelityMetrics
+
+    metrics = FidelityMetrics()
+    assert metrics.distribution_distance_ks(pd.Series([5, 5, 5, 5]), 5.0, 0.0) == 0.0
+    assert metrics.distribution_distance_ks(pd.Series([5, 5, 9, 9]), 5.0, 0.0) == 0.5
+    assert metrics.distribution_distance_ks(pd.Series([1, 2, 3, 4]), 5.0, 0.0) == 1.0
+
+
+def test_missing_weights_do_not_penalize_the_data():
+    """Empty `weights` passed the isinstance check, so JSD returned its 1.0 sentinel.
+
+    That scored perfectly balanced data worst-possible for a *schema* omission.
+    """
+    from seed_data.evaluation.fidelity import FidelityMetrics
+    from seed_data.schema.models import EntitySchema
+
+    schema = EntitySchema.model_validate({
+        "entity_name": "T", "description": "t", "fields": [
+            {"name": "status", "type": "enum", "enum_values": ["a", "b"],
+             "distribution": {"type": "categorical_weighted", "params": {}}}]})
+    data = pd.DataFrame([{"status": "a"}, {"status": "b"}, {"status": "a"}, {"status": "b"}])
+
+    result = FidelityMetrics().overall_fidelity_score(data, schema)
+    assert "status" not in result["distribution_distances"], "an empty spec must be skipped"
+    assert result["overall_score"] == pytest.approx(1.0)
+
+
+def test_integer_conformance_rejects_floats_and_bools():
+    """`int(value)` truncates and accepts bools, blinding the metric."""
+    from seed_data.evaluation.structural import StructuralMetrics
+
+    metrics = StructuralMetrics()
+    assert metrics._conforms_to_type(4, "integer") is True
+    assert metrics._conforms_to_type(4.0, "integer") is True      # integral float is fine
+    assert metrics._conforms_to_type(3.7, "integer") is False
+    assert metrics._conforms_to_type(True, "integer") is False

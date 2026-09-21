@@ -144,3 +144,89 @@ def test_failed_result_reads_the_doc_verdict_from_doc_loop():
     assert "doc critic returned no structured verdict" in doc.error
     # And it must not have reported the accepted data verdict instead.
     assert "data ok" not in doc.error
+
+
+def test_collect_tokens_does_not_double_count_nested_graphs():
+    """`get_agent_results()` already flattens sub-graphs, so also recursing doubled.
+
+    Regression from main, which used an exclusive if/elif: a 500-token run reported
+    800 once a nested loop graph was involved.
+    """
+    from seed_data.stages import pipeline as pipe
+
+    class _Metrics:
+        def __init__(self, n):
+            self.accumulated_usage = {"inputTokens": n, "outputTokens": n}
+
+    class _Agent:
+        def __init__(self, n):
+            self.metrics = _Metrics(n)
+
+    class _Leaf:
+        """A node result holding agents directly (no sub-graph)."""
+        def __init__(self, *agents):
+            self._agents = agents
+        def get_agent_results(self):
+            return list(self._agents)
+
+    class _Nested:
+        """A node result whose `.result` is itself a graph result."""
+        def __init__(self, inner):
+            self.result = inner
+        def get_agent_results(self):
+            # Strands flattens nested agents here too — this is the double-count trap.
+            return [a for nr in inner_results(self.result) for a in nr.get_agent_results()]
+
+    def inner_results(res):
+        return list(res.results.values())
+
+    class _Graph:
+        def __init__(self, results):
+            self.results = results
+            self.execution_order: list = []
+
+    inner = _Graph({"doc_generator": _Leaf(_Agent(100)), "doc_critic": _Leaf(_Agent(150))})
+    outer = _Graph({"data_generator": _Leaf(_Agent(50)), "doc_loop": _Nested(inner)})
+
+    usage = pipe._collect_tokens(outer)
+    # 50 + 100 + 150 = 300 per direction; double-counting the nested pair gave 550.
+    assert usage["inputTokens"] == 300, usage
+    assert usage["outputTokens"] == 300, usage
+    assert usage["totalTokens"] == 600, usage
+
+
+def test_a_raise_after_rendering_does_not_discard_the_pdf(tmp_path):
+    """The except path returned `success=False, pdf_path=None` unconditionally.
+
+    The graph can render and accept a PDF and then fail in a later node (augment,
+    say); discarding it threw away finished, paid-for work sitting on disk.
+    """
+    from unittest.mock import patch
+    from seed_data.stages import pipeline as pipe
+
+    pdf_dir = tmp_path / "pdfs"
+    pdf_dir.mkdir()
+    (pdf_dir / "doc.pdf").write_bytes(b"%PDF-1.4 rendered")
+
+    schema_dir = tmp_path / "schema"
+    schema_dir.mkdir()
+    (schema_dir / "schema.json").write_text('{"title": "widget", "type": "object", "properties": {}}')
+
+    def boom(*a, **k):
+        raise RuntimeError("augment node exploded")
+
+    with patch.object(pipe, "build_pipeline_graph", lambda *a, **k: boom), \
+         patch.object(pipe, "build_context") as mk_ctx:
+        from seed_data.stages.base import StageContext, ModelConfig
+        mk_ctx.return_value = StageContext(
+            schema_dict={"title": "widget"},
+            output_path=str(pdf_dir / "doc.pdf"),
+            data_json_path=str(tmp_path / "doc.json"),
+            script_path=str(tmp_path / "doc.html"),
+            models=ModelConfig(), output_dir=str(tmp_path),
+        )
+        doc = pipe.generate(schema_dir=str(schema_dir), verbose=False)
+
+    assert doc.pdf_path == str(pdf_dir / "doc.pdf"), "the rendered PDF must be reported"
+    assert doc.success is True
+    assert "augment node exploded" in (doc.error or "")

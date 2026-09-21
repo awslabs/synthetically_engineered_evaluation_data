@@ -42,11 +42,6 @@ from seed_data.schema.models import EntitySchema, FieldDefinition, InferredSchem
 
 _JSON_SCHEMA_HEADER = "http://json-schema.org/draft-07/schema#"
 
-#: Semantic ``FieldDefinition.type`` -> ``(json_schema_type, format_or_None)``.
-#: Keys are the vocabulary ``prompts/schema_extraction.j2`` instructs the model to
-#: emit; values are what draft-07 actually accepts. ``format`` is an annotation in
-#: draft-07 (not asserted by default), so it guides the generator without making
-#: otherwise-valid data fail validation.
 #: Inbound counterpart of :data:`_SEMANTIC_TYPES`: a draft-07 type name that is not
 #: already part of the semantic vocabulary -> the semantic name to store on
 #: ``FieldDefinition.type``.
@@ -68,6 +63,11 @@ _CANONICAL_TYPES: dict[str, str] = {
     "number": "float",
 }
 
+#: Semantic ``FieldDefinition.type`` -> ``(json_schema_type, format_or_None)``.
+#: Keys are the vocabulary ``prompts/schema_extraction.j2`` instructs the model to
+#: emit; values are what draft-07 actually accepts. ``format`` is an annotation in
+#: draft-07 (not asserted by default), so it guides the generator without making
+#: otherwise-valid data fail validation.
 _SEMANTIC_TYPES: dict[str, tuple[str, str | None]] = {
     "float": ("number", None),
     "double": ("number", None),
@@ -193,8 +193,17 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
         # so stringify here (assigning the raw list would bypass the field
         # validator and make `model_dump_json` warn) and remember the values' real
         # JSON type so the enum rebuilds faithfully.
-        if any(not isinstance(v, str) for v in sub["enum"] if v is not None):
-            field.enum_base_type = raw_jtype
+        non_null = [v for v in sub["enum"] if v is not None]
+        if any(not isinstance(v, str) for v in non_null):
+            # Inferred from the *members* when the property declares no `type` —
+            # draft-07 allows `{"enum": [1, 2, 3]}` with no type at all, and
+            # `raw_jtype` defaults to "string" there, so keying off it recorded a
+            # numeric enum as a string one: the exact corruption `enum_base_type`
+            # exists to prevent. An explicit `type` still wins, since it is the
+            # author's stated intent.
+            field.enum_base_type = (
+                raw_jtype if "type" in sub else _enum_base_from_values(non_null)
+            )
         field.enum_values = [
             str(v) if v is not None else "None" for v in sub["enum"]
         ]
@@ -207,7 +216,14 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
             field.min_items = sub["minItems"]
         if "maxItems" in sub:
             field.max_items = sub["maxItems"]
-        item_sub, _, _ = _unwrap_nullable(sub.get("items", {}) or {})
+        # draft-07 allows the *tuple* form (`"items": [{...}, {...}]`, one schema per
+        # position). `_unwrap_nullable` assumes a dict and raised an uncaught
+        # AttributeError on a list. The first element describes the leading position,
+        # which is the closest single element type this model can hold.
+        raw_items = sub.get("items") or {}
+        if isinstance(raw_items, list):
+            raw_items = next((i for i in raw_items if isinstance(i, dict)), {})
+        item_sub, _, _ = _unwrap_nullable(raw_items)
         if item_sub.get("type") == "object" and "properties" in item_sub:
             field.children = _parse_properties(item_sub)
         elif item_sub:
@@ -244,18 +260,52 @@ def from_json_schema(schema_dict: dict, guidance: str = "") -> InferredSchema:
 
 # --- InferredSchema -> JSON Schema ------------------------------------------
 
+def _enum_base_from_values(values: list) -> str:
+    """Infer an enum's JSON base type from its members.
+
+    Used when the source property declares no ``type`` of its own. Booleans are
+    checked before integers because ``bool`` is a subclass of ``int``.
+    """
+    if all(isinstance(v, bool) for v in values):
+        return "boolean"
+    if all(isinstance(v, int) and not isinstance(v, bool) for v in values):
+        return "integer"
+    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+        return "number"
+    return "string"
+
+
+#: Casters for restoring a stringified enum to its declared JSON type. Keyed by both
+#: the draft-07 name and the semantic alias, because ``enum_base_type`` can hold
+#: either — ``_parse_property`` records the JSON name, but an LLM-built
+#: ``FieldDefinition`` uses the vocabulary the extraction prompt teaches, and
+#: ``_to_json_type`` accepts those aliases when emitting the ``type``. Missing the
+#: alias meant the ``type`` was coerced while the values were not.
+_ENUM_CASTERS: dict[str, "callable"] = {
+    "integer": int,
+    "int": int,
+    "number": float,
+    "float": float,
+    "double": float,
+    "decimal": float,
+    # `bool("False")` is True, so parse the string form rather than calling bool().
+    "boolean": lambda v: str(v).strip().lower() in ("true", "1"),
+    "bool": lambda v: str(v).strip().lower() in ("true", "1"),
+}
+
+
 def _coerce_enum_values(values: list, base_type: str | None) -> list:
     """Restore an enum's original value type for emission.
 
-    ``FieldDefinition.enum_values`` is ``list[str]``, so a numeric enum arrives
-    here stringified. Emitting those strings under a numeric ``type`` produces a
-    schema nothing can satisfy, so convert back when a base type was recorded.
+    ``FieldDefinition.enum_values`` is ``list[str]``, so a non-string enum arrives
+    here stringified. Emitting those strings under a non-string ``type`` produces a
+    schema nothing can satisfy — a boolean enum became
+    ``{"type": "boolean", "enum": ["True", "False"]}``, which rejects ``true``,
+    ``false`` *and* ``"True"``, so the data critic (which validates every generated
+    document against this schema) could never accept and the run burned every retry.
     """
-    if base_type == "integer":
-        caster = int
-    elif base_type == "number":
-        caster = float
-    else:
+    caster = _ENUM_CASTERS.get(base_type or "")
+    if caster is None:
         return values
 
     coerced = []
@@ -340,7 +390,16 @@ def _fields_to_object(fields: list[FieldDefinition]) -> dict:
     required = []
     for field in fields:
         properties[field.name] = _field_to_prop(field)
-        if field.is_required:
+        # `required` is about *key presence*, so a required-and-nullable field stays
+        # in the list (the key is always emitted; its value may be null) — which is
+        # why this is not `requires_value`, whose job is "must carry a value".
+        #
+        # The one exclusion is `presence_probability`: such a field is deliberately
+        # absent from some documents, and `prompts/data_generator.j2` tells the model
+        # to omit the key when the roll fails. Emitted as `required` *and*
+        # `x-probability`, the schema contradicted the prompt and the data critic
+        # rejected every document that obeyed it — roughly 30% of them.
+        if field.is_required and field.presence_probability is None:
             required.append(field.name)
     obj: dict = {"type": "object", "properties": properties}
     if required:
@@ -410,12 +469,15 @@ def to_schema_dir(schema: InferredSchema, path: str, entity_name: str | None = N
     else:
         entity = next(e for e in schema.entities if e.entity_name == entity_name)
 
-    with open(os.path.join(path, "schema.json"), "w") as f:
+    with open(os.path.join(path, "schema.json"), "w", encoding="utf-8") as f:
         json.dump(to_json_schema(schema, entity_name=entity.entity_name), f, indent=2)
         f.write("\n")
 
     if entity.generation_guidance:
-        with open(os.path.join(path, "generation_guidance.md"), "w") as f:
+        # `encoding="utf-8"` explicitly: LLM-authored guidance reliably contains em
+        # dashes, and the locale default is US-ASCII under C/POSIX, where the write
+        # raised UnicodeEncodeError and discarded the whole paid-for inference run.
+        with open(os.path.join(path, "generation_guidance.md"), "w", encoding="utf-8") as f:
             f.write(entity.generation_guidance)
             if not entity.generation_guidance.endswith("\n"):
                 f.write("\n")

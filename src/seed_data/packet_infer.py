@@ -316,6 +316,12 @@ def infer_packet(
     # Build into a staging dir and move into place only if everything succeeds,
     # so a mid-loop failure (throttle, guardrail) never leaves a poisoned output.
     final_dir = os.path.abspath(output_dir)
+    # The parent must exist *before* mkdtemp uses it as `dir=`. The makedirs that
+    # creates it used to sit ~35 lines below, at promotion time, so a nested
+    # `--output out/packets/lending` died here with a FileNotFoundError naming a temp
+    # directory the user never asked for — after the whole-PDF segmentation vision
+    # call had already been paid for.
+    os.makedirs(os.path.dirname(final_dir) or ".", exist_ok=True)
     staging = tempfile.mkdtemp(prefix=".seed_packet_", dir=os.path.dirname(final_dir) or ".")
     try:
         doc_specs = []
@@ -346,7 +352,7 @@ def infer_packet(
             "description": f"Packet inferred from {pdf.name} ({len(doc_specs)} document types).",
             "documents": doc_specs,
         }
-        with open(os.path.join(staging, "packet.json"), "w") as f:
+        with open(os.path.join(staging, "packet.json"), "w", encoding="utf-8") as f:
             json.dump(packet_config, f, indent=2)
             f.write("\n")
 

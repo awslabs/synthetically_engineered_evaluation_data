@@ -79,13 +79,20 @@ def run_structured(
 
     output_paths: list[str] = []
     row_counts: dict[str, int] = {}
+    export_message: str | None = None
     if ps.export_json:
         try:
             export = json.loads(ps.export_json)
             output_paths = export.get("files", [])
             row_counts = export.get("record_counts", {})
         except (json.JSONDecodeError, TypeError):
-            logger.warning("Could not parse export summary")
+            # `export_data` signals failure by returning a plain-text message, not
+            # JSON — e.g. "Parquet export needs a parquet engine ... pip install
+            # pyarrow". Swallowed as an unparseable summary, that actionable text was
+            # replaced below by a misleading "all records may have been filtered by
+            # validation". Kept so the real reason reaches the user.
+            export_message = ps.export_json.strip() or None
+            logger.warning("Export did not return a JSON summary: %s", export_message)
 
     # The pipeline can run to completion yet write nothing — e.g. every record
     # failed a non-null constraint and was filtered out. That is still a failure,
@@ -93,7 +100,9 @@ def run_structured(
     # Surface whatever the pipeline knows about why.
     error = None
     if not output_paths:
-        if ps.evaluation_issues:
+        if export_message:
+            error = export_message
+        elif ps.evaluation_issues:
             error = "No data exported. Evaluation issues: " + "; ".join(ps.evaluation_issues)
         else:
             error = (

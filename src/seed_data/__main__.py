@@ -289,7 +289,7 @@ def _plan(argv):
         print(e, file=sys.stderr)
         sys.exit(1)
 
-    with open(args.output, "w") as f:
+    with open(args.output, "w", encoding="utf-8") as f:
         f.write(schema.model_dump_json(indent=2))
 
     entity_names = ", ".join(e.entity_name for e in schema.entities) or "(none)"
@@ -553,7 +553,7 @@ def _plan_and_generate(argv):
         sys.exit(1)
 
     if args.save_schema:
-        with open(args.save_schema, "w") as f:
+        with open(args.save_schema, "w", encoding="utf-8") as f:
             f.write(schema.model_dump_json(indent=2))
         print(f"Wrote InferredSchema to: {args.save_schema}")
 

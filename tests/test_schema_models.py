@@ -349,3 +349,115 @@ def test_infer_schema_unaffected_by_rename(tmp_path, monkeypatch):
     schema = infer_mod.infer_schema(str(tmp_path / "*.pdf"), name="thing", verbose=False)
     assert isinstance(schema, Schema)
     assert schema.name == "thing"
+
+
+# --- review round 5: crit/high schema defects ---------------------------------
+
+def test_enum_without_explicit_type_keeps_its_value_type():
+    """draft-07 allows `{"enum": [1,2,3]}` with no `type`.
+
+    `enum_base_type` was taken from a `raw_jtype` that defaults to "string" there, so
+    a numeric enum was recorded as a string one and round-tripped to
+    `{"type":"string","enum":["1","2","3"]}` — the exact corruption the field exists
+    to prevent. Regression introduced while fixing the `number`/`float` mismatch.
+    """
+    from seed_data.schema.io import to_json_schema
+
+    inferred = from_json_schema({"title": "T", "type": "object",
+                                 "properties": {"rating": {"enum": [1, 2, 3]}}})
+    field = inferred.entities[0].fields[0]
+    assert field.enum_base_type == "integer"
+    assert to_json_schema(inferred)["properties"]["rating"] == {"type": "integer", "enum": [1, 2, 3]}
+
+
+def test_boolean_enum_round_trips_satisfiably():
+    """`{"type":"boolean","enum":[true,false]}` became `enum:["True","False"]`.
+
+    Nothing satisfies that — Draft7Validator rejects `true`, `false` *and* `"True"` —
+    and `stages/data` validates every generated document against this schema, so the
+    critic could never accept and the run burned every retry.
+    """
+    import jsonschema
+    from seed_data.schema.io import to_json_schema
+
+    inferred = from_json_schema({"title": "T", "type": "object", "required": ["flag"],
+                                 "properties": {"flag": {"type": "boolean",
+                                                         "enum": [True, False]}}})
+    rebuilt = to_json_schema(inferred)
+    assert rebuilt["properties"]["flag"] == {"type": "boolean", "enum": [True, False]}
+    # And it must actually validate real data.
+    jsonschema.Draft7Validator(rebuilt).validate({"flag": True})
+
+
+def test_semantic_enum_base_types_are_also_coerced():
+    """`enum_base_type` can hold the semantic alias, not just the JSON name.
+
+    `_to_json_type` accepts `int`/`float`, so the emitted `type` was coerced while the
+    values were left as strings — the same unsatisfiable pairing.
+    """
+    from seed_data.schema.io import _coerce_enum_values
+
+    assert _coerce_enum_values(["1", "2"], "int") == [1, 2]
+    assert _coerce_enum_values(["1.5"], "float") == [1.5]
+    assert _coerce_enum_values(["true", "false"], "bool") == [True, False]
+
+
+def test_sometimes_present_field_is_not_emitted_as_required():
+    """A `presence_probability` field must not be in `required`.
+
+    `prompts/data_generator.j2` tells the model to omit the key when the roll fails,
+    so emitting it as both `required` and `x-probability` made the schema contradict
+    the prompt — the critic rejected ~30% of generations for obeying it.
+    """
+    from seed_data.schema.io import to_json_schema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "D", "description": "d", "fields": [
+            {"name": "always", "type": "string", "required": True},
+            {"name": "sometimes", "type": "string", "required": True,
+             "presence_probability": 0.7}]}]})
+    out = to_json_schema(schema)
+
+    assert out["required"] == ["always"]
+    assert out["properties"]["sometimes"]["x-probability"] == 0.7
+
+
+def test_required_and_nullable_still_round_trips():
+    """The exclusion above must not also drop required-and-nullable fields.
+
+    `required` is about key presence, so a field that is required *and* nullable
+    belongs in the list — which is why this is not keyed off `requires_value`.
+    """
+    from seed_data.schema.io import to_json_schema
+
+    inferred = from_json_schema({
+        "title": "T", "type": "object", "required": ["price"],
+        "properties": {"price": {"anyOf": [{"type": "number"}, {"type": "null"}]}}})
+    assert to_json_schema(inferred)["required"] == ["price"]
+
+
+def test_tuple_form_items_does_not_crash():
+    """draft-07's tuple form (`items: [...]`) raised an uncaught AttributeError."""
+    inferred = from_json_schema({"title": "T", "type": "object", "properties": {
+        "pair": {"type": "array", "items": [{"type": "string"}, {"type": "integer"}]}}})
+    field = inferred.entities[0].fields[0]
+    assert field.type == "array"
+    assert field.item_type == "string"
+
+
+def test_guidance_is_written_as_utf8(tmp_path, monkeypatch):
+    """The guidance .md was written with the locale default encoding.
+
+    LLM-authored guidance reliably contains em dashes, and under a C/POSIX locale the
+    write raised UnicodeEncodeError — discarding the whole paid-for inference run.
+    """
+    from seed_data.schema.io import to_schema_dir
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "T", "description": "t",
+        "fields": [{"name": "a", "type": "string"}],
+        "generation_guidance": "Totals must match — always."}]})
+    dest = tmp_path / "out"
+    to_schema_dir(schema, str(dest))
+    written = (dest / "generation_guidance.md").read_text(encoding="utf-8")
+    assert "—" in written

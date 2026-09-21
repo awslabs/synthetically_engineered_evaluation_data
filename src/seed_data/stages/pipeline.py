@@ -95,6 +95,20 @@ def build_context(
     )
 
 
+class _EmptyResult:
+    """Stand-in with no node results, for a run that produced nothing.
+
+    Lives here rather than in `batch`, which imports from this module — both the
+    batch aggregator and the single-document error path need it, and the reverse
+    import would be circular.
+    """
+    results: dict = {}
+    execution_order: list = []
+
+
+_EMPTY_RESULT = _EmptyResult()
+
+
 def _collect_tokens(result) -> dict:
     """Recursively sum token usage across the graph and sub-graphs."""
     usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
@@ -103,15 +117,20 @@ def _collect_tokens(result) -> dict:
         if not hasattr(res, "results"):
             return
         for node_result in res.results.values():
+            # Exclusive: `get_agent_results()` already flattens a nested graph's
+            # agents, so also recursing counted every nested node twice (a 500-token
+            # run reported 800). Recurse only where there is a sub-graph to descend
+            # into, and read agent metrics only where there is not.
+            nr = getattr(node_result, "result", None)
+            if hasattr(nr, "results"):
+                _walk(nr)
+                continue
             for agent_result in node_result.get_agent_results():
                 metrics = getattr(agent_result, "metrics", None)
                 acc = getattr(metrics, "accumulated_usage", None) if metrics else None
                 if acc:
                     usage["inputTokens"] += acc.get("inputTokens", 0)
                     usage["outputTokens"] += acc.get("outputTokens", 0)
-            nr = getattr(node_result, "result", None)
-            if hasattr(nr, "results"):
-                _walk(nr)
 
     _walk(result)
     usage["totalTokens"] = usage["inputTokens"] + usage["outputTokens"]
@@ -217,6 +236,18 @@ def generate(
     try:
         result = graph(PIPELINE_TASK.format(doctype=ctx.doctype))
     except Exception as e:
+        # A raise here does not mean nothing was produced: the graph may have
+        # rendered and accepted the PDF and then failed in a later node (augment,
+        # say). Returning `success=False, pdf_path=None` unconditionally threw away
+        # finished, paid-for work that is sitting on disk. `result_from` reads the
+        # filesystem, so let it report what actually exists and only synthesize a
+        # failure when there is genuinely no document.
+        if os.path.exists(ctx.output_path):
+            doc = result_from(ctx, _EMPTY_RESULT, augment=augment)
+            return doc.model_copy(update={
+                "verdict": "error",
+                "error": f"Pipeline raised after the document was produced: {e}",
+            })
         return GeneratedDoc(
             success=False, doc_id=doc_id, doctype=ctx.doctype,
             data_json_path=ctx.data_json_path, verdict="error", error=str(e),

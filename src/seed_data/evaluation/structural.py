@@ -89,8 +89,11 @@ class StructuralMetrics:
         """Check if a value conforms to the declared type."""
         try:
             if declared_type == "integer":
-                int(value)
-                return True
+                # `int(value)` alone truncates (int(3.7) == 3) and accepts bools, so
+                # the metric was blind to exactly the violation it exists to catch.
+                if isinstance(value, bool):
+                    return False
+                return float(value).is_integer()
             elif declared_type == "float":
                 float(value)
                 return True
@@ -165,7 +168,13 @@ class StructuralMetrics:
             uv = self.uniqueness_violation_count(df, entity)
             results["uniqueness_violations"][entity.entity_name] = uv
 
-        avg_type = sum(type_scores) / len(type_scores) if type_scores else 1.0
+        # `0.0` when there were entities to score but none produced a measurable
+        # conformance rate (every frame empty): defaulting to 1.0 reported perfect
+        # structural health for a dataset with no rows at all.
+        avg_type = (
+            sum(type_scores) / len(type_scores) if type_scores
+            else (1.0 if not schema.entities else 0.0)
+        )
         total_unique_violations = sum(results["uniqueness_violations"].values())
         uniqueness_penalty = min(total_unique_violations * 0.05, 0.5)
 

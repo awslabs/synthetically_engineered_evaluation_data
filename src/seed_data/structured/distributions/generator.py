@@ -57,6 +57,31 @@ def normalized_weights(weights, expected: int) -> list[float] | None:
     return [w / total for w in numeric]
 
 
+def scalar_param(params: dict, name: str, default: float) -> float:
+    """Read any numeric distribution parameter, falling back to ``default``.
+
+    The unsigned counterpart of :func:`positive_param`, for the parameters that may
+    legitimately be zero or negative (``mean``, ``mu``, ``low``, ``high``,
+    ``skewness``). Those went straight into ``float()``, which raises ``TypeError``
+    on the list values ``DistributionSpec.params`` is explicitly typed to allow
+    (``{"mean": [50.0]}``) — killing the whole generation run, which is the failure
+    ``positive_param`` was introduced to prevent for its own subset.
+    """
+    raw = params.get(name, default)
+    if isinstance(raw, (list, tuple)):
+        # A scalar arriving as a one-element list is the common LLM shape; take it.
+        raw = raw[0] if len(raw) == 1 else default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("Distribution parameter %s=%r is not a number — using %s", name, raw, default)
+        return float(default)
+    if not math.isfinite(value):
+        logger.warning("Distribution parameter %s=%s is not finite — using %s", name, value, default)
+        return float(default)
+    return value
+
+
 def positive_param(params: dict, name: str, default: float) -> float:
     """Read a strictly-positive distribution parameter, falling back to ``default``.
 
@@ -124,7 +149,7 @@ class DistributionGenerator:
 
     def _sample_skewed(self, spec: DistributionSpec, count: int, min_val: float, max_val: float) -> np.ndarray:
         """Sample from skewed distribution, scaled to fit [min_val, max_val]."""
-        a = float(spec.params.get("skewness", 5.0))
+        a = scalar_param(spec.params, "skewness", 5.0)
         if spec.type == DistributionType.SKEWED_LEFT:
             a = -a
 
@@ -194,9 +219,9 @@ class DistributionGenerator:
         total_days = (end_date - start_date).days
 
         if spec and spec.type == DistributionType.NORMAL:
-            mean_day = spec.params.get("mean", total_days / 2)
+            mean_day = scalar_param(spec.params, "mean", total_days / 2)
             std_day = positive_param(spec.params, "std", total_days / 6)
-            offsets = self.rng.normal(float(mean_day), std_day, size=count)
+            offsets = self.rng.normal(mean_day, std_day, size=count)
         elif spec and spec.type == DistributionType.EXPONENTIAL:
             # `lambda` is a divisor and comes from the LLM: at 0 this raised
             # ZeroDivisionError, taking the whole run down.
@@ -220,13 +245,13 @@ class DistributionGenerator:
         params = spec.params
 
         if spec.type == DistributionType.NORMAL:
-            mean = float(params.get("mean", 0.0))
+            mean = scalar_param(params, "mean", 0.0)
             std = positive_param(params, "std", 1.0)
             return self.rng.normal(mean, std, size=count)
 
         elif spec.type == DistributionType.UNIFORM:
-            low = float(params.get("low", 0.0))
-            high = float(params.get("high", 1.0))
+            low = scalar_param(params, "low", 0.0)
+            high = scalar_param(params, "high", 1.0)
             # numpy tolerates low > high but returns values outside [low, high];
             # ordering them matches what the schema plainly means.
             return self.rng.uniform(min(low, high), max(low, high), size=count)
@@ -236,16 +261,16 @@ class DistributionGenerator:
             return self.rng.exponential(1.0 / lam, size=count)
 
         elif spec.type == DistributionType.LOG_NORMAL:
-            mu = float(params.get("mu", 0.0))
+            mu = scalar_param(params, "mu", 0.0)
             sigma = positive_param(params, "sigma", 1.0)
             return self.rng.lognormal(mu, sigma, size=count)
 
         elif spec.type == DistributionType.SKEWED_LEFT:
-            a = float(params.get("skewness", 5.0))
+            a = scalar_param(params, "skewness", 5.0)
             return stats.skewnorm.rvs(-a, size=count, random_state=self.rng)
 
         elif spec.type == DistributionType.SKEWED_RIGHT:
-            a = float(params.get("skewness", 5.0))
+            a = scalar_param(params, "skewness", 5.0)
             return stats.skewnorm.rvs(a, size=count, random_state=self.rng)
 
         else:

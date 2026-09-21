@@ -62,7 +62,11 @@ class FidelityMetrics:
                     violations += 1
 
         if total_cells == 0:
-            return 0.0
+            # No overlap between schema and data is not a perfect result — it means
+            # the generated records share no columns with the schema at all, which
+            # scored 1.0 fidelity / 1.0 coverage / 1.0 conformance and passed the
+            # gate with no issue recorded. Treated as a total violation instead.
+            return 1.0 if schema.fields else 0.0
         return violations / total_cells
 
     def _violates_constraint(self, value, field: FieldDefinition) -> bool:
@@ -110,17 +114,32 @@ class FidelityMetrics:
 
         Returns KS statistic in [0, 1]. Lower = better fit.
         """
-        values = observed.dropna().astype(float)
+        # Coerced, not cast: `astype(float)` raises on a single non-numeric cell, and
+        # `run_evaluation`'s blanket except then threw away fidelity *and* coverage for
+        # the entire entity. A non-numeric value in a numeric column is a type_error
+        # the validator already reports; it must not also blind the distribution check.
+        # This is the `pd.to_numeric(..., errors="coerce")` pattern `coverage` uses.
+        values = pd.to_numeric(observed, errors="coerce").dropna()
         if len(values) < 2:
             return 1.0
 
         sorted_vals = sorted(values)
         n = len(sorted_vals)
-        max_diff = 0.0
 
+        if target_std <= 0:
+            # A zero/absent std is a degenerate distribution: all mass at the mean, so
+            # its CDF is a step function. The per-point loop below cannot express that
+            # — it compares against the *pre-jump* empirical CDF at tied values — and
+            # with `z = 0` it previously pinned the theoretical CDF at a constant 0.5,
+            # scoring KS 0.5 for data that matched the spec exactly. The distance is
+            # simply the fraction of observations that are not at the mean.
+            off_mass = sum(1 for v in sorted_vals if v != target_mean)
+            return off_mass / n
+
+        max_diff = 0.0
         for i, val in enumerate(sorted_vals):
             empirical_cdf = (i + 1) / n
-            z = (val - target_mean) / target_std if target_std > 0 else 0
+            z = (val - target_mean) / target_std
             theoretical_cdf = 0.5 * (1 + math.erf(z / math.sqrt(2)))
             diff = abs(empirical_cdf - theoretical_cdf)
             max_diff = max(max_diff, diff)
@@ -188,7 +207,11 @@ class FidelityMetrics:
 
             elif field.distribution.type == DistributionType.CATEGORICAL_WEIGHTED:
                 weights_list = field.distribution.params.get("weights", [])
-                if field.enum_values and isinstance(weights_list, list):
+                # `and weights_list`: an empty list passes the isinstance check, making
+                # `expected` empty, and `distribution_distance_jsd` then returns its
+                # `total_expected == 0` sentinel of 1.0 — scoring perfectly balanced
+                # data worst-possible because the *schema* omitted its weights.
+                if field.enum_values and isinstance(weights_list, list) and weights_list:
                     expected = dict(zip(field.enum_values, weights_list))
                     observed = _hashable(series).dropna().value_counts().to_dict()
                     jsd = self.distribution_distance_jsd(observed, expected)

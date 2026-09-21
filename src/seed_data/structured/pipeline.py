@@ -273,6 +273,12 @@ def build_graph_pipeline(
             report = run_evaluation(data, schema)
         except Exception as e:
             logger.warning("Evaluation failed: %s", e)
+            # The post-processed data must be written back before routing to export,
+            # exactly as the two success paths below do. Without it `export_step`
+            # re-read `ps.gen_result_json` — the *raw* generation output — so rows
+            # post-processing had corrected or dropped as unfixable were exported
+            # anyway, and the run reported success.
+            ps.gen_result_json = json.dumps({"data": data})
             return json.dumps({"quality_passed": True, "retry": "none", "reason": f"Evaluation error: {e}"})
 
         # Worst entity, not the mean: averaging lets a healthy entity mask one

@@ -216,3 +216,45 @@ def test_plan_scenarios_short_response_also_warns(monkeypatch, caplog):
 
     assert out == ["only-one", "b", "b"]
     assert any("1 of 3" in r.getMessage() for r in caplog.records)
+
+
+def test_a_raising_worker_does_not_lose_the_other_documents(tmp_path, monkeypatch):
+    """Strands' graph is fail-fast, so one worker's exception cancelled its siblings.
+
+    Unguarded, that exception propagated out of `generate_batch` and every
+    `GeneratedDoc` was lost — including documents that had already rendered. main's
+    per-document try/except did not have this exposure.
+    """
+    monkeypatch.setattr(
+        batch_mod, "plan_scenarios",
+        lambda count, brief, **kw: [f"scenario-{i}" for i in range(count)],
+    )
+    monkeypatch.setattr(
+        batch_mod, "build_context",
+        lambda *, extra, output_dir, **kw: _ctx(str(tmp_path), extra.split("-")[-1]),
+    )
+
+    def fake_build_batch_graph(contexts, **kw):
+        # Two of the three documents render before the graph blows up.
+        for ctx in contexts[:2]:
+            os.makedirs(os.path.dirname(ctx.output_path), exist_ok=True)
+            with open(ctx.output_path, "wb") as f:
+                f.write(b"%PDF-1.4 rendered")
+
+        class _Graph:
+            def __call__(self, task):
+                raise RuntimeError("worker_2 exploded")
+
+        return _Graph(), [f"worker_{i}" for i in range(len(contexts))]
+
+    monkeypatch.setattr(batch_mod, "build_batch_graph", fake_build_batch_graph)
+
+    docs = batch_mod.generate_batch(
+        schema_dir=str(tmp_path), count=3, brief="b",
+        output_dir=str(tmp_path / "out"), verbose=False,
+    )
+
+    assert len(docs) == 3, "every scenario must still get a result"
+    assert sum(1 for d in docs if d.success) == 2, "rendered documents must survive"
+    failed = [d for d in docs if not d.success]
+    assert failed and "worker_2 exploded" in (failed[0].error or "")

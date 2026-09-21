@@ -114,5 +114,9 @@ class CoverageMetrics:
             results["combinatorial_2way"] = comb_cov
             scores.append(comb_cov)
 
-        results["overall_score"] = sum(scores) / len(scores) if scores else 1.0
+        # `0.0` when the schema declares fields but none were measurable: an entity
+        # whose data shares no columns with its schema scored 1.0 here and passed the
+        # quality gate. A schema with no fields at all is vacuously covered.
+        default = 1.0 if not schema.fields else 0.0
+        results["overall_score"] = sum(scores) / len(scores) if scores else default
         return results
