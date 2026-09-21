@@ -19,6 +19,8 @@ we do not add any semaphore/wave machinery on top of the graph.
 """
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.multiagent import GraphBuilder
@@ -32,14 +34,25 @@ from seed_data.stages.pipeline import (
     GeneratedDoc, build_context, build_pipeline_graph, result_from, PIPELINE_TASK,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class _ScenarioPlan(BaseModel):
     """Structured output from the scenario planner."""
     scenarios: list[str] = Field(description="Distinct, specific scenario briefs — one per document")
 
 
-def plan_scenarios(count: int, brief: str, model: str = "sonnet", session=None) -> list[str]:
-    """Turn one brief into ``count`` distinct, specific scenario strings."""
+def plan_scenarios(
+    count: int, brief: str, model: str = "sonnet", session=None,
+    *, seed: int | None = None, verbose: bool = True,
+) -> list[str]:
+    """Turn one brief into ``count`` distinct, specific scenario strings.
+
+    ``brief`` is the caller's raw brief. The determinism ``seed`` is folded in here
+    rather than by the caller so the seed instruction reaches only the planner: the
+    fallback below pads with ``brief``, and padding with a pre-seeded string wrote
+    "[Deterministic seed: N...]" into every document's generation guidance.
+    """
     system_prompt = (
         "You are a scenario planner for synthetic document generation. Given a "
         "high-level brief, produce exactly N distinct, specific scenario briefs — "
@@ -49,12 +62,35 @@ def plan_scenarios(count: int, brief: str, model: str = "sonnet", session=None) 
     )
     agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
     result = agent(
-        f"Brief: {brief}\n\nProduce exactly {count} distinct scenario briefs.",
+        f"Brief: {_seeded_brief(brief, seed)}\n\nProduce exactly {count} distinct scenario briefs.",
         structured_output_model=_ScenarioPlan,
     )
-    scenarios = list(result.structured_output.scenarios)
-    if len(scenarios) < count:  # defend against a short response
-        scenarios += [brief] * (count - len(scenarios))
+    # `structured_output` is None on a guardrail/content-filter refusal. Treated as
+    # zero scenarios so the padding below fills every slot with the raw brief: this
+    # function is sugar for "vary one brief N ways", and falling back to N copies of
+    # the brief still generates the N documents that were asked for. Unguarded,
+    # `.scenarios` raised an AttributeError that named neither the step nor the cause.
+    plan = result.structured_output
+    scenarios = list(plan.scenarios) if plan is not None else []
+
+    shortfall = count - len(scenarios)
+    if shortfall > 0:
+        # A warning, not just a print: the documents still generate and
+        # `BatchResult` will report N/N succeeded, so this degradation is otherwise
+        # invisible to a programmatic caller. `logs.configure_progress_logging`
+        # attaches a stderr handler, and an embedding host can capture the record.
+        cause = ("returned no structured output (likely a content-filter or "
+                 "guardrail refusal)" if plan is None
+                 else f"returned only {len(scenarios)} of {count} scenarios")
+        logger.warning(
+            "Scenario planning %s — padding %d document(s) with the unvaried brief; "
+            "those documents will not be diverse", cause, shortfall,
+        )
+        if verbose:
+            print(f"  Scenario planning {cause} — padding {shortfall} "
+                  "document(s) with the unvaried brief")
+        scenarios += [brief] * shortfall
+
     return scenarios[:count]
 
 
@@ -141,7 +177,11 @@ def generate_batch(
 
     if verbose:
         print(f"Planning {count} scenarios from brief: {brief}")
-    scenarios = plan_scenarios(count, _seeded_brief(brief, seed), model=models.batch, session=session)
+    # The raw brief, with `seed` passed alongside: `plan_scenarios` folds the seed
+    # into the planner prompt only, keeping it out of the padding fallback.
+    scenarios = plan_scenarios(
+        count, brief, model=models.batch, session=session, seed=seed, verbose=verbose,
+    )
     if verbose:
         for i, s in enumerate(scenarios):
             print(f"  [{i}] {s[:90]}")

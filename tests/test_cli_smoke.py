@@ -149,7 +149,7 @@ def test_plan_help_exits_clean():
     r = _run("plan", "--help")
     assert r.returncode == 0
     out = r.stdout
-    for flag in ("--name", "--output", "--quiet"):
+    for flag in ("--name", "--output", "--quiet", "--data-model"):
         assert flag in out, f"{flag} missing from plan --help"
 
 
@@ -159,13 +159,20 @@ def test_plan_requires_inputs():
     assert r.returncode == 2
 
 
+def test_plan_rejects_unknown_data_model():
+    """`plan` had no model flag at all, so extraction was stuck on the default."""
+    r = _run("plan", "some text", "--data-model", "not-a-model")
+    assert r.returncode == 2
+    assert "invalid choice" in r.stderr.lower()
+
+
 # --- generate-structured subcommand parses (no Bedrock) --------------------
 
 def test_generate_structured_help_exits_clean():
     r = _run("generate-structured", "--help")
     assert r.returncode == 0
     out = r.stdout
-    for flag in ("--rows", "--format", "--output", "--quiet"):
+    for flag in ("--rows", "--format", "--output", "--quiet", "--data-model"):
         assert flag in out, f"{flag} missing from generate-structured --help"
 
 
@@ -173,6 +180,13 @@ def test_generate_structured_requires_schema():
     # no positional schema -> argparse exits 2
     r = _run("generate-structured")
     assert r.returncode == 2
+
+
+def test_generate_structured_rejects_unknown_data_model():
+    """`generate-structured` had no model flag, so the whole pipeline was pinned."""
+    r = _run("generate-structured", "somefile.json", "--data-model", "not-a-model")
+    assert r.returncode == 2
+    assert "invalid choice" in r.stderr.lower()
 
 
 def test_generate_structured_bad_format_errors():
@@ -410,3 +424,138 @@ def test_deprecated_subcommands_are_not_advertised(old):
     """
     out = _run("--help").stdout
     assert f"  {old} " not in out
+
+
+# --- model flags reach the Generator, not just argparse ----------------------
+#
+# In-process rather than via `_run`: the subprocess tests above prove the flag
+# parses, which is not the same as it being wired. `plan` and `generate-structured`
+# previously built a bare `Generator()`, so there was nothing to wire — every other
+# subcommand took a model and these two silently used ModelConfig's default.
+
+def _fake_generator(captured):
+    """A Generator stand-in that records the ModelConfig it was constructed with."""
+    class _Schema:
+        entities = []
+        def model_dump_json(self, **kw): return "{}"
+
+    class _StructuredResult:
+        success = True
+        row_counts = {}
+        output_paths = []
+        evaluation = None
+
+    class _FakeGenerator:
+        def __init__(self, *, models=None, **kw):
+            captured["models"] = models
+
+        def plan(self, *inputs, **kw):
+            return _Schema()
+
+        def generate_structured(self, schema, **kw):
+            return _StructuredResult()
+
+    return _FakeGenerator
+
+
+def test_plan_passes_data_model_to_generator(monkeypatch, tmp_path):
+    from seed_data import __main__ as cli
+
+    captured = {}
+    monkeypatch.setattr("seed_data.Generator", _fake_generator(captured))
+    cli._plan(["some text", "--data-model", "haiku",
+               "--output", str(tmp_path / "schema.json")])
+
+    assert captured["models"].data == "haiku"
+
+
+def test_generate_structured_passes_data_model_to_generator(monkeypatch, tmp_path):
+    from seed_data import __main__ as cli
+
+    captured = {}
+    monkeypatch.setattr("seed_data.Generator", _fake_generator(captured))
+    cli._generate_structured(["somefile.json", "--data-model", "opus",
+                              "--output", str(tmp_path)])
+
+    assert captured["models"].data == "opus"
+
+
+@pytest.mark.parametrize("subcommand,argv", [
+    ("plan", ["some text"]),
+    ("generate-structured", ["somefile.json"]),
+])
+def test_new_model_flags_default_to_the_shared_data_model(monkeypatch, tmp_path, subcommand, argv):
+    """`plan` and `generate-structured` must default to the same model as everyone else.
+
+    Both built a bare `Generator()` before, so they silently ran ModelConfig's
+    `sonnet` while every other subcommand's `--data-model` defaulted to `gpt-oss` —
+    which made `plan` + `generate-structured` use a different model than the one-shot
+    `plan-and-generate` the docs present as their equivalent.
+    """
+    from seed_data import __main__ as cli
+
+    captured = {}
+    monkeypatch.setattr("seed_data.Generator", _fake_generator(captured))
+    handler = cli._plan if subcommand == "plan" else cli._generate_structured
+    handler([*argv, "--output", str(tmp_path / "out.json")])
+
+    assert captured["models"].data == cli.DEFAULT_DATA_MODEL
+
+
+def test_no_model_flag_hard_codes_its_default():
+    """Every model flag's default must be a named constant, not a string literal.
+
+    The invariant the constants exist to hold: five subcommands each hard-coded
+    "gpt-oss" for --data-model while `plan` and `generate-structured` had no flag and
+    ran ModelConfig's `sonnet`, so the same work used different models depending on
+    which subcommand you reached it through.
+
+    Checked by parsing the source rather than `--help` output: argparse does not print
+    defaults here and every constant's value is already in the `choices` list, so a
+    text assertion passes even when a subcommand reintroduces a literal.
+    """
+    import ast
+    import pathlib
+
+    from seed_data import __main__ as cli
+
+    tree = ast.parse(pathlib.Path(cli.__file__).read_text())
+    offenders = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_argument" and node.args):
+            continue
+        flag = node.args[0]
+        if not (isinstance(flag, ast.Constant) and isinstance(flag.value, str)
+                and flag.value.endswith("-model")):
+            continue
+        default = next((k.value for k in node.keywords if k.arg == "default"), None)
+        # A Name/Attribute is a constant reference; a str Constant is a literal.
+        if isinstance(default, ast.Constant) and isinstance(default.value, str):
+            offenders.append(f"{flag.value}={default.value!r}")
+
+    assert not offenders, f"model flags with hard-coded defaults: {offenders}"
+
+
+@pytest.mark.parametrize("subcommand", [
+    "plan", "generate-structured", "generate-documents",
+    "plan-and-generate", "infer-schema", "packet",
+])
+def test_every_subcommand_offers_data_model(subcommand):
+    """--data-model must be reachable from every subcommand that generates data."""
+    out = _run(subcommand, "--help").stdout
+    assert "--data-model" in out, f"{subcommand} has no --data-model"
+
+
+def test_infer_model_default_stays_vision_capable():
+    """--infer-model must not follow DEFAULT_DATA_MODEL onto a text-only model.
+
+    `gpt-oss` is `openai.gpt-oss-120b`, which cannot take image blocks, and the
+    vision path is what reads PDFs. This is why the infer role has its own default
+    sourced from `infer.DEFAULT_INFER_MODEL` rather than the CLI constants.
+    """
+    from seed_data import __main__ as cli
+    from seed_data.infer import DEFAULT_INFER_MODEL
+
+    assert DEFAULT_INFER_MODEL != cli.DEFAULT_DATA_MODEL
+    assert DEFAULT_INFER_MODEL == "sonnet"

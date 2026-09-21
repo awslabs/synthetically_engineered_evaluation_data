@@ -190,7 +190,13 @@ it. Feed it to `generate-structured` or `generate-documents`.
 | `inputs` | required | One or more free-text description(s), file paths/globs, and/or `s3://` URIs |
 | `--name` | `dataset` | Logical dataset name |
 | `--output` | `./schema.json` | Path to write the `InferredSchema` JSON |
+| `--data-model` | `gpt-oss` | Model for the schema-extraction agent |
 | `--quiet` | off | Suppress progress output |
+
+`--data-model` covers the schema-extraction agent, which handles free text, example
+data, JSON Schema, SQL DDL, and ERD inputs. Document and image inputs take a
+different route — the vision inference path — whose model is a separate role with
+its own vision-capable default; `infer-schema --infer-model` is where you set that.
 
 ## Single document
 
@@ -450,6 +456,8 @@ pyarrow.
 | `--rows` | `100` | Target records per entity |
 | `--format` | `csv` | `csv`, `parquet`, `excel`, or `json` |
 | `--output` | `./output` | Output directory |
+| `--data-model` | `gpt-oss` | Model for the structured-generation agents |
+| `--seed` | none | Seed the programmatic columns for reproducible output; free-text fields stay unseeded |
 | `--quiet` | off | Suppress progress output |
 
 ## Infer a schema from documents

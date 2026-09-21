@@ -8,7 +8,7 @@ address is "123 Main St". That judgement needs a model, which is exactly what
 doc-gen's critique loop already does for PDFs. This module points the same
 mechanism at tabular data.
 
-Mirrors :func:`seed_data.critique.critique_data`: a Strands ``Agent`` with the
+Mirrors :func:`seed_data.stages.data.critique`: a Strands ``Agent`` with the
 calculator tool and ``structured_output_model``, returning a plain dict so
 callers stay decoupled from the pydantic models.
 """

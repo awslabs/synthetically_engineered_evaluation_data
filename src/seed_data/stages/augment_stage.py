@@ -120,6 +120,22 @@ def build_critic(ctx: StageContext) -> FunctionNode:
         )
         accepted_now = result["verdict"] == "accepted"
 
+        # verdict="error" means the critic could not judge the augmentation (a
+        # guardrail refusal), not that the augmentation was poor. Re-running the
+        # augmentor cannot fix that: it would spend a full augraphy pass plus another
+        # vision critique per attempt, twice over, for the cap below to accept the
+        # same PDF anyway. Marked non-retryable, the graph stops here instead — the
+        # augmented PDF on disk is still reported, since `result_from` reads it from
+        # the filesystem rather than from this verdict.
+        if result["verdict"] == "error":
+            print(f"  Aug critic: {result.get('summary', 'critique unavailable')} "
+                  "— not retrying.")
+            return Verdict(
+                accepted=False, retryable=False, score=0,
+                summary=result.get("summary", "Augmentation critique unavailable."),
+                feedback=result.get("summary", "Augmentation critique unavailable."),
+            ).as_node_text()
+
         # Best-effort cap: after MAX_AUG_ATTEMPTS, accept the current augmented
         # PDF even if under threshold rather than loop back to the augmentor.
         if not accepted_now and attempts["n"] >= MAX_AUG_ATTEMPTS:

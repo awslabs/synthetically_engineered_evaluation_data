@@ -6,6 +6,17 @@ import time
 
 from dotenv import load_dotenv
 
+# Per-role CLI model defaults, named once so the subcommands cannot drift apart.
+# They had: every subcommand hard-coded "gpt-oss" for --data-model, but `plan` and
+# `generate-structured` had no flag at all and so ran ModelConfig's `sonnet` — which
+# meant `plan` + `generate-structured` used a different model than the one-shot
+# `plan-and-generate` documented as doing the same thing.
+DEFAULT_DATA_MODEL = "gpt-oss"
+DEFAULT_DOC_MODEL = "gpt-oss"
+DEFAULT_CRITIC_MODEL = "sonnet"
+DEFAULT_AUG_MODEL = "gpt-oss"
+DEFAULT_BATCH_MODEL = "nova2-lite"
+
 
 def _clone_schema_library(argv):
     """Handle the `clone-schema-library` subcommand."""
@@ -45,12 +56,12 @@ def _packet(argv):
                         help="Parallel workers for sub-documents within a packet")
     parser.add_argument("--shuffle", action="store_true",
                         help="Randomize sub-document order in the merged PDF")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--context-model", default="nova2-lite", choices=model_choices,
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--context-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
                         help="Model for shared-context resolution / planning")
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--augment", action="store_true")
@@ -103,8 +114,12 @@ def _infer_schema(argv):
     parser.add_argument("--name", required=True, help="Document-type name (schema title)")
     parser.add_argument("--output", required=True,
                         help="Directory to write the inferred schema.json + generation_guidance.md")
-    parser.add_argument("--infer-model", default="sonnet", choices=model_choices,
-                        help="Vision-capable model for inference (default: sonnet)")
+    # Sourced from the library default rather than a second literal: this is the
+    # vision role, and it must stay vision-capable, so it deliberately does not
+    # follow DEFAULT_DATA_MODEL/DEFAULT_DOC_MODEL (both text-only `gpt-oss`).
+    from seed_data.infer import DEFAULT_INFER_MODEL
+    parser.add_argument("--infer-model", default=DEFAULT_INFER_MODEL, choices=model_choices,
+                        help=f"Vision-capable model for inference (default: {DEFAULT_INFER_MODEL})")
     parser.add_argument("--max-docs", type=int, default=5,
                         help="Max example documents to feed the model (default: 5)")
     # Packet mode: input is ONE concatenated multi-document PDF. --name is the
@@ -124,11 +139,11 @@ def _infer_schema(argv):
     parser.add_argument("--count", type=int, default=1,
                         help="With --then-generate: number of docs (>1 = batch)")
     parser.add_argument("--scenario", default="", help="With --then-generate: scenario / diversity brief")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices)
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--augment", action="store_true")
@@ -235,8 +250,9 @@ def _plan(argv):
     """
 
     load_dotenv()
-    from seed_data import Generator
+    from seed_data import MODELS, Generator, ModelConfig
 
+    model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
         prog="seed-data plan",
         description="Ingest inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) "
@@ -248,10 +264,25 @@ def _plan(argv):
                         help="Logical dataset name (default: dataset)")
     parser.add_argument("--output", default="./schema.json",
                         help="Path to write the InferredSchema JSON (default: ./schema.json)")
+    # Only --data-model: it is the schema-extraction agent's model, and extraction is
+    # the only agent this subcommand chooses. Document/image inputs go to the vision
+    # path, whose model is a distinct role with its own default (infer.py's
+    # DEFAULT_INFER_MODEL) and must stay vision-capable — `seed-data infer-schema`
+    # exposes it as --infer-model.
+    #
+    # Defaulted to DEFAULT_DATA_MODEL, matching every other subcommand. This does
+    # change what a bare `seed-data plan` uses (it built `Generator()`, so it got
+    # ModelConfig's `sonnet`): keeping `sonnet` here would mean `plan` +
+    # `generate-structured` silently ran a different model than the one-shot
+    # `plan-and-generate` the docs present as their equivalent.
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices,
+                        help="Model for the schema-extraction agent "
+                             f"(default: {DEFAULT_DATA_MODEL}). Does not affect "
+                             "document/image inputs, which use the vision model.")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
-    gen = Generator()
+    gen = Generator(models=ModelConfig(data=args.data_model))
     try:
         schema = gen.plan(*args.inputs, name=args.name, verbose=not args.quiet)
     except (ValueError, FileNotFoundError) as e:
@@ -272,8 +303,9 @@ def _plan(argv):
 def _generate_structured(argv):
     """Handle the `generate-structured` subcommand — schema -> CSV/Parquet/Excel."""
     load_dotenv()
-    from seed_data import Generator
+    from seed_data import MODELS, Generator, ModelConfig
 
+    model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
         prog="seed-data generate-structured",
         description="Generate structured data from an InferredSchema.",
@@ -291,10 +323,16 @@ def _generate_structured(argv):
                         help="Seed the programmatic columns (numeric, enum, date, ID, "
                              "pattern) for reproducible output; free-text fields come "
                              "from an LLM and stay unseeded")
+    # `run_structured` drives every agent in the pipeline off `models.data`, so this
+    # one flag covers the whole subcommand. Defaulted to DEFAULT_DATA_MODEL so
+    # `plan` + `generate-structured` and the one-shot `plan-and-generate` agree.
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices,
+                        help="Model for the structured-generation agents "
+                             f"(default: {DEFAULT_DATA_MODEL})")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
-    gen = Generator(output_dir=args.output)
+    gen = Generator(output_dir=args.output, models=ModelConfig(data=args.data_model))
     try:
         result = gen.generate_structured(
             args.schema, rows=args.rows, format=args.format, seed=args.seed,
@@ -348,12 +386,12 @@ def _generate_documents(argv):
     parser.add_argument("--scenario", default="",
                         help="What to generate this run (>1 count: the theme to diversify)")
     parser.add_argument("--output", default="./output", help="Output directory")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices,
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
                         help="Model for planning batch scenarios")
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--augment", action="store_true")
@@ -465,11 +503,11 @@ def _plan_and_generate(argv):
                         help="documents only: which entity of a multi-entity schema to render")
     parser.add_argument("--augment", action="store_true",
                         help="documents only: apply image augmentation")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices)
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--threshold", type=int, default=5)
@@ -649,12 +687,12 @@ def main():
                         help="What to generate this run (>1 count: the theme to diversify)")
     parser.add_argument("--count", type=int, default=1,
                         help="Number of docs (>1 plans diverse scenarios and fans out)")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices,
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
                         help="Model for planning batch scenarios")
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"],
                         help="PDF rendering backend")

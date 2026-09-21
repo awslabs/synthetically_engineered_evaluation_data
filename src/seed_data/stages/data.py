@@ -109,7 +109,38 @@ def critique(ctx: StageContext) -> Verdict:
         "Validate this data. Use the calculator tool to verify all arithmetic.",
         structured_output_model=_LLMDataCritique,
     )
-    llm: _LLMDataCritique = result.structured_output
+    llm: _LLMDataCritique | None = result.structured_output
+    if llm is None:
+        # None on a guardrail/content-filter refusal. Returned as a Verdict rather
+        # than raised — that keeps the documented `-> Verdict` contract, and a raise
+        # would take down a document, or a whole batch sibling, over a failure of the
+        # *critic* rather than of the data.
+        #
+        # `retryable=False` because the data was never judged: the schema gates above
+        # already passed, so regenerating produces equally valid data for the same
+        # unwilling critic to refuse again. Marked retryable, this walked the retry
+        # edge and burned the node budget on ~7 pointless regenerations before the
+        # document failed anyway, never reaching the doc stage. Terminating here
+        # spends nothing and reports the real cause.
+        refusal = Verdict(
+            accepted=False, score=0, retryable=False,
+            summary="The critic model returned no structured verdict.",
+            feedback="The data could not be validated (likely a content-filter or "
+                     "guardrail refusal on the critique request, not a defect in "
+                     "the data). Critiquing with a different --critic-model may "
+                     "succeed; regenerating the data will not.",
+            issues=[CritiqueIssue(
+                category="completeness", severity="critical",
+                description="Critic model returned no structured output; data is unvalidated.",
+            )],
+        )
+        # Printed on the same path as a normal critique: an early return that says
+        # nothing leaves a failed run with no console explanation at all.
+        print(f"\n--- Data Critique ({ctx.models.critic}) ---")
+        print(f"  Score:   {refusal.score}/10 → not validated (no retry)")
+        print(f"  Summary: {refusal.summary}")
+        print("--- End Data Critique ---\n")
+        return refusal
 
     verdict = Verdict(
         accepted=llm.score >= ctx.threshold,

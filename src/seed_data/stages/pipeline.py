@@ -250,9 +250,25 @@ def result_from(ctx: StageContext, result, *, augment: bool = False) -> Generate
             execution_order=execution_order, token_usage=tokens,
         )
 
+    # Name the stage that stopped, when one left a verdict. A critic that could not
+    # judge (guardrail refusal -> retryable=False) halts the graph before the doc
+    # stage, so "PDF was not created" is true but says nothing about why; its summary
+    # is the only record of the real cause.
+    #
+    # "doc_loop", not `doc_stage.CRITIC_NAME`, for the same reason the success path
+    # above prefers it: `doc_critic` is a node of the *nested* loop graph, so it is
+    # never a key of the top-level result and looking it up here always missed —
+    # falling through to the accepted data verdict, which then failed the
+    # `not accepted` test and enriched nothing.
+    halted = (verdict_of(result, "doc_loop")
+              or verdict_of(result, data_stage.CRITIC_NAME))
+    error = "PDF was not created"
+    if halted is not None and not halted.accepted and halted.summary:
+        error = f"{error}: {halted.summary}"
+
     return GeneratedDoc(
         success=False, doc_id=doc_id, doctype=ctx.doctype,
         data_json_path=ctx.data_json_path, verdict="error",
         execution_order=execution_order, token_usage=tokens,
-        error="PDF was not created",
+        error=error,
     )

@@ -88,6 +88,14 @@ class Verdict(BaseModel):
     summary: str = ""
     feedback: str = ""
     issues: list[CritiqueIssue] = Field(default_factory=list)
+    # Whether regenerating could plausibly fix this. False marks a rejection the
+    # generator cannot act on — the critic itself failed (a guardrail refusal, no
+    # structured verdict), so the work under review was never judged. Without this
+    # the two-state `accepted` bool forced such a failure down the retry edge, and
+    # the loop regenerated already-valid work until the node budget ran out, every
+    # attempt reviewed by the same unwilling critic. Defaults True so an ordinary
+    # quality rejection keeps retrying, which is what the loop is for.
+    retryable: bool = True
 
     def as_node_text(self) -> str:
         """Serialize for a graph node's output message.
@@ -171,8 +179,15 @@ def accepted(node_name: str):
 
 
 def rejected(node_name: str):
-    """Edge condition: traverse when ``node_name`` emitted a rejecting Verdict."""
+    """Edge condition: traverse when ``node_name`` emitted a *retryable* rejection.
+
+    A rejection with ``retryable=False`` deliberately matches neither this condition
+    nor :func:`accepted`, so no edge fires and the graph stops at the critic. That is
+    the intended terminal state for a critic that could not judge the work: looping
+    would re-run the generator against the same failure, and accepting would pass off
+    unvalidated output as reviewed.
+    """
     def _cond(state):
         v = verdict_of(state, node_name)
-        return bool(v and not v.accepted)
+        return bool(v and not v.accepted and v.retryable)
     return _cond

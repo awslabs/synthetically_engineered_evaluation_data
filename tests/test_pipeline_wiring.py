@@ -60,3 +60,87 @@ def test_build_context_from_resolved(tmp_path):
     # a graph builds from a real build_context, in both modes
     build_pipeline_graph(ctx)
     build_pipeline_graph(ctx, augment=True)
+
+
+def test_failed_result_names_the_halting_critic():
+    """A terminal critic verdict must reach `GeneratedDoc.error`.
+
+    A critic that could not judge sets `retryable=False`, halting the graph before
+    the doc stage. `error` was a bare "PDF was not created", which is true but hides
+    the only record of the real cause — the critic's own summary.
+    """
+    import os
+    from seed_data.stages import pipeline as pipe
+    from seed_data.stages import data as data_stage
+    from seed_data.stages.base import StageContext, ModelConfig, Verdict
+
+    refusal = Verdict(
+        accepted=False, score=0, retryable=False,
+        summary="The critic model returned no structured verdict.",
+    )
+
+    class _NodeResult:
+        def get_agent_results(self):
+            return [refusal.as_node_text()]
+
+    class _Result:
+        results = {data_stage.CRITIC_NAME: _NodeResult()}
+        execution_order: list = []
+
+    ctx = StageContext(
+        schema_dict={"title": "widget"},
+        output_path=os.path.join("/nonexistent", "doc.pdf"),
+        data_json_path=os.path.join("/nonexistent", "doc.json"),
+        script_path=os.path.join("/nonexistent", "doc.html"),
+        models=ModelConfig(),
+    )
+
+    doc = pipe.result_from(ctx, _Result())
+    assert doc.success is False
+    assert "PDF was not created" in doc.error
+    assert "no structured verdict" in doc.error
+
+
+def test_failed_result_reads_the_doc_verdict_from_doc_loop():
+    """The doc-stage verdict must be looked up under "doc_loop", not "doc_critic".
+
+    `doc_critic` is a node of the *nested* loop graph, so it is never a key of the
+    top-level result. Looking it up here always missed and fell through to the data
+    critic's accepted verdict, which then failed the `not accepted` test — so a
+    doc-stage halt reported a bare "PDF was not created" with no cause.
+    """
+    import os
+    from seed_data.stages import pipeline as pipe
+    from seed_data.stages import data as data_stage
+    from seed_data.stages.base import StageContext, ModelConfig, Verdict
+
+    def _node(verdict):
+        class _NodeResult:
+            def get_agent_results(self):
+                return [verdict.as_node_text()]
+        return _NodeResult()
+
+    class _Result:
+        # Exactly the top-level shape Strands produces: the nested loop appears as
+        # "doc_loop" and `doc_critic` is nowhere to be found.
+        results = {
+            data_stage.CRITIC_NAME: _node(Verdict(accepted=True, score=8, summary="data ok")),
+            "doc_loop": _node(Verdict(
+                accepted=False, retryable=False, score=0,
+                summary="The doc critic returned no structured verdict.",
+            )),
+        }
+        execution_order: list = []
+
+    ctx = StageContext(
+        schema_dict={"title": "widget"},
+        output_path=os.path.join("/nonexistent", "doc.pdf"),
+        data_json_path=os.path.join("/nonexistent", "doc.json"),
+        script_path=os.path.join("/nonexistent", "doc.html"),
+        models=ModelConfig(),
+    )
+
+    doc = pipe.result_from(ctx, _Result())
+    assert "doc critic returned no structured verdict" in doc.error
+    # And it must not have reported the accepted data verdict instead.
+    assert "data ok" not in doc.error

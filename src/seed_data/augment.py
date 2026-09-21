@@ -295,6 +295,18 @@ def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: 
 
     result = agent(user_message, structured_output_model=CritiqueResult)
     critique = result.structured_output
+    if critique is None:
+        # None on a guardrail/content-filter refusal — `critique.score` below raised
+        # an AttributeError naming neither the step nor the cause. Reported as
+        # verdict="error", the same contract `evaluation.critique` uses for a
+        # reviewer that could not judge, so the caller sees a non-accepting verdict
+        # and a summary that says why. The augment loop's MAX_AUG_ATTEMPTS cap then
+        # accepts the best-effort PDF rather than retrying indefinitely.
+        summary = ("Augmentation critique unavailable: the critic returned no "
+                   "structured output (likely a content-filter or guardrail refusal).")
+        print(f"\n--- Aug Critique ({model}) ---\n  {summary}\n--- End Aug Critique ---\n")
+        return {"score": 0, "verdict": "error", "issues": [], "summary": summary}
+
     verdict = "accepted" if critique.score >= threshold else "rejected"
 
     print(f"\n--- Aug Critique ({model}) ---")
