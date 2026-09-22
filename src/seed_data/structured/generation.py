@@ -678,10 +678,25 @@ def _fill_string_fields_with_llm(
 
     total_count = len(partial_records)
     batch_size = 15  # Smaller batches since we're sending full record context
-    filled_idx = 0
+    filled_count = 0
 
+    # `continue` on a failed batch (rather than `break`) is right for a transient
+    # error, but wrong for a persistent one: a guardrail refusal or a bad model id
+    # fails identically every time, and retrying all 67 batches of a 1000-record
+    # entity spends 67 Bedrock calls to learn that once. Give up after this many
+    # *consecutive* failures — a working batch resets the count, so an intermittent
+    # throttle still gets the whole entity filled.
+    max_consecutive_failures = 3
     failed_batches = 0
+    consecutive_failures = 0
     for batch_start in range(0, total_count, batch_size):
+        if consecutive_failures >= max_consecutive_failures:
+            logger.warning(
+                "LLM string fill for %s: giving up after %d consecutive batch failures; "
+                "%d of %d records were filled",
+                entity_name, consecutive_failures, filled_count, total_count,
+            )
+            break
         batch = partial_records[batch_start:batch_start + batch_size]
 
         # Show only the fields that are filled (for context) + mark which are missing
@@ -713,9 +728,10 @@ def _fill_string_fields_with_llm(
                         for fname in fields_to_fill:
                             if fname in llm_values[i]:
                                 record[fname] = llm_values[i][fname]
-                filled_idx = batch_start + len(batch)
+                filled_count += len(batch)
+                consecutive_failures = 0
                 logger.info("LLM string batch: filled %d records for %s (total: %d/%d)",
-                            len(batch), entity_name, filled_idx, total_count)
+                            len(batch), entity_name, filled_count, total_count)
             else:
                 # `continue`, not `break`: one bad batch is not a reason to abandon the
                 # remaining ones. Breaking left every later record unfilled, and the
@@ -723,10 +739,12 @@ def _fill_string_fields_with_llm(
                 # the run still reported success.
                 logger.warning("LLM string batch returned no JSON list for %s", entity_name)
                 failed_batches += 1
+                consecutive_failures += 1
                 continue
         except Exception as e:
             logger.warning("LLM string batch failed for %s: %s", entity_name, e)
             failed_batches += 1
+            consecutive_failures += 1
             continue
 
     # Fallback for any unfilled records
@@ -752,8 +770,10 @@ def _fill_string_fields_with_llm(
             entity_name, fabricated, failed_batches,
         )
 
+    # `filled_count`, not the old running high-water mark: that was `batch_start +
+    # len(batch)`, so a mid-run failure still reported every earlier record as filled.
     logger.info("LLM filled string fields for %s: %d/%d records completed by LLM",
-                entity_name, filled_idx, total_count)
+                entity_name, filled_count, total_count)
 
     return partial_records
 

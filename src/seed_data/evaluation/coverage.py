@@ -114,9 +114,19 @@ class CoverageMetrics:
             results["combinatorial_2way"] = comb_cov
             scores.append(comb_cov)
 
-        # `0.0` when the schema declares fields but none were measurable: an entity
-        # whose data shares no columns with its schema scored 1.0 here and passed the
-        # quality gate. A schema with no fields at all is vacuously covered.
-        default = 1.0 if not schema.fields else 0.0
+        # An empty `scores` has two quite different causes, and keying the default off
+        # `schema.fields` alone conflated them:
+        #
+        #   (a) The data shares no columns with the schema — nothing was covered
+        #       because nothing matched. Scoring 1.0 let that pass the gate.
+        #   (b) The entity has no *measurable* coverage dimension: no enum column and
+        #       no numeric field with both bounds. A name/email/date entity is the
+        #       common case, and scoring it 0.0 against a 0.4 threshold failed every
+        #       such run through three generation retries and two schema revisions
+        #       before giving up — which is what keying off `schema.fields` did.
+        #
+        # So distinguish them by overlap, exactly as `fidelity` now does.
+        overlaps = any(f.name in data.columns for f in schema.fields)
+        default = 0.0 if (schema.fields and not overlaps) else 1.0
         results["overall_score"] = sum(scores) / len(scores) if scores else default
         return results

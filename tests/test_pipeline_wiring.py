@@ -227,6 +227,12 @@ def test_a_raise_after_rendering_does_not_discard_the_pdf(tmp_path):
         )
         doc = pipe.generate(schema_dir=str(schema_dir), verbose=False)
 
+    # The finished PDF must still be reported so the work is discoverable...
     assert doc.pdf_path == str(pdf_dir / "doc.pdf"), "the rendered PDF must be reported"
-    assert doc.success is True
+    # ...but the run did not complete, and `success=True` here was itself a defect:
+    # every CLI success branch prints the paths without ever printing `error` and
+    # exits 0, so a crashed run was reported as a clean one. (This assertion
+    # previously read `is True` — the test encoded the bug.)
+    assert doc.success is False
+    assert doc.verdict == "error"
     assert "augment node exploded" in (doc.error or "")

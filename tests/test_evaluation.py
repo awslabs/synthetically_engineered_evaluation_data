@@ -304,3 +304,88 @@ def test_integer_conformance_rejects_floats_and_bools():
     assert metrics._conforms_to_type(4.0, "integer") is True      # integral float is fine
     assert metrics._conforms_to_type(3.7, "integer") is False
     assert metrics._conforms_to_type(True, "integer") is False
+
+
+# --- review round 6: repairing the round-5 overcorrections --------------------
+
+def test_text_only_entity_is_not_penalized_for_having_no_coverage_dimension():
+    """The round-5 "nothing examined -> 0.0" fix overcorrected.
+
+    `scores` is empty for any entity with no enum column and no fully-bounded numeric
+    field — a name/email/date entity, i.e. the common case — not only for the
+    schema/data mismatch it was aimed at. Scoring 0.0 against the 0.4 threshold failed
+    every such run through 3 generation retries and 2 schema revisions.
+    """
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "P", "description": "p", "fields": [
+            {"name": "name", "type": "string"},
+            {"name": "email", "type": "email"},
+            {"name": "joined", "type": "date"}]}]})
+
+    report = run_evaluation({"P": [
+        {"name": "Ada", "email": "a@b.c", "joined": "2024-01-01"},
+        {"name": "Bo", "email": "b@b.c", "joined": "2024-02-01"}]}, schema)
+
+    assert report.overall_coverage_score == 1.0
+    assert report.passes_quality_gate is True
+
+
+def test_fk_only_junction_table_is_not_a_total_violation():
+    """Same overcorrection in fidelity: `total_cells == 0` also means "all FKs".
+
+    Every field of `OrderItem(order_id, product_id)` is skipped as a foreign key, so
+    there is nothing to constraint-check — scoring it 1.0 violations (fidelity 0.0 vs
+    a 0.6 threshold) failed a perfectly good entity.
+    """
+    from seed_data.evaluation.fidelity import FidelityMetrics
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "OrderItem", "description": "oi", "fields": [
+            {"name": "order_id", "type": "integer"},
+            {"name": "product_id", "type": "integer"}],
+        "structured_relationships": [
+            {"source_entity": "OrderItem", "source_field": "order_id",
+             "target_entity": "Order", "target_field": "id", "cardinality": "one_to_many"},
+            {"source_entity": "OrderItem", "source_field": "product_id",
+             "target_entity": "Product", "target_field": "id", "cardinality": "one_to_many"}]}]})
+    data = pd.DataFrame([{"order_id": 1, "product_id": 10}, {"order_id": 2, "product_id": 11}])
+
+    assert FidelityMetrics().constraint_violation_rate(data, schema.entities[0]) == 0.0
+
+
+def test_genuine_schema_data_mismatch_still_fails_the_gate():
+    """The repair above must not restore the original blind spot."""
+    from seed_data.evaluation.metrics import run_evaluation
+    from seed_data.schema.models import InferredSchema
+
+    schema = InferredSchema.model_validate({"entities": [{
+        "entity_name": "C", "description": "c", "fields": [
+            {"name": "id", "type": "integer"}, {"name": "email", "type": "email"}]}]})
+
+    report = run_evaluation({"C": [{"foo": 1}, {"foo": 2}]}, schema)
+    assert report.passes_quality_gate is False
+    assert report.overall_quality_score < 0.5
+
+
+def test_evaluator_scores_against_the_parameters_the_generator_used():
+    """A `std: 0` spec is generated with `positive_param`'s 1.0 substitution.
+
+    The round-5 degenerate-KS fix read the spec raw, so it scored spread data — which
+    is what the generator correctly produced — as a ~1.0 distance from a step
+    function, dragging fidelity to the threshold for data that was fine.
+    """
+    from seed_data.evaluation.fidelity import FidelityMetrics
+    from seed_data.schema.models import EntitySchema
+
+    schema = EntitySchema.model_validate({"entity_name": "T", "description": "t", "fields": [
+        {"name": "amount", "type": "float",
+         "distribution": {"type": "normal", "params": {"mean": 100, "std": 0}}}]})
+    # The spread the generator actually produces for that spec (std substituted to 1.0).
+    data = pd.DataFrame([{"amount": v} for v in [99.2, 100.1, 100.8, 99.5, 100.4]])
+
+    result = FidelityMetrics().overall_fidelity_score(data, schema)
+    assert result["overall_score"] > 0.6, result

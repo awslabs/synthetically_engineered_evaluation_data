@@ -42,9 +42,22 @@ class RecordValidator:
             if entity_schema is None:
                 continue
 
+            # An FK column copies its parent's key verbatim, so a type mismatch there
+            # is a *schema* defect (the FK's declared type disagrees with the PK's
+            # actual values), not a value defect. Marking it fixable let
+            # `_correct_type` rewrite every FK to `min_value or 0`, which destroys
+            # referential integrity — strictly worse than the mismatch it "fixed".
+            fk_fields = {
+                rel.source_field
+                for rel in entity_schema.structured_relationships
+                if rel.source_entity == entity_name
+            }
+
             total_records += len(records)
             for idx, record in enumerate(records):
-                record_violations = self._validate_record(record, idx, entity_name, entity_schema)
+                record_violations = self._validate_record(
+                    record, idx, entity_name, entity_schema, fk_fields
+                )
                 violations.extend(record_violations)
 
             violations.extend(self._validate_uniqueness(records, entity_name, entity_schema))
@@ -121,7 +134,8 @@ class RecordValidator:
         return violations
 
     def _validate_record(
-        self, record: dict, idx: int, entity_name: str, schema: EntitySchema
+        self, record: dict, idx: int, entity_name: str, schema: EntitySchema,
+        fk_fields: set[str] | None = None,
     ) -> list[Violation]:
         """Validate a single record against its entity schema."""
         violations = []
@@ -144,7 +158,9 @@ class RecordValidator:
                     )
                 continue
 
-            type_violation = self._check_type(value, field, entity_name, idx)
+            type_violation = self._check_type(
+                value, field, entity_name, idx, bool(fk_fields and field.name in fk_fields)
+            )
             if type_violation:
                 violations.append(type_violation)
                 continue
@@ -154,7 +170,9 @@ class RecordValidator:
 
         return violations
 
-    def _check_type(self, value, field: FieldDefinition, entity: str, idx: int) -> Violation | None:
+    def _check_type(
+        self, value, field: FieldDefinition, entity: str, idx: int, is_fk: bool = False
+    ) -> Violation | None:
         """Check type conformance."""
         try:
             if field.type == "integer":
@@ -177,7 +195,9 @@ class RecordValidator:
                 violation_type="type_error",
                 actual_value=str(value),
                 constraint=f"Expected type '{field.type}'",
-                fixable=field.type in ("integer", "float"),
+                # Never fixable for an FK: see the comment where `fk_fields` is built.
+                # The violation is still reported so the mismatch is visible.
+                fixable=(not is_fk) and field.type in ("integer", "float"),
             )
         return None
 

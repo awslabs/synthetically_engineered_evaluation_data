@@ -5,6 +5,7 @@ import pandas as pd
 
 from seed_data.evaluation.diversity import _hashable
 from seed_data.schema.models import DistributionType, EntitySchema, FieldDefinition
+from seed_data.structured.distributions.generator import positive_param, scalar_param
 
 
 def _is_missing(value) -> bool:
@@ -62,11 +63,23 @@ class FidelityMetrics:
                     violations += 1
 
         if total_cells == 0:
-            # No overlap between schema and data is not a perfect result — it means
-            # the generated records share no columns with the schema at all, which
-            # scored 1.0 fidelity / 1.0 coverage / 1.0 conformance and passed the
-            # gate with no issue recorded. Treated as a total violation instead.
-            return 1.0 if schema.fields else 0.0
+            # Two different situations reach here, and conflating them was a defect in
+            # both directions:
+            #
+            #   (a) No schema field appears in the data at all — the records share no
+            #       columns with their schema. Scoring that 0.0 violations reported
+            #       perfect fidelity for data that matches nothing, and it passed the
+            #       gate with no issue recorded.
+            #   (b) Every field that *is* present was skipped as a foreign key. That is
+            #       an ordinary junction table (`OrderItem(order_id, product_id)`);
+            #       there is simply nothing for this metric to check, and scoring it a
+            #       total violation failed a perfectly good entity.
+            #
+            # So key off overlap, not off the counter.
+            present = [f for f in schema.fields if f.name in data.columns]
+            if schema.fields and not present:
+                return 1.0
+            return 0.0
         return violations / total_cells
 
     def _violates_constraint(self, value, field: FieldDefinition) -> bool:
@@ -199,9 +212,15 @@ class FidelityMetrics:
 
             series = data[field.name]
             if field.distribution.type == DistributionType.NORMAL:
-                mean = field.distribution.params.get("mean", 0.0)
-                std = field.distribution.params.get("std", 1.0)
-                ks = self.distribution_distance_ks(series, float(mean), float(std))
+                # Read through the *same* helpers the generator uses, so the evaluator
+                # scores against the parameters that were actually sampled from. Read
+                # raw, a spec of `{"mean": 100, "std": 0}` was generated with
+                # `positive_param`'s 1.0 substitution — producing spread data — and then
+                # scored here as a degenerate distribution, giving ~1.0 KS distance and
+                # dragging fidelity to the threshold for data that was fine.
+                mean = scalar_param(field.distribution.params, "mean", 0.0)
+                std = positive_param(field.distribution.params, "std", 1.0)
+                ks = self.distribution_distance_ks(series, mean, std)
                 results["distribution_distances"][field.name] = {"ks_statistic": ks}
                 dist_scores.append(1.0 - ks)
 

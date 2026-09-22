@@ -1283,3 +1283,88 @@ def test_export_failure_message_is_not_replaced():
 
     assert "pyarrow" in (result.error or ""), result.error
     assert "filtered by validation" not in (result.error or "")
+
+
+def test_string_fk_survives_correction():
+    """A type error on an FK must not be "fixable".
+
+    `_as_float` leaving the string in place only helps if nothing rewrites it. The
+    validator marked the resulting type_error `fixable=True`, and `_correct_type`
+    coerced it to `min_value or 0` — turning every FK in the column into 0 and
+    destroying referential integrity, which is worse than the mismatch it "fixed".
+    """
+    from seed_data.schema.models import InferredSchema
+    from seed_data.structured.postprocessing.corrector import RecordCorrector
+    from seed_data.structured.postprocessing.validator import RecordValidator
+
+    schema = InferredSchema.model_validate({"entities": [
+        {"entity_name": "Customer", "description": "c",
+         "fields": [{"name": "id", "type": "string"}]},
+        {"entity_name": "Order", "description": "o", "fields": [
+            {"name": "id", "type": "integer"},
+            {"name": "customer_id", "type": "float"}],   # declared type disagrees with the PK
+         "structured_relationships": [{
+             "source_entity": "Order", "source_field": "customer_id",
+             "target_entity": "Customer", "target_field": "id",
+             "cardinality": "one_to_many"}]}]})
+    data = {"Customer": [{"id": "CUS-0001"}, {"id": "CUS-0002"}],
+            "Order": [{"id": 1, "customer_id": "CUS-0001"},
+                      {"id": 2, "customer_id": "CUS-0002"}]}
+
+    report = RecordValidator().validate_dataset(data, schema)
+    fk_type_errors = [v for v in report.violations
+                      if v.field == "customer_id" and v.violation_type == "type_error"]
+    assert fk_type_errors, "the mismatch must still be reported"
+    assert all(not v.fixable for v in fk_type_errors), "an FK must never be auto-corrected"
+
+    corrected = RecordCorrector(seed=1).correct_dataset(data, report.violations, schema)
+    assert [r["customer_id"] for r in corrected["Order"]] == ["CUS-0001", "CUS-0002"]
+
+
+def test_persistent_fill_failure_gives_up_but_intermittent_does_not():
+    """`break` -> `continue` needed a bound.
+
+    A guardrail refusal or bad model id fails identically every time, so retrying all
+    67 batches of a 1000-record entity spends 67 Bedrock calls to learn that once. A
+    working batch must reset the counter so a scattered throttle still completes.
+    """
+    from unittest.mock import patch
+    from seed_data.schema.models import EntitySchema
+    from seed_data.structured.generation import _fill_string_fields_with_llm
+
+    schema = EntitySchema.model_validate({"entity_name": "T", "description": "t", "fields": [
+        {"name": "notes", "type": "string", "required": True}]})
+
+    def _run(agent_cls, n_records=100):
+        records = [{"id": i} for i in range(n_records)]
+        with patch("seed_data.structured.generation.Agent", agent_cls), \
+             patch("seed_data.structured.generation._bulk_generation_model", lambda *a, **k: None):
+            _fill_string_fields_with_llm("T", schema, records, [], ["notes"])
+
+    calls = {"n": 0}
+
+    class _AlwaysFails:
+        def __init__(self, *a, **k): pass
+        def __call__(self, *a, **k):
+            calls["n"] += 1
+            raise RuntimeError("guardrail refusal")
+
+    _run(_AlwaysFails)
+    assert calls["n"] == 3, f"must stop after 3 consecutive failures, made {calls['n']} calls"
+
+    flaky = {"n": 0}
+
+    class _Flaky:
+        def __init__(self, *a, **k): pass
+        def __call__(self, *a, **k):
+            flaky["n"] += 1
+            if flaky["n"] in (2, 4):
+                raise RuntimeError("throttled")
+
+            class _Result:
+                def __str__(self):
+                    return "[" + ",".join(['{"notes":"ok"}'] * 15) + "]"
+            return _Result()
+
+    _run(_Flaky)
+    assert flaky["n"] == 7, f"scattered failures must not abort, made {flaky['n']} calls"

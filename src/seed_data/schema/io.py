@@ -275,6 +275,22 @@ def _enum_base_from_values(values: list) -> str:
     return "string"
 
 
+def _to_bool(value: str) -> bool:
+    """Parse a stringified boolean, raising on anything else.
+
+    ``bool("False")`` is ``True``, so the string form has to be inspected. Raising
+    (rather than returning False for unknown input) is deliberate: it is what makes
+    the caller's "the recorded base type no longer describes these values" bail-out
+    reachable.
+    """
+    lowered = str(value).strip().lower()
+    if lowered in ("true", "1"):
+        return True
+    if lowered in ("false", "0"):
+        return False
+    raise ValueError(f"not a boolean: {value!r}")
+
+
 #: Casters for restoring a stringified enum to its declared JSON type. Keyed by both
 #: the draft-07 name and the semantic alias, because ``enum_base_type`` can hold
 #: either — ``_parse_property`` records the JSON name, but an LLM-built
@@ -289,8 +305,11 @@ _ENUM_CASTERS: dict[str, "callable"] = {
     "double": float,
     "decimal": float,
     # `bool("False")` is True, so parse the string form rather than calling bool().
-    "boolean": lambda v: str(v).strip().lower() in ("true", "1"),
-    "bool": lambda v: str(v).strip().lower() in ("true", "1"),
+    # Raises on anything unrecognized, which is what lets `_coerce_enum_values`' bail-out
+    # fire: a total function here meant the bail-out was unreachable and every
+    # unparseable member was silently coerced to False.
+    "boolean": _to_bool,
+    "bool": _to_bool,
 }
 
 
@@ -310,6 +329,13 @@ def _coerce_enum_values(values: list, base_type: str | None) -> list:
 
     coerced = []
     for value in values:
+        # `FieldDefinition.enum_values` records a null member as the string "None"
+        # (see the field validator), so restore it rather than feeding it to a caster:
+        # the boolean caster turned it into `False`, which both invents a value the
+        # source schema never allowed and drops the null the schema did allow.
+        if value == "None":
+            coerced.append(None)
+            continue
         try:
             coerced.append(caster(value))
         except (TypeError, ValueError):

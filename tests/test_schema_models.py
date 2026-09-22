@@ -461,3 +461,21 @@ def test_guidance_is_written_as_utf8(tmp_path, monkeypatch):
     to_schema_dir(schema, str(dest))
     written = (dest / "generation_guidance.md").read_text(encoding="utf-8")
     assert "—" in written
+
+
+def test_boolean_enum_preserves_its_null_member():
+    """`enum_values` records null as the string "None"; the caster ate it.
+
+    The boolean caster was total (`in ("true","1")`), so "None" became `False` — which
+    invents a value the source never allowed and drops the null it did. Being total
+    also meant `_coerce_enum_values`' bail-out was unreachable.
+    """
+    from seed_data.schema.io import _coerce_enum_values, to_json_schema
+
+    assert _coerce_enum_values(["True", "False", "None"], "boolean") == [True, False, None]
+    # And an unparseable member now reaches the bail-out instead of silently coercing.
+    assert _coerce_enum_values(["yes", "no"], "boolean") == ["yes", "no"]
+
+    inferred = from_json_schema({"title": "T", "type": "object",
+                                 "properties": {"flag": {"enum": [True, False, None]}}})
+    assert to_json_schema(inferred)["properties"]["flag"]["enum"] == [True, False, None]

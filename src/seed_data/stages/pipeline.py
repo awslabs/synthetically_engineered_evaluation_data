@@ -244,9 +244,20 @@ def generate(
         # failure when there is genuinely no document.
         if os.path.exists(ctx.output_path):
             doc = result_from(ctx, _EMPTY_RESULT, augment=augment)
+            # `success=False`, even though the PDF exists and `pdf_path` is reported.
+            # The run did not complete, and every CLI success branch prints the paths
+            # without ever printing `error` and exits 0 — so leaving `success=True`
+            # here reported a crashed run as a clean one. Keeping `pdf_path` populated
+            # means the finished work is still discoverable; `success` answers "did
+            # this run do what it was asked", which it did not.
             return doc.model_copy(update={
+                "success": False,
                 "verdict": "error",
-                "error": f"Pipeline raised after the document was produced: {e}",
+                "error": (
+                    f"Pipeline raised after the document was produced: {e}. "
+                    f"The PDF at {ctx.output_path} is complete and usable; "
+                    "token usage is unavailable because the graph did not return."
+                ),
             })
         return GeneratedDoc(
             success=False, doc_id=doc_id, doctype=ctx.doctype,
