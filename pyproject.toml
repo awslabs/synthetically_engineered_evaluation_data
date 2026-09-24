@@ -22,14 +22,17 @@ dependencies = [
     # which current reportlab (4.5.x) does not provide -> ImportError in the render
     # tool. 0.2.17 fixed that import; require it. See seed_data/tools.py.
     "xhtml2pdf>=0.2.17",
-    "weasyprint",
+    # Security floor: <70.0 has an SSRF when rendering untrusted HTML.
+    "weasyprint>=70.0",
     "pillow",
     "python-dotenv",
     "boto3",
     "jinja2",
     "augraphy",
     "pypdfium2",
-    "pypdf",
+    # Security floor: <6.16.1 has several DoS issues (unbounded memory/runtime
+    # and an infinite loop) on crafted PDFs — and this package reads user PDFs.
+    "pypdf>=6.16.1",
     "opencv-python",
     "pyyaml",
 ]
@@ -58,7 +61,7 @@ dev = [
     "pytest",
     "ruff>=0.15,<0.16",
     "mkdocs",
-    "mkdocs-material",
+    "mkdocs-material>=9.7.7",  # security floor: DOM XSS in search suggestions
     "mkdocs-awesome-nav",
     "mkdocstrings-python",
     "pymdown-extensions",
@@ -125,7 +128,7 @@ lint = [
 ]
 docs = [
     "mkdocs",
-    "mkdocs-material",
+    "mkdocs-material>=9.7.7",  # security floor: DOM XSS in search suggestions
     "mkdocs-awesome-nav",
     "mkdocstrings-python",
     "pymdown-extensions",

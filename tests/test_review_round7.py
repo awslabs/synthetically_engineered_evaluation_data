@@ -307,6 +307,6 @@ def test_generator_session_reaches_every_packet_model():
          patch("seed_data.stages.pipeline.generate", fake_generate), \
          patch("seed_data.api.Generator._resolve_packet", lambda self, p: "/x"), \
          patch("seed_data.packet.load_packet_config", lambda d: PacketConfig(
-             name="t", description="", documents=[DocumentSpec(document_class="w2", schema_dir="/tmp")])):
+             name="t", description="", documents=[DocumentSpec(document_class="w2", schema_dir="/nonexistent")])):
         Generator(session=sentinel).generate_packet("t")
     assert seen["ctx"] is sentinel and seen["gen"] is sentinel

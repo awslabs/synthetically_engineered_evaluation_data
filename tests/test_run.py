@@ -43,14 +43,14 @@ def schema():
 def structured_result(schema):
     return StructuredResult(
         success=True, schema=schema, format="csv",
-        output_paths=["/tmp/out/Order.csv"], row_counts={"Order": 100},
+        output_paths=["/nonexistent/out/Order.csv"], row_counts={"Order": 100},
     )
 
 
 def _doc(success=True):
     return GeneratedDoc(
         doc_id="abcd1234", doctype="Order", success=success, verdict="ACCEPT",
-        score=9, pdf_path="/tmp/out/doc.pdf",
+        score=9, pdf_path="/nonexistent/out/doc.pdf",
     )
 
 
