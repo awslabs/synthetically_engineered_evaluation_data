@@ -144,7 +144,7 @@ def test_adapter_guidance_passthrough():
 
 
 def test_adapter_sample_pdfs_passthrough():
-    samples = ["/tmp/a.pdf", "/tmp/b.pdf"]
+    samples = ["/nonexistent/a.pdf", "/nonexistent/b.pdf"]
     assert inferred_to_resolved(
         _entity([FieldDefinition(name="f", type="string")]), sample_pdfs=samples,
     )[2] == samples
