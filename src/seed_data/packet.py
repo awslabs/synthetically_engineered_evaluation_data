@@ -23,7 +23,7 @@ from typing import Any
 
 import pypdf
 
-from seed_data.utils import load_schema_dir, make_model
+from seed_data.utils import load_schema_dir, make_model, safe_path_segment
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +142,7 @@ def resolve_shared_context(
     config: PacketConfig,
     extra: str = "",
     model: str = "nova2-lite",
+    session=None,
 ) -> dict[str, Any]:
     """Resolve shared context fields for a packet.
 
@@ -158,19 +159,17 @@ def resolve_shared_context(
     Returns:
         Dictionary of shared context field names → generated values.
     """
-    from pydantic import BaseModel, Field
-    from strands import Agent
 
     # Gather schema summaries for the LLM
     schema_summaries = _collect_schema_summaries(config)
 
     if config.shared_context:
         return _generate_values_for_explicit_context(
-            config, schema_summaries, extra, model,
+            config, schema_summaries, extra, model, session=session,
         )
 
     return _infer_and_generate_context(
-        config, schema_summaries, extra, model,
+        config, schema_summaries, extra, model, session=session,
     )
 
 
@@ -192,12 +191,13 @@ def _generate_values_for_explicit_context(
     schema_summaries: str,
     extra: str,
     model: str,
+    session=None,
 ) -> dict[str, Any]:
     """Generate values for explicitly defined shared context fields."""
     from strands import Agent
 
     agent = Agent(
-        model=make_model(model),
+        model=make_model(model, session=session),
         system_prompt=(
             "You generate realistic shared context values for a document packet. "
             "Be highly creative and diverse — vary names, ethnicities, locations, occupations, "
@@ -236,12 +236,13 @@ def _infer_and_generate_context(
     schema_summaries: str,
     extra: str,
     model: str,
+    session=None,
 ) -> dict[str, Any]:
     """Infer shared fields from schemas, then generate values."""
     from strands import Agent
 
     agent = Agent(
-        model=make_model(model),
+        model=make_model(model, session=session),
         system_prompt=(
             "You analyze document schemas to find fields that should be consistent "
             "across related documents, then generate realistic values. "
@@ -288,7 +289,7 @@ def _parse_json_from_response(text: str) -> dict[str, Any]:
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
         # Remove first line (```json) and last line (```)
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         cleaned = "\n".join(lines)
     try:
         return json.loads(cleaned)
@@ -325,6 +326,7 @@ def generate_packet(
     critic_samples: bool = True,
     renderer: str = "xhtml2pdf",
     enable_preview: bool = False,
+    session=None,
 ) -> PacketResult:
     """Generate a single packet: resolve context, generate docs, merge, emit labels.
 
@@ -360,7 +362,9 @@ def generate_packet(
     # Step 1: Resolve shared context
     if shared_context is None:
         print(f"  Resolving shared context for packet {packet_id}...")
-        shared_context = resolve_shared_context(config, extra=extra, model=context_model)
+        shared_context = resolve_shared_context(
+            config, extra=extra, model=context_model, session=session,
+        )
 
     # Save shared context for reproducibility
     context_path = os.path.join(workspace_dir, "shared_context.json")
@@ -389,6 +393,11 @@ def generate_packet(
         augment=augment,
         critic_samples=critic_samples,
         renderer=renderer,
+        # Flows via **generate_kwargs into `stages.pipeline.generate(session=...)`.
+        # `Generator(session=...)` documents in-process credentials for every
+        # modality; packets were the one path that silently dropped it and fell
+        # back to ambient env credentials.
+        session=session,
     )
 
     # Step 4: Optionally shuffle order
@@ -530,9 +539,20 @@ def _generate_subdocuments(
         )
         combined_extra = "\n\n".join(filter(None, [extra, context_instructions]))
 
+        # `document_class` is model-supplied — `packet_infer` writes whatever the
+        # vision model labelled the segment straight into packet.json — and it is
+        # about to become a path component. Lowercasing and replacing spaces left
+        # separators and `..` intact, so a class of "../../../../tmp/pwned" escaped
+        # the output tree and the makedirs below created it. Its sibling
+        # `schema_dir_name` was already sanitized this way; this is the same
+        # treatment, applied here so a hand-written or previously-generated
+        # packet.json is guarded too.
         doc_output_dir = os.path.join(
             workspace_dir,
-            planned_doc.document_class.lower().replace(" ", "-"),
+            safe_path_segment(
+                planned_doc.document_class.lower().replace(" ", "-"),
+                f"document-{index + 1}",
+            ),
         )
         os.makedirs(doc_output_dir, exist_ok=True)
 

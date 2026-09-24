@@ -8,7 +8,7 @@ import shutil
 from strands.models import BedrockModel
 from botocore.config import Config
 
-from seed_data import MODELS
+from seed_data.model_registry import MODELS
 from seed_data.session import get_boto_session
 
 # GitHub location of the schema library, for docs and CLI messaging.
@@ -64,13 +64,18 @@ def sha256_file(path: str) -> str:
 
 
 def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
-               session=None) -> BedrockModel:
+               session=None, temperature: float | None = None) -> BedrockModel:
     """Create a BedrockModel from a MODELS key or raw model ID.
 
     ``model_key`` may be a key in ``MODELS`` or a raw Bedrock model ID (for region
     portability, e.g. an EU/GovCloud inference profile). ``session`` is an optional
     boto3 Session for in-process use (containers, Lambda, AgentCore); if omitted,
     one is resolved from the environment via ``get_boto_session``.
+
+    ``temperature`` is optional so the structured/ingest agents — which each run at
+    their own sampling temperature — can come through this factory rather than
+    constructing ``BedrockModel`` themselves. This is the only place ``boto_session``
+    is wired, so a call site that bypasses it silently ignores the caller's session.
     """
     import warnings
 
@@ -97,6 +102,9 @@ def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
         "boto_client_config": BOTO_CONFIG,
         "max_tokens": max_tokens,
     }
+
+    if temperature is not None:
+        kwargs["temperature"] = temperature
 
     # Some models don't support streaming with tool use
     if entry and entry.get("streaming") is False:
@@ -133,3 +141,24 @@ def load_schema_dir(schema_dir: str) -> tuple[dict, str, list[str]]:
     sample_pdfs = sorted(glob.glob(os.path.join(samples_dir, "*.pdf"))) if os.path.isdir(samples_dir) else []
 
     return schema, "\n\n---\n\n".join(steering_parts), sample_pdfs
+
+
+def safe_path_segment(name: str, fallback: str) -> str:
+    """Reduce a model-supplied name to a single safe path segment.
+
+    Any name that reaches the filesystem having come from a model is untrusted:
+    ``../../../../tmp/pwned`` joined onto an output directory escapes it, and
+    ``os.makedirs`` will happily create the result. Keeps only the basename, maps
+    anything outside ``[alnum]-_`` to ``-``, strips leading/trailing dots and
+    dashes, and substitutes ``fallback`` when nothing usable is left (an empty
+    segment would write into the parent instead of a subdirectory).
+
+    Shared by ``packet_infer`` (for ``schema_dir_name``, at inference time) and
+    ``packet`` (for ``document_class``, at generation time). Both are needed:
+    sanitizing only at inference leaves a hand-written or previously-generated
+    ``packet.json`` unguarded, so the check belongs at every point a name becomes
+    a path.
+    """
+    base = os.path.basename(name.strip().replace("\\", "/").rstrip("/"))
+    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in base).strip("-.")
+    return cleaned or fallback

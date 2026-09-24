@@ -377,4 +377,41 @@ if __name__ == "__main__":
     test_load_inference_result()
     test_load_inference_result_missing()
     test_write_packet_manifest()
-    print(f"\nAll packet tests passed.")
+    print("\nAll packet tests passed.")
+
+
+def test_document_class_cannot_escape_the_output_tree():
+    """`document_class` is model-supplied and becomes a path component.
+
+    `packet_infer` writes whatever the vision model labelled a segment straight into
+    packet.json, and `_generate_subdocuments` joined it onto the workspace dir after
+    only lowercasing and replacing spaces — so "../../../../tmp/pwned" escaped the
+    output tree and os.makedirs created it. Its sibling `schema_dir_name` was already
+    sanitized; this is the same treatment at the point the name becomes a path.
+    """
+    import os
+    from seed_data.utils import safe_path_segment
+
+    workspace = "/work/packet"
+    hostile = [
+        "../../../../tmp/pwned", "../../etc", "..", "", "   ",
+        "/abs/path", "a/b/c", "..\\..\\windows",
+    ]
+    for name in hostile:
+        segment = safe_path_segment(name.lower().replace(" ", "-"), "document-1")
+        resolved = os.path.normpath(os.path.join(workspace, segment))
+        assert resolved.startswith(workspace + os.sep), f"{name!r} escaped to {resolved}"
+        assert os.sep not in segment, f"{name!r} produced a multi-segment path: {segment!r}"
+
+    # Ordinary labels must be untouched apart from the existing slug treatment.
+    assert safe_path_segment("loan-application", "fb") == "loan-application"
+    assert safe_path_segment("pay-stub", "fb") == "pay-stub"
+
+
+def test_safe_dir_name_still_delegates_to_the_shared_helper():
+    """packet_infer's sanitizer and packet's must not drift apart."""
+    from seed_data.packet_infer import _safe_dir_name
+    from seed_data.utils import safe_path_segment
+
+    for name in ["../../evil", "", "Pay Stub", "w2"]:
+        assert _safe_dir_name(name, "fb") == safe_path_segment(name, "fb")

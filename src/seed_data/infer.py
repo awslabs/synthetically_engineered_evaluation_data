@@ -31,8 +31,13 @@ DEFAULT_MAX_DOCS = 5
 DEFAULT_INFER_MODEL = "sonnet"
 
 
-class _InferredSchema(BaseModel):
-    """Structured output the inference model returns."""
+class _InferenceDraft(BaseModel):
+    """Structured output the inference model returns.
+
+    Named ``_InferenceDraft`` (private) to avoid confusion with the canonical,
+    richer :class:`seed_data.schema.InferredSchema` (typed fields, distributions,
+    relationships). This is only a thin Bedrock structured-output holder.
+    """
     json_schema: dict = Field(description="A draft-07 JSON Schema object capturing every visible field")
     generation_guidance: str = Field(description="Markdown: visual style, data realism, math rules, variations")
     field_notes: str = Field(default="", description="Per-field rationale for required/optional and type decisions")
@@ -124,13 +129,13 @@ def _run_inference(docs: list[Document], *, name: str, model: str,
         f"Analyze the {len(docs)} example(s) above and produce the JSON Schema and "
         f"generation guidance for the '{name}' document type."})
 
-    result = agent(user_message, structured_output_model=_InferredSchema)
+    result = agent(user_message, structured_output_model=_InferenceDraft)
     if result.structured_output is None:
         raise ValueError(
             "The model returned no structured schema (likely a content-filter or "
             "guardrail refusal on the document). Try a different --infer-model."
         )
-    inferred: _InferredSchema = result.structured_output
+    inferred: _InferenceDraft = result.structured_output
 
     # Force the title to the requested name (authoritative doctype), regardless
     # of what the model put there — mirrors Schema.to_schema_dict.
@@ -169,11 +174,13 @@ def write_schema_dir(schema: "Schema", dest: str) -> str:  # noqa: F821
             "Choose a different --output or remove it first."
         )
 
-    with open(schema_path, "w") as f:
+    with open(schema_path, "w", encoding="utf-8") as f:
         json.dump(schema.to_schema_dict(), f, indent=2)
         f.write("\n")
     if schema.generation_guidance:
-        with open(guidance_path, "w") as f:
+        # See `schema.io.to_schema_dir`: without an explicit encoding this raised
+        # UnicodeEncodeError on an em dash under a C/POSIX locale, losing the run.
+        with open(guidance_path, "w", encoding="utf-8") as f:
             f.write(schema.generation_guidance)
             if not schema.generation_guidance.endswith("\n"):
                 f.write("\n")

@@ -21,11 +21,28 @@ pip install seed-data
 
 This works out of the box: the default `xhtml2pdf` renderer requires no additional system libraries.
 
+The base install covers the document pipeline. Structured (tabular) generation lives behind an extra:
+
+```bash
+# documents only — the lean base install
+pip install seed-data
+
+# adds structured (tabular) generation
+pip install "seed-data[structured]"
+
+# every optional feature
+pip install "seed-data[all]"
+```
+
+Structured support is opt-in because it pulls in pandas and the file-format engines (openpyxl for `.xlsx`, pyarrow for `.parquet`), which are only needed for tabular generation and scoring. Keeping them out of the base install means anyone who only wants documents does not pay for that dependency tree. The document pipeline never needs the extra; structured commands raise a clear `ImportError` telling you to install it.
+
+The extra also pins numpy and scipy, but those already ship in the base install as transitive dependencies of `augraphy`; they are listed only to declare the versions this code uses directly. Every output format, `--format parquet` included, works with the extra alone.
+
 Verify with `seed-data --help` (see [Verify Installation](#verify-installation)).
 
 ### From source (contributors)
 
-If you are working from a clone of the repository, install the package in editable mode with the `dev` extras:
+If you are working from a clone of the repository, install the package in editable mode with the `dev` extras. `dev` implies `[all]`, so the structured stack is present and its tests run rather than skip:
 
 ```bash
 python -m venv .venv
@@ -77,6 +94,12 @@ Leave this variable unset when running schemas or briefs you do not fully trust,
 
 ```bash
 seed-data --help          # or: python -m seed_data --help
+```
+
+If you installed the `[structured]` extra, check that the tabular stack is importable:
+
+```bash
+python -c "import pandas, openpyxl, pyarrow; print('structured extra OK')"
 ```
 
 You can also run the test suite (no AWS credentials required):

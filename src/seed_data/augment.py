@@ -3,6 +3,7 @@
 Handles PDF → PNG → augraphy pipeline → PNG → PDF conversion.
 The LLM agent decides the augmentation config; this module executes it.
 """
+import inspect as _inspect
 import json
 import os
 
@@ -62,9 +63,6 @@ AUGMENTATION_REGISTRY = {
 }
 
 
-import inspect as _inspect
-
-
 def _coerce_to_default_shape(value, default):
     """Coerce an LLM-supplied param value to match augraphy's expected shape.
 
@@ -89,7 +87,12 @@ def _coerce_to_default_shape(value, default):
     def _num(x):
         if isinstance(x, bool):
             return x
-        if want_int and isinstance(x, (int, float)):
+        # Truncate only integral values. An int-typed default does not mean the
+        # param is integer-only — augraphy's `p` defaults to the int `1` but is a
+        # probability, and `int(0.8) == 0` silently disabled the augmentation
+        # entirely (the critic then rejected "no visible change" until the
+        # attempt cap accepted an un-augmented PDF). main preserved 0.8 here.
+        if want_int and isinstance(x, (int, float)) and float(x).is_integer():
             return int(x)
         return x
 
@@ -297,6 +300,18 @@ def critique_augmented_document(pdf_path: str, model: str = "haiku", threshold: 
 
     result = agent(user_message, structured_output_model=CritiqueResult)
     critique = result.structured_output
+    if critique is None:
+        # None on a guardrail/content-filter refusal — `critique.score` below raised
+        # an AttributeError naming neither the step nor the cause. Reported as
+        # verdict="error", the same contract `evaluation.critique` uses for a
+        # reviewer that could not judge, so the caller sees a non-accepting verdict
+        # and a summary that says why. The augment loop's MAX_AUG_ATTEMPTS cap then
+        # accepts the best-effort PDF rather than retrying indefinitely.
+        summary = ("Augmentation critique unavailable: the critic returned no "
+                   "structured output (likely a content-filter or guardrail refusal).")
+        print(f"\n--- Aug Critique ({model}) ---\n  {summary}\n--- End Aug Critique ---\n")
+        return {"score": 0, "verdict": "error", "issues": [], "summary": summary}
+
     verdict = "accepted" if critique.score >= threshold else "rejected"
 
     print(f"\n--- Aug Critique ({model}) ---")

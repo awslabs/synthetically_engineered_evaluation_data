@@ -19,6 +19,8 @@ we do not add any semaphore/wave machinery on top of the graph.
 """
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.multiagent import GraphBuilder
@@ -30,7 +32,10 @@ from seed_data.utils import make_model
 from seed_data.stages.base import ModelConfig
 from seed_data.stages.pipeline import (
     GeneratedDoc, build_context, build_pipeline_graph, result_from, PIPELINE_TASK,
+    _EMPTY_RESULT,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _ScenarioPlan(BaseModel):
@@ -38,8 +43,17 @@ class _ScenarioPlan(BaseModel):
     scenarios: list[str] = Field(description="Distinct, specific scenario briefs — one per document")
 
 
-def plan_scenarios(count: int, brief: str, model: str = "sonnet", session=None) -> list[str]:
-    """Turn one brief into ``count`` distinct, specific scenario strings."""
+def plan_scenarios(
+    count: int, brief: str, model: str = "sonnet", session=None,
+    *, seed: int | None = None, verbose: bool = True,
+) -> list[str]:
+    """Turn one brief into ``count`` distinct, specific scenario strings.
+
+    ``brief`` is the caller's raw brief. The determinism ``seed`` is folded in here
+    rather than by the caller so the seed instruction reaches only the planner: the
+    fallback below pads with ``brief``, and padding with a pre-seeded string wrote
+    "[Deterministic seed: N...]" into every document's generation guidance.
+    """
     system_prompt = (
         "You are a scenario planner for synthetic document generation. Given a "
         "high-level brief, produce exactly N distinct, specific scenario briefs — "
@@ -49,19 +63,43 @@ def plan_scenarios(count: int, brief: str, model: str = "sonnet", session=None) 
     )
     agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
     result = agent(
-        f"Brief: {brief}\n\nProduce exactly {count} distinct scenario briefs.",
+        f"Brief: {_seeded_brief(brief, seed)}\n\nProduce exactly {count} distinct scenario briefs.",
         structured_output_model=_ScenarioPlan,
     )
-    scenarios = list(result.structured_output.scenarios)
-    if len(scenarios) < count:  # defend against a short response
-        scenarios += [brief] * (count - len(scenarios))
+    # `structured_output` is None on a guardrail/content-filter refusal. Treated as
+    # zero scenarios so the padding below fills every slot with the raw brief: this
+    # function is sugar for "vary one brief N ways", and falling back to N copies of
+    # the brief still generates the N documents that were asked for. Unguarded,
+    # `.scenarios` raised an AttributeError that named neither the step nor the cause.
+    plan = result.structured_output
+    scenarios = list(plan.scenarios) if plan is not None else []
+
+    shortfall = count - len(scenarios)
+    if shortfall > 0:
+        # A warning, not just a print: the documents still generate and
+        # `BatchResult` will report N/N succeeded, so this degradation is otherwise
+        # invisible to a programmatic caller. `logs.configure_progress_logging`
+        # attaches a stderr handler, and an embedding host can capture the record.
+        cause = ("returned no structured output (likely a content-filter or "
+                 "guardrail refusal)" if plan is None
+                 else f"returned only {len(scenarios)} of {count} scenarios")
+        logger.warning(
+            "Scenario planning %s — padding %d document(s) with the unvaried brief; "
+            "those documents will not be diverse", cause, shortfall,
+        )
+        if verbose:
+            print(f"  Scenario planning {cause} — padding {shortfall} "
+                  "document(s) with the unvaried brief")
+        scenarios += [brief] * shortfall
+
     return scenarios[:count]
 
 
 class _CoordinatorNode(MultiAgentBase):
     """Entry node the worker pipeline graphs fan out from."""
     def __init__(self, name: str = "coordinator"):
-        super().__init__(); self.name = name
+        super().__init__()
+        self.name = name
 
     async def invoke_async(self, task, invocation_state=None, **kwargs):
         ar = AgentResult(stop_reason="end_turn",
@@ -96,6 +134,9 @@ def build_batch_graph(
         name = f"worker_{i}"
         pipeline = build_pipeline_graph(
             ctx, max_attempts=max_attempts, timeout=timeout, augment=augment,
+            # Same reasoning as `generate`: the 600s default node cap overrode
+            # the caller's timeout for the whole per-document render loop.
+            node_timeout=timeout,
         )
         builder.add_node(pipeline, name)
         builder.add_edge("coordinator", name)
@@ -140,7 +181,11 @@ def generate_batch(
 
     if verbose:
         print(f"Planning {count} scenarios from brief: {brief}")
-    scenarios = plan_scenarios(count, _seeded_brief(brief, seed), model=models.batch, session=session)
+    # The raw brief, with `seed` passed alongside: `plan_scenarios` folds the seed
+    # into the planner prompt only, keeping it out of the padding fallback.
+    scenarios = plan_scenarios(
+        count, brief, model=models.batch, session=session, seed=seed, verbose=verbose,
+    )
     if verbose:
         for i, s in enumerate(scenarios):
             print(f"  [{i}] {s[:90]}")
@@ -160,7 +205,19 @@ def generate_batch(
     graph, worker_names = build_batch_graph(
         contexts, max_attempts=max_attempts, timeout=timeout, augment=augment,
     )
-    result = graph(PIPELINE_TASK.format(doctype=contexts[0].doctype if contexts else "document"))
+    # Guarded: Strands' graph is fail-fast, so one worker raising cancels its
+    # siblings and the exception propagates out of `generate_batch` — losing every
+    # `GeneratedDoc`, including documents that had already rendered successfully.
+    # main's per-document try/except did not have this exposure. Falling through to
+    # the per-worker extraction below lets `result_from` report each context from the
+    # filesystem, so finished work survives a sibling's failure.
+    batch_error: str | None = None
+    try:
+        result = graph(PIPELINE_TASK.format(doctype=contexts[0].doctype if contexts else "document"))
+    except Exception as e:
+        logger.warning("Batch graph raised, recovering per-document results: %s", e)
+        batch_error = str(e)
+        result = _EMPTY_RESULT
 
     # Pull each worker's sub-result out of the outer result and extract it with
     # the same result_from() the single-document path uses.
@@ -173,6 +230,15 @@ def generate_batch(
         else:
             # Worker didn't run / no sub-result — fall back to inspecting its ctx.
             doc = result_from(ctx, _EMPTY_RESULT, augment=augment)
+        # A document with nothing on disk after a batch-level failure should name that
+        # failure. `result_from` has already set the generic "PDF was not created" by
+        # this point, so append rather than only filling an empty field — the batch
+        # error is the actual cause and the generic text is the symptom.
+        if batch_error and not doc.success:
+            detail = f"Batch run failed: {batch_error}"
+            doc = doc.model_copy(update={
+                "error": f"{doc.error} ({detail})" if doc.error else detail
+            })
         docs.append(doc)
         if on_document is not None:
             on_document(i, len(contexts), doc)
@@ -193,12 +259,3 @@ def _seeded_brief(brief: str, seed: int | None) -> str:
     if seed is None:
         return brief
     return f"{brief}\n\n[Deterministic seed: {seed}. Produce the same scenarios for this seed.]"
-
-
-class _EmptyResult:
-    """Stand-in with no node results, for a worker that produced nothing."""
-    results: dict = {}
-    execution_order: list = []
-
-
-_EMPTY_RESULT = _EmptyResult()

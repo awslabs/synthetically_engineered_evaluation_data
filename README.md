@@ -1,8 +1,8 @@
 # Synthetically Engineered Evaluation Data (SEED)
 
-AI-powered synthetic document generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set.
+AI-powered synthetic data generation pipeline built on the [Strands Agents SDK](https://strandsagents.com/). Produces realistic PDF documents from JSON schemas, validates them through multi-stage critique loops, and optionally applies image augmentation to simulate real-world scanning/faxing artifacts. Each document is paired with a ground-truth JSON label, so the output is a ready-made benchmark set. SEED also generates **structured (tabular) data** — CSV, Parquet, Excel, or JSON, one file per entity — from the same planned schema.
 
-Designed for building evaluation datasets for document understanding systems: OCR, Key Information Extraction (KIE), and document classification. Use it from the command line (`seed-data`) or the typed Python API (`seed_data.Generator`).
+Designed for building evaluation datasets for document understanding systems (OCR, Key Information Extraction (KIE), document classification) and for tabular datasets to exercise data pipelines, analytics, and ML workflows. Use it from the command line (`seed-data`) or the typed Python API (`seed_data.Generator`).
 
 > **Not a production-ready solution.** This asset represents a proof-of-value
 > for the services included and is not intended as a production-ready solution.
@@ -72,6 +72,9 @@ seed-data --schema-dir invoice --scenario "Midwest food-distributor invoice"   #
 seed-data --schema-dir fcc-invoice --count 10 --scenario "Local TV stations"    # batch
 seed-data packet lending-package --scenario "First-time homebuyer in Portland"  # packet
 seed-data infer-schema ./samples/*.pdf --name invoice --output ./schemas/invoice  # schema from real docs
+seed-data plan "Customers and their orders" --output ./schema.json              # any input -> schema
+seed-data generate-structured ./schema.json --rows 500 --format parquet           # structured (tabular)
+seed-data plan-and-generate "Customers and their orders" --output structured --rows 500         # plan + generate
 ```
 
 **Python:**
@@ -85,6 +88,9 @@ doc    = gen.generate("invoice", scenario="Midwest food-distributor invoice")
 batch  = gen.generate_batch("fcc-invoice", count=10, scenario="Local TV stations")
 packet = gen.generate_packet("lending-package", scenario="First-time homebuyer in Portland")
 schema = gen.infer_schema("./samples/*.pdf", name="invoice")  # reverse-engineer a schema from real docs
+ing    = gen.plan("Customers and their orders")             # any input -> InferredSchema
+table  = gen.generate_structured(ing, rows=500)               # structured (tabular) data
+result = gen.plan_and_generate("Customers and their orders")                # plan + generate, one call
 ```
 
 **Schema from documents** — the inverse of generation. Point SEED at real example
@@ -95,7 +101,104 @@ See [Schema from Documents](https://github.com/awslabs/synthetically_engineered_
 
 Full docs: [CLI Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/CLI-Usage/README.md) · [Python API Usage](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Python-API-Usage/README.md).
 
+## Structured Data Generation
+
+Alongside documents, SEED generates structured (tabular) datasets. A run writes
+**one file per entity** into the output directory, named from the lowercased
+entity name with spaces replaced by underscores: `<entity>.csv`, `.json`,
+`.xlsx`, or `.parquet`. A schema with entities `Customer` and `Order` at
+`--format csv` produces `output/customer.csv` and `output/order.csv`.
+
+Structured generation is an **opt-in extra** — pandas and the file-format engines
+(openpyxl for `.xlsx`, pyarrow for `.parquet`) are kept out of the base install so
+`pip install seed-data` stays lean for document-only users:
+
+```bash
+pip install "seed-data[structured]"
+```
+
+The document pipeline never needs the extra. Structured commands raise a clear
+`ImportError` pointing at it if it is missing. Every output format works with the
+extra installed — no separate engine install.
+
+Planning is the shared front door. `seed-data plan` takes free text, example
+data files (CSV/JSON/XLSX), formal schemas (JSON Schema, SQL DDL), documents
+(PDF/PNG/JPEG, read with a vision model), ERD diagrams — or several of those
+together — and writes one unified `InferredSchema` JSON. The **same planned
+schema can drive either modality**: pass it to `generate-structured` for tables,
+or to `generate-documents` for PDFs.
+
+```bash
+# 1. Plan a schema from anything
+seed-data plan "Customers with orders and line items" ./samples/orders.csv \
+  --name retail --output ./schema.json
+
+# 2. Generate tables from that schema
+seed-data generate-structured ./schema.json --rows 500 --format csv --output ./output
+
+# ...or generate documents from the very same schema
+seed-data generate-documents ./schema.json --entity Order --count 3
+```
+
+`seed-data plan-and-generate` does planning + generation in one shot, with no intermediate schema
+file. Note that on `plan-and-generate` — and only on `plan-and-generate` — `--output` selects the *modality*
+and `--output-dir` selects the *path*:
+
+```bash
+seed-data plan-and-generate "Customers with orders and line items" ./samples/orders.csv \
+  --output structured --rows 500 --format parquet \
+  --output-dir ./output --save-schema ./schema.json
+```
+
+From Python, the same two steps with `Generator`:
+
+```python
+from seed_data import Generator
+
+gen = Generator(output_dir="./output")
+
+schema = gen.plan("Customers with orders and line items", "./samples/orders.csv",
+                    name="retail")
+result = gen.generate_structured(schema, rows=500, format="csv")
+
+print(result.success)       # True when files were written
+print(result.output_paths)  # ['./output/customer.csv', './output/order.csv', ...]
+print(result.format)        # 'csv'
+print(result.row_counts)    # {'Customer': 500, 'Order': 500}
+print(result.evaluation)    # metric name -> score
+print(result.token_usage)   # {'inputTokens': ..., 'outputTokens': ..., 'totalTokens': ...}
+print(result.error)         # None on success
+```
+
+`Generator.available_input_types()` lists what planning can classify:
+`free_text`, `example_data`, `schema`, `document`, `erd`.
+
+A structured run writes a flat directory of per-entity files:
+
+```text
+output/
+├── customer.csv             # one file per entity, lowercased, spaces -> _
+├── order.csv
+└── order_line_item.csv
+```
+
 ## Architecture
+
+### Shared front door, two modalities
+
+```text
+   free text ─┐
+example data ─┤
+      schema ─┼─→  plan  ─→ InferredSchema ─┬─→ structured pipeline ─→ CSV/Parquet/
+   documents ─┤                             │                          Excel/JSON
+         ERD ─┘                             └─→ document pipeline ─→ PDF + JSON label
+```
+
+`plan` classifies each input and normalizes everything into one
+`InferredSchema`, so the choice of modality is made *after* planning, not
+before it. One schema can therefore drive tables, documents, or both. The
+document pipeline is unchanged — `--schema-dir` with a legacy schema directory
+still enters it directly, without planning.
 
 ### Single-document pipeline
 
@@ -165,6 +268,8 @@ uv run seed-data --help
 
 `uv sync` installs the `dev` dependency group by default (configured via
 `[tool.uv] default-groups`). Use `uv sync --no-dev` for a runtime-only install.
+The `dev` group already includes the structured stack, so a `uv sync` checkout
+can generate both modalities with no extra step.
 
 <details>
 <summary>Alternative: pip or conda</summary>
@@ -181,6 +286,26 @@ pip install -e ".[dev]"
 
 Note: pip resolves dependencies fresh and does not use `uv.lock`.
 </details>
+
+### Optional dependencies (extras)
+
+| Install | Adds | Use for |
+|---|---|---|
+| `pip install seed-data` | base only | Documents. Stays lean — no pandas |
+| `pip install "seed-data[structured]"` | pandas, openpyxl, pyarrow | Structured (tabular) generation |
+| `pip install "seed-data[all]"` | every optional feature | Both modalities |
+| `pip install -e ".[dev]"` | `[all]` + pytest, ruff, mkdocs | Contributing |
+
+The base install is CI-enforced to import and pass its test suite with no pandas
+present, so the published document-only offering keeps working exactly as
+before. Structured commands raise a clear `ImportError` telling you to install
+the extra; the document pipeline never needs it. All four output formats —
+including `--format parquet` — work with `[structured]` alone.
+
+The extra also pins numpy and scipy, but those are not what makes it heavy: both
+already arrive in the base install as transitive dependencies of `augraphy`. They
+are named in the extra only to declare the versions this code uses directly.
+pandas is the dependency the base install genuinely omits.
 
 ### PDF renderers
 
@@ -272,14 +397,90 @@ Packet subcommand (`seed-data packet <name|path>`):
 | `--shuffle` | off | Randomize sub-document order in the merged PDF |
 | `--context-model` | `nova2-lite` | Model for shared-context resolution |
 
+Plan subcommand (`seed-data plan <inputs...>`) — any inputs to one
+`InferredSchema` JSON:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `inputs` | required | One or more free-text descriptions, file paths/globs, and/or `s3://` URIs |
+| `--name` | `dataset` | Logical dataset name |
+| `--output` | `./schema.json` | Path to write the InferredSchema JSON |
+| `--quiet` | off | Suppress stage progress output |
+
+Structured subcommand (`seed-data generate-structured <schema>`):
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `schema` | required | Bundled schema name, InferredSchema JSON path, or schema directory |
+| `--rows` | `100` | Target records per entity |
+| `--format` | `csv` | `csv`, `parquet`, `excel`, or `json` |
+| `--output` | `./output` | Output directory |
+| `--quiet` | off | Suppress stage progress output |
+
+Document subcommand (`seed-data generate-documents <schema>`) — the modern
+spelling of the default mode, and what lets a planned schema drive the
+document pipeline:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `schema` | required | InferredSchema JSON path, schema directory, or bundled name |
+| `--entity` | | For a multi-entity InferredSchema: which entity to render |
+| `--count` | `1` | Number of documents; `> 1` plans diverse scenarios and fans out |
+| `--scenario` | | What to generate this run |
+| `--output` | `./output` | Output directory |
+| `--data-model` | `gpt-oss` | Model for data generation |
+| `--doc-model` | `gpt-oss` | Model for PDF generation |
+| `--critic-model` | `sonnet` | Model for all critics |
+| `--batch-model` | `nova2-lite` | Model for batch scenario planning |
+| `--aug-model` | `gpt-oss` | Model for augmentation decisions |
+| `--renderer` | `xhtml2pdf` | `xhtml2pdf` (pure Python), `weasyprint`, or `reportlab` |
+| `--augment` | off | Enable augraphy image augmentation |
+| `--no-critic-samples` | off | Disable reference sample PDFs in the doc critic |
+| `--threshold` | `5` | Acceptance score, 1–10 |
+| `--max-attempts` | `5` | Max critic-retry cycles |
+| `--timeout` | `3600` | Safety timeout in seconds |
+| `--seed` | | Seed for batch scenario planning |
+| `--quiet` | off | Suppress stage progress output |
+
+End-to-end subcommand (`seed-data plan-and-generate <inputs...>`) — plan, then generate, in
+one shot with no intermediate schema file.
+
+**On `plan-and-generate`, `--output` is the modality, not a path.** The path is `--output-dir`.
+Every other command uses `--output` for the path.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `inputs` | required | Same as `plan`: free-text descriptions, paths/globs, `s3://` URIs |
+| `--output` | `structured` | Which modality to generate: `structured` or `documents` |
+| `--output-dir` | `./output` | Directory to write artifacts to |
+| `--name` | `dataset` | Logical dataset name |
+| `--save-schema` | | Also write the planned InferredSchema JSON to this path |
+| `--rows` | `100` | structured only: target records per entity |
+| `--format` | `csv` | structured only: `csv`, `parquet`, `excel`, or `json` |
+| `--count` | `1` | documents only: how many to generate |
+| `--scenario` | | documents only: what to generate this run |
+| `--entity` | | documents only: which entity of a multi-entity schema to render |
+| `--augment` | off | documents only: apply image augmentation |
+| `--data-model` | `gpt-oss` | Model for data generation |
+| `--doc-model` | `gpt-oss` | Model for PDF generation |
+| `--critic-model` | `sonnet` | Model for all critics |
+| `--batch-model` | `nova2-lite` | Model for batch scenario planning |
+| `--aug-model` | `gpt-oss` | Model for augmentation decisions |
+| `--renderer` | `xhtml2pdf` | `xhtml2pdf` (pure Python), `weasyprint`, or `reportlab` |
+| `--threshold` | `5` | Acceptance score, 1–10 |
+| `--timeout` | `3600` | Safety timeout in seconds |
+| `--quiet` | off | Suppress stage progress output |
+
 Utility subcommand — copy the bundled schema library out to edit locally:
 
 ```bash
 seed-data clone-schema-library ./schemas
 ```
 
-Run `seed-data --help`, `seed-data packet --help`, and
-`seed-data infer-schema --help` for the complete list.
+Run `seed-data --help`, `seed-data packet --help`,
+`seed-data infer-schema --help`, `seed-data plan --help`,
+`seed-data generate-structured --help`, `seed-data generate-documents --help`,
+and `seed-data plan-and-generate --help` for the complete list.
 
 ### What to expect from a batch
 
@@ -371,6 +572,19 @@ output/
 
 Packet runs use the evaluation-dataset layout (merged PDFs in `input/`,
 per-section labels in `baseline/`); see the [Packets guide](https://github.com/awslabs/synthetically_engineered_evaluation_data/blob/main/docs/docs/Guides/packets.md).
+
+Structured runs (`generate-structured`, or `plan-and-generate --output structured`) write one
+file per entity directly into the output directory — no subdirectories:
+
+```
+output/
+├── customer.csv             # lowercased entity name, spaces -> underscores
+├── order.csv
+└── order_line_item.csv
+```
+
+The extension follows `--format`: `.csv`, `.json`, `.xlsx` (`excel`), or
+`.parquet`. `StructuredResult.output_paths` lists the files that were written.
 
 ## Tests
 

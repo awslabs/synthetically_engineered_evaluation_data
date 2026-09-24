@@ -131,3 +131,86 @@ def test_aug_critic_gives_up_when_no_pdf_after_cap(tmp_path, monkeypatch):
     verdicts = [Verdict.from_node_text(node.func("", ctx)) for _ in range(aug.MAX_AUG_ATTEMPTS)]
     assert verdicts[-1].accepted is True   # gave up -> accept so the graph exits
     assert verdicts[0].accepted is False   # first attempt asked for a re-run
+
+
+def test_aug_critique_returns_error_verdict_on_refusal(tmp_path, monkeypatch):
+    """A guardrail refusal on the aug critic must not raise an AttributeError.
+
+    `critique_augmented_document` read `result.structured_output.score` unguarded, so
+    a refusal crashed the augment critic node. Reported as verdict="error" — the same
+    contract `evaluation.critique` uses for a reviewer that could not judge — which
+    the augment loop treats as non-accepting and its MAX_AUG_ATTEMPTS cap bounds.
+    """
+    from seed_data import augment as aug_mod
+
+    pdf = tmp_path / "aug.pdf"
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+    class _Result:
+        structured_output = None
+
+    class _FakeAgent:
+        def __init__(self, *a, **k): pass
+        def __call__(self, *a, **k): return _Result()
+
+    # Both are imported inside the function, so patch them at their source modules.
+    monkeypatch.setattr("strands.Agent", _FakeAgent)
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: None)
+
+    out = aug_mod.critique_augmented_document(str(pdf), model="haiku", threshold=7)
+
+    assert out["verdict"] == "error"
+    assert out["score"] == 0
+    assert out["issues"] == []
+    assert "refusal" in out["summary"].lower() or "no structured output" in out["summary"].lower()
+    # The augment stage keys off this, so it must not read as accepted.
+    assert out["verdict"] != "accepted"
+
+
+def test_aug_critic_does_not_retry_a_critique_refusal(tmp_path, monkeypatch):
+    """verdict="error" must halt the augment loop, not walk the retry edge.
+
+    A refusal is not a poor augmentation, so re-running the augmentor cannot fix it —
+    it spends a full augraphy pass plus another vision critique per attempt for the
+    best-effort cap to accept the same PDF anyway. Left at the default
+    retryable=True, that is exactly what happened.
+    """
+    import seed_data.stages.augment_stage as aug
+    from seed_data.stages.base import rejected
+
+    ctx = _ctx(str(tmp_path), threshold=7)
+    p = aug._aug_output_path(ctx)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    open(p, "wb").write(b"%PDF-1.4 aug")
+
+    calls = {"n": 0}
+
+    def _refuse(**kw):
+        calls["n"] += 1
+        return {"verdict": "error", "score": 0, "issues": [],
+                "summary": "Augmentation critique unavailable: guardrail refusal."}
+
+    monkeypatch.setattr("seed_data.augment.critique_augmented_document", _refuse)
+
+    node = aug.build_critic(ctx)
+    v = Verdict.from_node_text(node.func("", ctx))
+
+    assert v.accepted is False
+    assert v.retryable is False
+    assert "unavailable" in v.summary.lower()
+
+    # The retry edge must not fire, so the augmentor is never re-run.
+    class _State:
+        results = {aug.CRITIC_NAME: _AugNodeResult(v)}
+
+    assert rejected(aug.CRITIC_NAME)(_State()) is False
+    assert calls["n"] == 1
+
+
+class _AugNodeResult:
+    """Minimal NodeResult stand-in, as `verdict_of` consumes it."""
+    def __init__(self, verdict):
+        self._text = verdict.as_node_text()
+
+    def get_agent_results(self):
+        return [self._text]

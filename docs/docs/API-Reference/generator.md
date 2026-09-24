@@ -7,7 +7,10 @@ title: Generator (Python API)
 The blessed programmatic surface. Import everything from the package top level:
 
 ```python
-from seed_data import Generator, ModelConfig, Schema, GeneratedDoc, BatchResult
+from seed_data import (
+    Generator, ModelConfig, Schema, InferredSchema,
+    GeneratedDoc, BatchResult, StructuredResult,
+)
 ```
 
 The mental model: **configure a `Generator` once** (models, threshold, renderer,
@@ -33,11 +36,22 @@ back into generation (see [Schema from Documents](../Guides/schema-from-document
 | `gen.generate_from_samples(...)` | infer, then generate one document | `GeneratedDoc` |
 | `gen.generate_batch_from_samples(...)` | infer, then generate a batch | `BatchResult` |
 
+**Planning & structured data** — turn any input into a schema, generate tabular data
+from it, or do both in one call:
+
+| Verb | Makes | Returns |
+|---|---|---|
+| `gen.plan(...)` | one schema from any mix of inputs | `InferredSchema` |
+| `gen.generate_structured(...)` | tabular data (CSV/Parquet/Excel/JSON) | `StructuredResult` |
+| `gen.plan_and_generate(...)` | plan, then generate — end to end | `GeneratedDoc` \| `BatchResult` \| `StructuredResult` |
+
 See also the task-oriented guides:
 [Single Document](../Guides/single-document.md) ·
 [Batch Generation](../Guides/batch-generation.md) ·
 [Packets](../Guides/packets.md) ·
-[Schema from Documents](../Guides/schema-from-documents.md).
+[Schema from Documents](../Guides/schema-from-documents.md) ·
+[Plan](../Guides/plan.md) ·
+[Structured Data](../Guides/structured-data.md).
 
 ## `Generator(...)` — configure once
 
@@ -60,9 +74,12 @@ gen = Generator(
 )
 
 # Discover what's bundled with the package:
-Generator.available_schemas()   # -> ["invoice", ...]
-Generator.available_packets()   # -> ["lending-package", ...]
+Generator.available_schemas()      # -> ["invoice", ...]
+Generator.available_packets()      # -> ["lending-package", ...]
+Generator.available_input_types()  # -> ["free_text", "example_data", ...] (plan)
 ```
+
+`threshold=7` is the Python default; the CLI's `--threshold` defaults to `5`.
 
 Passing `session` lets the generator run in-process with explicit credentials
 (containers, Lambda, AgentCore). If omitted, credentials resolve from the
@@ -79,8 +96,8 @@ region portability (EU/GovCloud).
 ## `gen.generate(...)` — one document
 
 Returns a [`GeneratedDoc`](#generateddoc). `schema` accepts a bundled schema name,
-a path to a schema directory, or a [`Schema`](#schema-define-a-document-type-in-code)
-object.
+a path to a schema directory, a [`Schema`](#schema-define-a-document-type-in-code)
+object, or an [`InferredSchema`](#inferredschema) (e.g. straight from `plan`).
 
 ```python
 from seed_data import Generator, ModelConfig
@@ -88,9 +105,10 @@ from seed_data import Generator, ModelConfig
 gen = Generator(models=ModelConfig(doc="gpt-oss"), threshold=7)
 
 doc = gen.generate(
-    "invoice",                              # bundled name, dir path, or a Schema
+    "invoice",                              # bundled name, dir path, Schema, or InferredSchema
     scenario="Midwest food distributor, net-30 terms",  # what to generate this run
     augment=None,                           # None -> use the Generator's default; True/False overrides
+    entity=None,                            # multi-entity InferredSchema: which entity to render
     verbose=True,                           # print stage progress
 )
 
@@ -120,10 +138,11 @@ def on_document(index: int, total: int, doc: GeneratedDoc) -> None:
     print(f"[{index}/{total}] {doc.doctype}: {doc.verdict}")
 
 batch = gen.generate_batch(
-    "invoice",                       # bundled name, dir path, or a Schema
+    "invoice",                       # bundled name, dir path, Schema, or InferredSchema
     count=10,
     scenario="Distributors across the US Midwest, varied totals and terms",
     augment=None,                    # None -> Generator default; True/False overrides
+    entity=None,                     # multi-entity InferredSchema: which entity to render
     seed=42,                         # optional: stable scenario set for regressions
     on_document=on_document,
 )
@@ -238,6 +257,156 @@ batch = gen.generate_batch_from_samples(
 )
 ```
 
+## `gen.plan(...)` — any input to a schema
+
+The unified front door. Takes any mix of inputs — free-text descriptions, example
+data files, formal schema definitions, real documents, ERD diagrams — auto-detects
+what each one is, and merges them into a single
+[`InferredSchema`](#inferredschema). That schema then drives either modality:
+pass it to `generate_structured` for tables or to `generate`/`generate_batch` for
+documents.
+
+```python
+from seed_data import Generator
+
+gen = Generator()
+
+schema = gen.plan(
+    "Customers place orders; each order has line items",  # free text
+    "./samples/customers.csv",   # example data (CSV/XLS/XLSX)
+    "./ddl/orders.sql",          # a formal schema (SQL DDL or JSON Schema)
+    "./real/invoice.pdf",        # a document, read with a vision model
+    name="retail",               # logical dataset name
+    verbose=True,                # print progress
+)
+
+for entity in schema.entities:
+    print(entity.entity_name, len(entity.fields))
+```
+
+`inputs` is variadic and at least one is required; each may be a path, a glob, an
+`s3://` URI, or a bare free-text description. Returns an `InferredSchema`.
+
+Each input is classified independently, so kinds can be combined freely in one
+call. The detectable types:
+
+| Input type | Detected from | Read as |
+|---|---|---|
+| `free_text` | anything with no recognized file extension | a prose description of the data |
+| `example_data` | `.csv`, `.xls`, `.xlsx` | sample rows, profiled for columns, types and value ranges |
+| `schema` | `.sql`, `.ddl`, or a `.json` file that exists on disk | SQL DDL or a JSON Schema document |
+| `document` | `.pdf`, `.png`, `.jpg`, `.jpeg`, any `s3://` URI | a real document, read with a vision model |
+| `erd` | `.dbml`, `.puml`, `.plantuml`, `.mmd`, `.mermaid` | ERD text — entities plus their relationships |
+
+Detection is by URI scheme and file extension. A `.json` argument is treated as a
+schema definition only if that file exists; otherwise it falls through to free text.
+Document, image and `s3://` inputs are routed to the same vision path
+[`infer_schema`](#geninfer_schema-a-schema-from-example-documents) uses; every other
+kind goes to the schema-extraction agent. `Generator.available_input_types()`
+returns the type names at runtime:
+
+```python
+Generator.available_input_types()
+# -> ["free_text", "example_data", "schema", "document", "erd"]
+```
+
+Profiling `example_data` needs pandas, from the `[structured]` extra. Free-text,
+document, schema, and ERD planning all work in the lean base install.
+
+## `gen.generate_structured(...)` — tabular data
+
+Generate structured (tabular) data from an `InferredSchema`. Returns a
+[`StructuredResult`](#structuredresult). `schema` accepts a bundled schema name, a
+path to an `InferredSchema` JSON file, or an `InferredSchema` object (e.g. straight
+from `plan`). Output goes to the `Generator`'s `output_dir`.
+
+```python
+from seed_data import Generator
+
+gen = Generator(output_dir="./output")
+
+schema = gen.plan("Customers and their orders", name="retail")
+
+result = gen.generate_structured(
+    schema,              # bundled name, InferredSchema JSON path, or InferredSchema
+    rows=100,            # target records per entity
+    format="csv",        # "csv" | "parquet" | "excel" | "json"
+    verbose=True,        # print progress
+)
+
+if result.success:
+    print(result.output_paths)   # ["./output/customer.csv", "./output/order.csv"]
+    print(result.row_counts)     # {"Customer": 100, "Order": 100}
+    print(result.evaluation)     # {"diversity": ..., "fidelity": ..., ...}
+else:
+    print("failed:", result.error)
+```
+
+One file per entity is written into the output directory, named from the lowercased
+entity name with spaces replaced by underscores — `customer.csv`, `purchase_order.csv`.
+The extension follows `format`: `.csv`, `.json`, `.xlsx` (`format="excel"`), or
+`.parquet`. `format="parquet"` needs no extra install beyond `[structured]`,
+which ships pyarrow.
+
+!!! note "Requires the `[structured]` extra"
+    Structured generation needs `pip install "seed-data[structured]"` (pandas,
+    openpyxl, pyarrow). Without it, the verb raises `ImportError` immediately,
+    naming the extra to install. This is the one failure it raises rather than
+    returning as a `StructuredResult` — a missing install is a caller mistake
+    knowable before any work starts, not a generation outcome, and reporting it as
+    `success=False` made it look like the pipeline had run and failed. The
+    document pipeline never needs the extra.
+
+## `gen.plan_and_generate(...)` — end to end
+
+Plan a schema from the inputs and generate from it in one call: no intermediate file,
+no second verb. `output` selects the **modality**; the destination directory is the
+`Generator`'s `output_dir`.
+
+```python
+from seed_data import Generator
+
+gen = Generator(output_dir="./output")
+
+result = gen.plan_and_generate(
+    "Customers place orders; each order has line items",  # anything planning accepts
+    output="structured",   # "structured" (tables) | "documents" (PDFs)
+    name="retail",         # logical dataset name, passed to plan
+    rows=100,              # structured only: target records per entity
+    format="csv",          # structured only: csv | parquet | excel | json
+    count=1,               # documents only: how many (>1 dispatches to batch)
+    scenario="",           # documents only: free-text steering the content
+    entity=None,           # documents only: which entity of a multi-entity schema
+    augment=None,          # documents only: None -> Generator default
+    verbose=True,          # print progress
+)
+```
+
+`inputs` is variadic and at least one is required. The return type follows
+`output` and `count`:
+
+| `output` | `count` | Returns |
+|---|---|---|
+| `"structured"` | ignored | [`StructuredResult`](#structuredresult) |
+| `"documents"` | `1` (default) | [`GeneratedDoc`](#generateddoc) |
+| `"documents"` | `> 1` | [`BatchResult`](#batchresult) |
+
+Any other `output` value raises `ValueError`. Narrow the union by checking the
+modality you asked for:
+
+```python
+result = gen.plan_and_generate("./samples/*.pdf", output="documents", count=5,
+                 scenario="Midwest food distributors")
+
+print(result.count_succeeded)          # BatchResult, because count > 1
+for doc in result.succeeded:
+    print(doc.pdf_path)
+```
+
+`plan_and_generate` is a convenience chain over [`plan`](#genplan-any-input-to-a-schema)
+plus one generation verb, so it exposes no `seed` or `on_document` hooks — call
+`plan` then `generate_batch` yourself when you need those.
+
 ## Clarifying dialogue (`on_question`)
 
 All four inference verbs accept an `on_question` callback. When provided, the model
@@ -271,6 +440,13 @@ this to a terminal prompt via `--allow-questions` (interactive TTYs only).
 <a id="batchresult"></a>
 
 ::: seed_data.api.BatchResult
+    options:
+      heading_level: 3
+      show_root_heading: true
+
+<a id="structuredresult"></a>
+
+::: seed_data.api.StructuredResult
     options:
       heading_level: 3
       show_root_heading: true
@@ -358,6 +534,73 @@ schema = Schema.from_dir("./schemas/invoice")
 ```
 
 ::: seed_data.schema.Schema
+    options:
+      heading_level: 3
+      show_root_heading: true
+
+### The canonical schema — `InferredSchema` / `EntitySchema` / `FieldDefinition`
+
+`Schema` above is the legacy in-code document type, still fully supported and still
+what a schema directory loads into. Alongside it lives the canonical model shared by
+both modalities — it is what `plan` returns, what `generate_structured` consumes,
+and what `generate`/`generate_batch` accept via their `entity=` argument. Three
+nested classes, all importable from `seed_data.schema`:
+
+| Class | Holds |
+|---|---|
+| `InferredSchema` | `entities: list[EntitySchema]` — the whole dataset, one entry per entity/table. That is its only field. |
+| `EntitySchema` | one entity: `entity_name`, `description`, `fields`, `relationships` (free-text notes), `structured_relationships` (typed foreign keys with cardinality), `generation_guidance` (prose realism/rendering rules), `reference_samples` (example records for few-shot generation). |
+| `FieldDefinition` | one field: `name`, `type`, `description`, `nullable`, `required`, `unique`, `min_value`, `max_value`, `min_length`, `max_length`, `pattern`, `enum_values`, `default`, `distribution` (a statistical spec used by the structured sampler), `children` (sub-fields of a nested object/array field). |
+
+`required` and `nullable` are **independent**, and conflating them is the easiest
+mistake to make here:
+
+- `required` — must the key be *present* in the record?
+- `nullable` — may the value be *null* once the key is there?
+
+All four combinations are meaningful. A required, nullable field is a key that
+always appears but whose value is null when the source document omits it — which is
+exactly what document ground-truth labels look like, and why one flag cannot stand
+in for the other. `nullable` defaults to `False`. `required` is `bool | None` and
+defaults to `None`, meaning "infer from `nullable`" (`not nullable`), so schemas
+written before `required` existed keep their original behaviour.
+
+```python
+from seed_data.schema import EntitySchema, FieldDefinition, InferredSchema
+
+schema = InferredSchema(entities=[
+    EntitySchema(
+        entity_name="Customer",
+        description="Retail customers",
+        fields=[
+            FieldDefinition(name="customer_id", type="string", unique=True, required=True),
+            # present on every record, but null when unknown
+            FieldDefinition(name="phone", type="phone", required=True, nullable=True),
+            FieldDefinition(name="tier", type="enum", enum_values=["basic", "gold"]),
+        ],
+        generation_guidance="US customers; realistic name/city pairings.",
+    ),
+])
+```
+
+Read a schema back off disk with `seed_data.schema.io` (`from_schema_dir`,
+`from_json_schema`) or hand `generate_structured` a path and let it resolve —
+an `InferredSchema` JSON dump is recognized by its top-level `entities` list, and
+anything else is read as a plain JSON Schema document.
+
+<a id="inferredschema"></a>
+
+::: seed_data.schema.InferredSchema
+    options:
+      heading_level: 3
+      show_root_heading: true
+
+::: seed_data.schema.EntitySchema
+    options:
+      heading_level: 3
+      show_root_heading: true
+
+::: seed_data.schema.FieldDefinition
     options:
       heading_level: 3
       show_root_heading: true

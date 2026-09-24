@@ -9,6 +9,24 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+
+      # --only-group (not --group): default-groups=["dev"] pulls the full dev set,
+      # so --group lint would resolve ~155 packages. --only-group installs just ruff.
+      - name: Install lint tools
+        run: uv sync --only-group lint
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
   pytest:
     runs-on: ubuntu-latest
     steps:
@@ -22,11 +40,49 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      # Full env (default-groups=["dev"] includes the structured stack), so this
+      # runs the structured + evaluation tests with pandas present.
       - name: Install dependencies
         run: uv sync
 
       - name: Run tests
         run: uv run pytest
+
+  test-base:
+    # Guards the optional-dependency boundary: the base (documents-only) install
+    # must import and pass its tests with NO [structured] extra (no pandas). The
+    # structured/evaluation tests skip themselves via importorskip.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0   # setuptools-scm needs history/tags to derive the version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Build the wheel
+        run: uv build --wheel
+
+      - name: Install base wheel (no extras) + pytest in a clean venv
+        run: |
+          python3 -m venv /tmp/base
+          /tmp/base/bin/pip install --upgrade pip
+          /tmp/base/bin/pip install dist/*.whl pytest
+
+      - name: Confirm the structured stack is absent
+        run: |
+          if /tmp/base/bin/python -c "import pandas" 2>/dev/null; then
+            echo "pandas present — base install is not lean"; exit 1
+          fi
+          echo "pandas absent, as expected for a base install"
+
+      - name: Run the suite against the base install
+        # The venv holds only the base dependency set (from the wheel) + pytest —
+        # crucially no pandas. pytest's pythonpath=["src"] imports the source tree,
+        # so this exercises the code under a lean, pandas-free environment; the
+        # build-smoke job below separately validates the packaged wheel itself.
+        run: /tmp/base/bin/python -m pytest tests/ --ignore=tests/integration -p no:cacheprovider
 
   # Verify the package actually builds and the built wheel installs and imports
   # in a clean environment — catches packaging breakage (missing package data,

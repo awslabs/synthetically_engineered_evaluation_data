@@ -1,9 +1,21 @@
 """CLI entrypoint: python -m seed_data"""
 import argparse
+import os
 import sys
 import time
 
 from dotenv import load_dotenv
+
+# Per-role CLI model defaults, named once so the subcommands cannot drift apart.
+# They had: every subcommand hard-coded "gpt-oss" for --data-model, but `plan` and
+# `generate-structured` had no flag at all and so ran ModelConfig's `sonnet` — which
+# meant `plan` + `generate-structured` used a different model than the one-shot
+# `plan-and-generate` documented as doing the same thing.
+DEFAULT_DATA_MODEL = "gpt-oss"
+DEFAULT_DOC_MODEL = "gpt-oss"
+DEFAULT_CRITIC_MODEL = "sonnet"
+DEFAULT_AUG_MODEL = "gpt-oss"
+DEFAULT_BATCH_MODEL = "nova2-lite"
 
 
 def _clone_schema_library(argv):
@@ -44,12 +56,12 @@ def _packet(argv):
                         help="Parallel workers for sub-documents within a packet")
     parser.add_argument("--shuffle", action="store_true",
                         help="Randomize sub-document order in the merged PDF")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--context-model", default="nova2-lite", choices=model_choices,
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--context-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
                         help="Model for shared-context resolution / planning")
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--augment", action="store_true")
@@ -102,8 +114,12 @@ def _infer_schema(argv):
     parser.add_argument("--name", required=True, help="Document-type name (schema title)")
     parser.add_argument("--output", required=True,
                         help="Directory to write the inferred schema.json + generation_guidance.md")
-    parser.add_argument("--infer-model", default="sonnet", choices=model_choices,
-                        help="Vision-capable model for inference (default: sonnet)")
+    # Sourced from the library default rather than a second literal: this is the
+    # vision role, and it must stay vision-capable, so it deliberately does not
+    # follow DEFAULT_DATA_MODEL/DEFAULT_DOC_MODEL (both text-only `gpt-oss`).
+    from seed_data.infer import DEFAULT_INFER_MODEL
+    parser.add_argument("--infer-model", default=DEFAULT_INFER_MODEL, choices=model_choices,
+                        help=f"Vision-capable model for inference (default: {DEFAULT_INFER_MODEL})")
     parser.add_argument("--max-docs", type=int, default=5,
                         help="Max example documents to feed the model (default: 5)")
     # Packet mode: input is ONE concatenated multi-document PDF. --name is the
@@ -123,11 +139,11 @@ def _infer_schema(argv):
     parser.add_argument("--count", type=int, default=1,
                         help="With --then-generate: number of docs (>1 = batch)")
     parser.add_argument("--scenario", default="", help="With --then-generate: scenario / diversity brief")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices)
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"])
     parser.add_argument("--augment", action="store_true")
@@ -225,18 +241,422 @@ def _infer_schema(argv):
             sys.exit(1)
 
 
-def main():
-    # Subcommand dispatch (kept separate so the default generate flow is untouched).
-    if len(sys.argv) > 1 and sys.argv[1] == "clone-schema-library":
-        _clone_schema_library(sys.argv[2:])
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "packet":
-        _packet(sys.argv[2:])
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "infer-schema":
-        _infer_schema(sys.argv[2:])
+def _plan(argv):
+    """Handle the `plan` subcommand — inputs -> unified InferredSchema JSON.
+
+    Auto-detects each input's type (free-text, CSV/Excel example data, JSON
+    Schema, SQL DDL, ERD, or PDF/image documents) and writes the merged
+    InferredSchema to --output as JSON.
+    """
+
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data plan",
+        description="Ingest inputs (text, CSV, PDF, JSON Schema, SQL DDL, ERD) "
+                    "into a unified InferredSchema JSON file.",
+    )
+    parser.add_argument("inputs", nargs="+",
+                        help="Free-text description(s), file paths/globs, and/or s3:// URIs")
+    parser.add_argument("--name", default="dataset",
+                        help="Logical dataset name (default: dataset)")
+    parser.add_argument("--output", default="./schema.json",
+                        help="Path to write the InferredSchema JSON (default: ./schema.json)")
+    # Only --data-model: it is the schema-extraction agent's model, and extraction is
+    # the only agent this subcommand chooses. Document/image inputs go to the vision
+    # path, whose model is a distinct role with its own default (infer.py's
+    # DEFAULT_INFER_MODEL) and must stay vision-capable — `seed-data infer-schema`
+    # exposes it as --infer-model.
+    #
+    # Defaulted to DEFAULT_DATA_MODEL, matching every other subcommand. This does
+    # change what a bare `seed-data plan` uses (it built `Generator()`, so it got
+    # ModelConfig's `sonnet`): keeping `sonnet` here would mean `plan` +
+    # `generate-structured` silently ran a different model than the one-shot
+    # `plan-and-generate` the docs present as their equivalent.
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices,
+                        help="Model for the schema-extraction agent "
+                             f"(default: {DEFAULT_DATA_MODEL}). Does not affect "
+                             "document/image inputs, which use the vision model.")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(models=ModelConfig(data=args.data_model))
+    try:
+        schema = gen.plan(*args.inputs, name=args.name, verbose=not args.quiet)
+    except (ValueError, FileNotFoundError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    with open(args.output, "w", encoding="utf-8") as f:
+        f.write(schema.model_dump_json(indent=2))
+
+    entity_names = ", ".join(e.entity_name for e in schema.entities) or "(none)"
+    print(f"\n{'=' * 60}")
+    print(f"Wrote InferredSchema to: {args.output}")
+    print(f"Entities: {entity_names}")
+    print("Generate structured data with:")
+    print(f"  seed-data generate-structured {args.output} --rows 100 --format csv")
+
+
+def _generate_structured(argv):
+    """Handle the `generate-structured` subcommand — schema -> CSV/Parquet/Excel."""
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data generate-structured",
+        description="Generate structured data from an InferredSchema.",
+    )
+    parser.add_argument("schema",
+                        help="Bundled schema name, path to an InferredSchema JSON, "
+                             "or a schema directory")
+    parser.add_argument("--rows", type=int, default=100,
+                        help="Target records per entity (default: 100)")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "parquet", "excel", "json"],
+                        help="Output format (default: csv)")
+    parser.add_argument("--output", default="./output", help="Output directory")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed the programmatic columns (numeric, enum, date, ID, "
+                             "pattern) for reproducible output; free-text fields come "
+                             "from an LLM and stay unseeded")
+    # `run_structured` drives every agent in the pipeline off `models.data`, so this
+    # one flag covers the whole subcommand. Defaulted to DEFAULT_DATA_MODEL so
+    # `plan` + `generate-structured` and the one-shot `plan-and-generate` agree.
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices,
+                        help="Model for the structured-generation agents "
+                             f"(default: {DEFAULT_DATA_MODEL})")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(output_dir=args.output, models=ModelConfig(data=args.data_model))
+    try:
+        result = gen.generate_structured(
+            args.schema, rows=args.rows, format=args.format, seed=args.seed,
+            verbose=not args.quiet,
+        )
+    except (ImportError, FileNotFoundError, KeyError, ValueError, OSError) as e:
+        # A missing [structured] extra, an unreadable schema path, or a schema that
+        # does not parse are all setup mistakes the user can fix. Printed plainly
+        # rather than left as a traceback, matching every other subcommand — before
+        # this, `seed-data generate-structured typo.json` printed a raw
+        # FileNotFoundError stack.
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\n{'=' * 60}")
+    if result.success:
+        for entity, count in result.row_counts.items():
+            print(f"  {entity}: {count} rows")
+        print(f"Files: {', '.join(result.output_paths)}")
+        if result.evaluation:
+            scores = ", ".join(f"{k}={v:.2f}" for k, v in result.evaluation.items())
+            print(f"Quality: {scores}")
+    else:
+        print(f"FAILED: {result.error}")
+        sys.exit(1)
+
+
+def _generate_documents(argv):
+    """Handle the `generate-documents` subcommand — schema -> PDFs.
+
+    Accepts either an InferredSchema JSON file (e.g. produced by `seed-data
+    plan`) or a legacy schema directory / bundled schema name. The legacy dir
+    path is unchanged from the default `--schema-dir` flow; the JSON path is
+    adapted to the pipeline's schema triple via `schema/adapter.py`.
+    """
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data generate-documents",
+        description="Generate PDF documents from a schema (InferredSchema JSON, "
+                    "schema directory, or bundled schema name).",
+    )
+    parser.add_argument("schema",
+                        help="InferredSchema JSON path, schema directory, or bundled name")
+    parser.add_argument("--entity", default=None,
+                        help="For a multi-entity InferredSchema: which entity to render")
+    parser.add_argument("--count", type=int, default=1,
+                        help="Number of docs (>1 plans diverse scenarios and fans out)")
+    parser.add_argument("--scenario", default="",
+                        help="What to generate this run (>1 count: the theme to diversify)")
+    parser.add_argument("--output", default="./output", help="Output directory")
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
+                        help="Model for planning batch scenarios")
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
+    parser.add_argument("--renderer", default="xhtml2pdf",
+                        choices=["xhtml2pdf", "weasyprint", "reportlab"])
+    parser.add_argument("--augment", action="store_true")
+    parser.add_argument("--no-critic-samples", action="store_true",
+                        help="Disable reference sample PDFs in doc critic")
+    parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument("--max-attempts", type=int, default=5)
+    parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for batch scenario planning (regression-stable sets)")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(
+        models=ModelConfig(
+            data=args.data_model, doc=args.doc_model, critic=args.critic_model,
+            aug=args.aug_model, batch=args.batch_model,
+        ),
+        threshold=args.threshold,
+        renderer=args.renderer,
+        output_dir=args.output,
+        max_attempts=args.max_attempts,
+        timeout=args.timeout,
+        critic_samples=not args.no_critic_samples,
+        augment=args.augment,
+    )
+
+    # A directory (or bundled name) keeps the legacy path; a file is an
+    # InferredSchema JSON that the adapter converts.
+    schema_arg = args.schema
+    if os.path.isfile(schema_arg):
+        try:
+            schema_arg = gen._resolve_inferred(schema_arg)
+        except (ValueError, OSError) as e:
+            print(f"Could not load schema from {args.schema}: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        if args.count > 1:
+            scenario = args.scenario or "Generate diverse, realistic documents"
+            batch = gen.generate_batch(
+                schema_arg, count=args.count, scenario=scenario,
+                entity=args.entity, seed=args.seed, verbose=not args.quiet,
+            )
+        else:
+            batch = None
+            doc = gen.generate(
+                schema_arg, scenario=args.scenario,
+                entity=args.entity, verbose=not args.quiet,
+            )
+    except (FileNotFoundError, KeyError, ValueError) as e:
+        print(f"{e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\n{'=' * 60}")
+    if batch is not None:
+        print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
+        print(f"Tokens: {batch.total_tokens:,}")
+        for d in batch.documents:
+            status = "OK  " if d.success else "FAIL"
+            print(f"  {status} {d.doc_id[:8]}  {d.verdict:9} {d.pdf_path or d.error}")
+        if batch.count_succeeded == 0:
+            sys.exit(1)
+    else:
+        if doc.success:
+            print(f"PDF:     {doc.pdf_path}")
+            print(f"Data:    {doc.data_json_path}")
+            print(f"Verdict: {doc.verdict} ({doc.score}/10)")
+        else:
+            print(f"FAILED: {doc.error}")
+            sys.exit(1)
+
+
+def _plan_and_generate(argv):
+    """Handle the `plan-and-generate` subcommand — plan a schema, then generate,
+    in one shot."""
+    load_dotenv()
+    from seed_data import MODELS, Generator, ModelConfig
+
+    model_choices = list(MODELS.keys())
+    parser = argparse.ArgumentParser(
+        prog="seed-data plan-and-generate",
+        description="End-to-end: plan a schema from the inputs, then generate "
+                    "structured data or documents from it.",
+    )
+    parser.add_argument("inputs", nargs="+",
+                        help="Free-text description(s), file paths/globs, and/or s3:// URIs")
+    parser.add_argument("--output", default="structured",
+                        choices=["structured", "documents"],
+                        help="Which modality to generate (default: structured)")
+    parser.add_argument("--output-dir", default="./output",
+                        help="Directory to write artifacts to (default: ./output)")
+    parser.add_argument("--name", default="dataset",
+                        help="Logical dataset name (default: dataset)")
+    parser.add_argument("--save-schema", default=None,
+                        help="Also write the planned InferredSchema JSON to this path")
+    # structured-only
+    parser.add_argument("--rows", type=int, default=100,
+                        help="structured only: target records per entity (default: 100)")
+    parser.add_argument("--format", default="csv",
+                        choices=["csv", "parquet", "excel", "json"],
+                        help="structured only: output format (default: csv)")
+    # documents-only
+    parser.add_argument("--count", type=int, default=1,
+                        help="documents only: how many to generate")
+    parser.add_argument("--scenario", default="",
+                        help="documents only: what to generate this run")
+    parser.add_argument("--entity", default=None,
+                        help="documents only: which entity of a multi-entity schema to render")
+    parser.add_argument("--augment", action="store_true",
+                        help="documents only: apply image augmentation")
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
+    parser.add_argument("--renderer", default="xhtml2pdf",
+                        choices=["xhtml2pdf", "weasyprint", "reportlab"])
+    parser.add_argument("--threshold", type=int, default=5)
+    parser.add_argument("--timeout", type=int, default=3600)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="structured: seed the programmatic columns; documents "
+                             "(--count > 1): seed batch scenario planning. Schema "
+                             "planning is an LLM step and is never seeded")
+    parser.add_argument("--quiet", action="store_true")
+    args = parser.parse_args(argv)
+
+    gen = Generator(
+        models=ModelConfig(
+            data=args.data_model, doc=args.doc_model, critic=args.critic_model,
+            aug=args.aug_model, batch=args.batch_model,
+        ),
+        threshold=args.threshold,
+        renderer=args.renderer,
+        output_dir=args.output_dir,
+        timeout=args.timeout,
+        augment=args.augment,
+    )
+
+    verbose = not args.quiet
+
+    if args.output == "structured":
+        # Checked before planning, which is a multi-agent LLM run: failing after it
+        # would bill the user for the expensive half of the chain to report a
+        # missing install that was knowable from the start.
+        from seed_data.common.deps import require_structured
+
+        try:
+            require_structured("seed-data plan-and-generate --output structured")
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        # Ingest first so --save-schema can persist it even when generation fails.
+        schema = gen.plan(*args.inputs, name=args.name, verbose=verbose)
+    except (ValueError, FileNotFoundError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    if args.save_schema:
+        with open(args.save_schema, "w", encoding="utf-8") as f:
+            f.write(schema.model_dump_json(indent=2))
+        print(f"Wrote InferredSchema to: {args.save_schema}")
+
+    if args.output == "structured":
+        try:
+            result = gen.generate_structured(
+                schema, rows=args.rows, format=args.format, seed=args.seed,
+                verbose=verbose,
+            )
+        except (ImportError, FileNotFoundError, KeyError, ValueError, OSError) as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+        print(f"\n{'=' * 60}")
+        if result.success:
+            for entity, count in result.row_counts.items():
+                print(f"  {entity}: {count} rows")
+            print(f"Files: {', '.join(result.output_paths)}")
+            if result.evaluation:
+                scores = ", ".join(f"{k}={v:.2f}" for k, v in result.evaluation.items())
+                print(f"Quality: {scores}")
+        else:
+            print(f"FAILED: {result.error}")
+            sys.exit(1)
         return
 
+    # documents. Wrapped for the same reason as the structured branch and
+    # `generate-documents`: an `--entity` that is not in the schema surfaced as a
+    # raw KeyError traceback.
+    try:
+        batch = None
+        if args.count > 1:
+            scenario = args.scenario or "Generate diverse, realistic documents"
+            batch = gen.generate_batch(
+                schema, count=args.count, scenario=scenario,
+                entity=args.entity, seed=args.seed, verbose=verbose,
+            )
+        else:
+            doc = gen.generate(
+                schema, scenario=args.scenario, entity=args.entity, verbose=verbose,
+            )
+    except (FileNotFoundError, KeyError, ValueError, OSError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    if batch is not None:
+        print(f"\n{'=' * 60}")
+        print(f"Batch complete: {batch.count_succeeded}/{batch.count_requested} succeeded")
+        for d in batch.documents:
+            status = "OK  " if d.success else "FAIL"
+            print(f"  {status} {d.doc_id[:8]}  {d.verdict:9} {d.pdf_path or d.error}")
+        if batch.count_succeeded == 0:
+            sys.exit(1)
+    else:
+        print(f"\n{'=' * 60}")
+        if doc.success:
+            print(f"PDF:     {doc.pdf_path}")
+            print(f"Data:    {doc.data_json_path}")
+            print(f"Verdict: {doc.verdict} ({doc.score}/10)")
+        else:
+            print(f"FAILED: {doc.error}")
+            sys.exit(1)
+
+
+# Subcommand name -> handler. Kept as a table so `--help` can list them and
+# dispatch stays a single lookup.
+SUBCOMMANDS = {
+    "clone-schema-library": _clone_schema_library,
+    "packet": _packet,
+    "infer-schema": _infer_schema,
+    "plan": _plan,
+    "generate-structured": _generate_structured,
+    "generate-documents": _generate_documents,
+    "plan-and-generate": _plan_and_generate,
+}
+
+# Deprecated spellings, kept dispatchable for one release. Deliberately a separate
+# table from SUBCOMMANDS: `--help` lists that one, and an alias listed there would
+# advertise the name this rename is retiring. Neither spelling ever shipped in a
+# release — both are new on this branch — so these are a courtesy to in-flight
+# scripts, not a compatibility guarantee.
+DEPRECATED_SUBCOMMANDS = {
+    "ingest": ("plan", _plan),
+    "run": ("plan-and-generate", _plan_and_generate),
+}
+
+
+def main():
+    # Subcommand dispatch (kept separate so the default generate flow is untouched).
+    if len(sys.argv) > 1 and sys.argv[1] in SUBCOMMANDS:
+        SUBCOMMANDS[sys.argv[1]](sys.argv[2:])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] in DEPRECATED_SUBCOMMANDS:
+        # Printed rather than warnings.warn: this is a CLI, so the user is a person
+        # reading a terminal, and Python hides DeprecationWarning by default. stderr
+        # so it cannot corrupt piped stdout.
+        current, handler = DEPRECATED_SUBCOMMANDS[sys.argv[1]]
+        print(
+            f"warning: 'seed-data {sys.argv[1]}' is deprecated; "
+            f"use 'seed-data {current}' instead.",
+            file=sys.stderr,
+        )
+        handler(sys.argv[2:])
+        return
     load_dotenv()
 
     from seed_data import MODELS, Generator, ModelConfig
@@ -244,7 +664,21 @@ def main():
     model_choices = list(MODELS.keys())
     parser = argparse.ArgumentParser(
         prog="seed-data",
-        description="AI-powered document generation pipeline",
+        description="AI-powered synthetic data generation — documents and structured data",
+        epilog=(
+            "subcommands:\n"
+            "  plan                  any input -> a unified schema JSON to review\n"
+            "  generate-structured   schema -> CSV/Parquet/Excel/JSON\n"
+            "  generate-documents    schema -> PDFs (InferredSchema JSON or schema dir)\n"
+            "  plan-and-generate     end-to-end: plan + generate in one shot\n"
+            "  infer-schema          infer a schema from real sample documents\n"
+            "  packet                generate a coordinated multi-document packet\n"
+            "  clone-schema-library  copy the bundled schemas somewhere editable\n"
+            "\n"
+            "Run `seed-data <subcommand> --help` for a subcommand's options.\n"
+            "Without a subcommand, --schema-dir generates documents (below)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--schema-dir", required=True,
                         help="Schema directory path, or a bundled schema name")
@@ -253,12 +687,12 @@ def main():
                         help="What to generate this run (>1 count: the theme to diversify)")
     parser.add_argument("--count", type=int, default=1,
                         help="Number of docs (>1 plans diverse scenarios and fans out)")
-    parser.add_argument("--data-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--doc-model", default="gpt-oss", choices=model_choices)
-    parser.add_argument("--critic-model", default="sonnet", choices=model_choices)
-    parser.add_argument("--batch-model", default="nova2-lite", choices=model_choices,
+    parser.add_argument("--data-model", default=DEFAULT_DATA_MODEL, choices=model_choices)
+    parser.add_argument("--doc-model", default=DEFAULT_DOC_MODEL, choices=model_choices)
+    parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, choices=model_choices)
+    parser.add_argument("--batch-model", default=DEFAULT_BATCH_MODEL, choices=model_choices,
                         help="Model for planning batch scenarios")
-    parser.add_argument("--aug-model", default="gpt-oss", choices=model_choices)
+    parser.add_argument("--aug-model", default=DEFAULT_AUG_MODEL, choices=model_choices)
     parser.add_argument("--renderer", default="xhtml2pdf",
                         choices=["xhtml2pdf", "weasyprint", "reportlab"],
                         help="PDF rendering backend")

@@ -15,6 +15,9 @@ build/
 .env
 .venv/
 env/
+# Local interpreter pin. CI selects the version itself (3.12); pinning a
+# different one here would silently diverge from what gets tested.
+.python-version
 
 # PDFs / generated output
 output/

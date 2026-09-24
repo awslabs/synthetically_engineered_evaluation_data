@@ -1,6 +1,6 @@
 """Shared CLI argument parser for doc-gen-agent scripts."""
 import argparse
-from seed_data import MODELS
+from seed_data.model_registry import MODELS
 
 
 def base_parser(description="doc-gen-agent"):

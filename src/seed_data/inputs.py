@@ -84,7 +84,18 @@ def _resolve_one_local(spec: str) -> list[str]:
             if _classify(f) is not None
         )
     if any(ch in spec for ch in "*?[") or glob.has_magic(spec):
-        return sorted(glob.glob(spec))
+        # An existing file wins over glob interpretation: `invoice[1].pdf` is a
+        # legal filename whose brackets glob treats as a character class, so it
+        # matched nothing and the file silently vanished from the input set.
+        if os.path.isfile(spec):
+            return [spec]
+        matches = sorted(glob.glob(spec))
+        # An empty glob returns the spec itself rather than nothing, so it flows
+        # through `_load_local`'s existing not-found/unsupported reporting into
+        # `skipped` — previously it vanished without a note, violating this
+        # module's "never silently dropped" contract, and the paid vision call
+        # proceeded on a silently reduced document set.
+        return matches if matches else [spec]
     return [spec]  # a plain path (may or may not exist — checked when read)
 
 

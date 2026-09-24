@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from strands import Agent
 
-from seed_data import prompts, MODELS
+from seed_data import prompts
 from seed_data.utils import make_model
 
 
@@ -105,43 +105,9 @@ def critique_document(
     }
 
 
-def critique_data(
-    data_json_path: str,
-    schema: dict,
-    steering: str = "",
-    model: str = "haiku",
-    threshold: int = 7,
-) -> dict:
-    """Critique generated data using structured_output with domain-aware LLM."""
-    import json
-
-    with open(data_json_path) as f:
-        data = json.load(f)
-
-    system_prompt = prompts.render(
-        "data_critic",
-        schema_json=json.dumps(schema, indent=2),
-        steering=steering,
-        data_json=json.dumps(data, indent=2),
-    )
-    from strands_tools.calculator import calculator
-    agent = Agent(model=make_model(model), system_prompt=system_prompt, tools=[calculator])
-    result = agent("Validate this data. Use the calculator tool to verify all arithmetic.",
-                   structured_output_model=CritiqueResult)
-    critique = result.structured_output
-
-    verdict = "accepted" if critique.score >= threshold else "rejected"
-
-    print(f"\n--- Data Critique ({model}) ---")
-    print(f"  Score:   {critique.score}/10 → {verdict}")
-    print(f"  Summary: {critique.summary}")
-    for issue in critique.issues:
-        print(f"  [{issue.severity}] ({issue.category}) {issue.description}")
-    print("--- End Data Critique ---\n")
-
-    return {
-        "score": critique.score,
-        "verdict": verdict,
-        "issues": [issue.model_dump() for issue in critique.issues],
-        "summary": critique.summary,
-    }
+# `critique_data` lived here and was deleted rather than guarded against a None
+# `structured_output`. It had no callers anywhere in the package or the tests, and
+# two live replacements: `stages.data.critique` (deterministic JSON-Schema gate
+# before the LLM, structured `Verdict`, session support) for the document pipeline,
+# and `evaluation.critique.critique_structured` for the structured pipeline. Adding
+# a guard would have hardened code nothing reaches.

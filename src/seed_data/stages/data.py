@@ -49,6 +49,19 @@ def build_generator(ctx: StageContext) -> Agent:
 
 def _schema_errors(schema: dict, data: dict) -> list[CritiqueIssue]:
     """Deterministic JSON-Schema validation — exact, free, no LLM."""
+    # The schema itself may be invalid: `infer.py` hands the vision model's
+    # verbatim json_schema straight into this path, and a hand-edited schema dir
+    # can say `"type": "date"`. Unchecked, that raised UnknownType / TypeError /
+    # re.error out of the critic node and aborted the graph before any PDF. An
+    # invalid schema is not something regenerating the *data* can fix, so it is
+    # reported as a single critical issue rather than raised.
+    try:
+        jsonschema.Draft7Validator.check_schema(schema)
+    except jsonschema.SchemaError as e:
+        return [CritiqueIssue(
+            category="schema_invalid", severity="critical",
+            description=f"The schema itself is invalid, so data cannot be validated: {e.message}",
+        )]
     issues = []
     for e in jsonschema.Draft7Validator(schema).iter_errors(data):
         path = ".".join(str(p) for p in e.absolute_path) or "(root)"
@@ -89,6 +102,9 @@ def critique(ctx: StageContext) -> Verdict:
             summary=f"{len(schema_issues)} JSON Schema validation error(s) — fix before LLM critique.",
             feedback="\n".join(f"- [{i.severity}] {i.description}" for i in schema_issues),
             issues=schema_issues,
+            # An invalid *schema* cannot be fixed by regenerating the data; retrying
+            # would burn every attempt against the same broken schema.
+            retryable=not any(i.category == "schema_invalid" for i in schema_issues),
         )
 
     # LLM judgment: domain realism + arithmetic (with a calculator tool).
@@ -109,7 +125,38 @@ def critique(ctx: StageContext) -> Verdict:
         "Validate this data. Use the calculator tool to verify all arithmetic.",
         structured_output_model=_LLMDataCritique,
     )
-    llm: _LLMDataCritique = result.structured_output
+    llm: _LLMDataCritique | None = result.structured_output
+    if llm is None:
+        # None on a guardrail/content-filter refusal. Returned as a Verdict rather
+        # than raised — that keeps the documented `-> Verdict` contract, and a raise
+        # would take down a document, or a whole batch sibling, over a failure of the
+        # *critic* rather than of the data.
+        #
+        # `retryable=False` because the data was never judged: the schema gates above
+        # already passed, so regenerating produces equally valid data for the same
+        # unwilling critic to refuse again. Marked retryable, this walked the retry
+        # edge and burned the node budget on ~7 pointless regenerations before the
+        # document failed anyway, never reaching the doc stage. Terminating here
+        # spends nothing and reports the real cause.
+        refusal = Verdict(
+            accepted=False, score=0, retryable=False,
+            summary="The critic model returned no structured verdict.",
+            feedback="The data could not be validated (likely a content-filter or "
+                     "guardrail refusal on the critique request, not a defect in "
+                     "the data). Critiquing with a different --critic-model may "
+                     "succeed; regenerating the data will not.",
+            issues=[CritiqueIssue(
+                category="completeness", severity="critical",
+                description="Critic model returned no structured output; data is unvalidated.",
+            )],
+        )
+        # Printed on the same path as a normal critique: an early return that says
+        # nothing leaves a failed run with no console explanation at all.
+        print(f"\n--- Data Critique ({ctx.models.critic}) ---")
+        print(f"  Score:   {refusal.score}/10 → not validated (no retry)")
+        print(f"  Summary: {refusal.summary}")
+        print("--- End Data Critique ---\n")
+        return refusal
 
     verdict = Verdict(
         accepted=llm.score >= ctx.threshold,

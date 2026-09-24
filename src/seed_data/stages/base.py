@@ -18,6 +18,8 @@ builds on:
 """
 from __future__ import annotations
 
+import asyncio
+
 from pydantic import BaseModel, Field
 from strands.multiagent.base import MultiAgentBase, NodeResult, Status, MultiAgentResult
 from strands.agent.agent_result import AgentResult
@@ -88,6 +90,14 @@ class Verdict(BaseModel):
     summary: str = ""
     feedback: str = ""
     issues: list[CritiqueIssue] = Field(default_factory=list)
+    # Whether regenerating could plausibly fix this. False marks a rejection the
+    # generator cannot act on — the critic itself failed (a guardrail refusal, no
+    # structured verdict), so the work under review was never judged. Without this
+    # the two-state `accepted` bool forced such a failure down the retry edge, and
+    # the loop regenerated already-valid work until the node budget ran out, every
+    # attempt reviewed by the same unwilling critic. Defaults True so an ordinary
+    # quality rejection keeps retrying, which is what the loop is for.
+    retryable: bool = True
 
     def as_node_text(self) -> str:
         """Serialize for a graph node's output message.
@@ -128,7 +138,16 @@ class FunctionNode(MultiAgentBase):
 
     async def invoke_async(self, task, invocation_state=None, **kwargs):
         task_text = task if isinstance(task, str) else str(task)
-        result_text = self.func(task_text, self.ctx)
+        # In a worker thread, not on the event loop: the bound functions are
+        # synchronous and the critics call `Agent.__call__` (a blocking wait on
+        # `future.result()`), so running them inline stalled the loop that the
+        # batch fan-out's sibling workers — and the graph's own node_timeout —
+        # live on. A 10-document batch ran at sequential wall clock, and a wedged
+        # critic could not be timed out, because nothing else could be scheduled
+        # while it held the loop. Threads are the same isolation the packet path
+        # already uses (one loop per ThreadPoolExecutor worker), and each node's
+        # ctx is its own, so there is no shared mutable state to race on.
+        result_text = await asyncio.to_thread(self.func, task_text, self.ctx)
         agent_result = AgentResult(
             stop_reason="end_turn",
             message=Message(role="assistant", content=[ContentBlock(text=str(result_text))]),
@@ -171,8 +190,15 @@ def accepted(node_name: str):
 
 
 def rejected(node_name: str):
-    """Edge condition: traverse when ``node_name`` emitted a rejecting Verdict."""
+    """Edge condition: traverse when ``node_name`` emitted a *retryable* rejection.
+
+    A rejection with ``retryable=False`` deliberately matches neither this condition
+    nor :func:`accepted`, so no edge fires and the graph stops at the critic. That is
+    the intended terminal state for a critic that could not judge the work: looping
+    would re-run the generator against the same failure, and accepting would pass off
+    unvalidated output as reviewed.
+    """
     def _cond(state):
         v = verdict_of(state, node_name)
-        return bool(v and not v.accepted)
+        return bool(v and not v.accepted and v.retryable)
     return _cond

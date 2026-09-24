@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from strands.multiagent import GraphBuilder
 
 from seed_data.utils import load_schema_dir, sha256_file
-from seed_data.stages.base import StageContext, ModelConfig, Verdict, verdict_of, accepted, rejected
+from seed_data.stages.base import StageContext, ModelConfig, verdict_of, accepted, rejected
 from seed_data.stages import data as data_stage
 from seed_data.stages import document as doc_stage
 from seed_data.stages import augment_stage
@@ -95,6 +95,20 @@ def build_context(
     )
 
 
+class _EmptyResult:
+    """Stand-in with no node results, for a run that produced nothing.
+
+    Lives here rather than in `batch`, which imports from this module — both the
+    batch aggregator and the single-document error path need it, and the reverse
+    import would be circular.
+    """
+    results: dict = {}
+    execution_order: list = []
+
+
+_EMPTY_RESULT = _EmptyResult()
+
+
 def _collect_tokens(result) -> dict:
     """Recursively sum token usage across the graph and sub-graphs."""
     usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
@@ -103,15 +117,20 @@ def _collect_tokens(result) -> dict:
         if not hasattr(res, "results"):
             return
         for node_result in res.results.values():
+            # Exclusive: `get_agent_results()` already flattens a nested graph's
+            # agents, so also recursing counted every nested node twice (a 500-token
+            # run reported 800). Recurse only where there is a sub-graph to descend
+            # into, and read agent metrics only where there is not.
+            nr = getattr(node_result, "result", None)
+            if hasattr(nr, "results"):
+                _walk(nr)
+                continue
             for agent_result in node_result.get_agent_results():
                 metrics = getattr(agent_result, "metrics", None)
                 acc = getattr(metrics, "accumulated_usage", None) if metrics else None
                 if acc:
                     usage["inputTokens"] += acc.get("inputTokens", 0)
                     usage["outputTokens"] += acc.get("outputTokens", 0)
-            nr = getattr(node_result, "result", None)
-            if hasattr(nr, "results"):
-                _walk(nr)
 
     _walk(result)
     usage["totalTokens"] = usage["inputTokens"] + usage["outputTokens"]
@@ -201,7 +220,16 @@ def generate(
     )
     doc_id = os.path.splitext(os.path.basename(ctx.output_path))[0]
 
-    graph = build_pipeline_graph(ctx, max_attempts=max_attempts, timeout=timeout, augment=augment)
+    # `node_timeout=timeout`: the per-node cap exists to unwedge a stuck node,
+    # but left at its 600s default it silently overrode the user's --timeout —
+    # the whole doc render loop lives inside ONE node (`doc_loop`), so three
+    # legitimate 3-minute generate->render->critique cycles blew the cap and the
+    # run failed despite `--timeout 7200`. The user's timeout is the bound they
+    # asked for; a wedged node still dies, just at that bound.
+    graph = build_pipeline_graph(
+        ctx, max_attempts=max_attempts, timeout=timeout, augment=augment,
+        node_timeout=timeout,
+    )
 
     if verbose:
         print(f"Doctype:    {ctx.doctype}")
@@ -217,6 +245,29 @@ def generate(
     try:
         result = graph(PIPELINE_TASK.format(doctype=ctx.doctype))
     except Exception as e:
+        # A raise here does not mean nothing was produced: the graph may have
+        # rendered and accepted the PDF and then failed in a later node (augment,
+        # say). Returning `success=False, pdf_path=None` unconditionally threw away
+        # finished, paid-for work that is sitting on disk. `result_from` reads the
+        # filesystem, so let it report what actually exists and only synthesize a
+        # failure when there is genuinely no document.
+        if os.path.exists(ctx.output_path):
+            doc = result_from(ctx, _EMPTY_RESULT, augment=augment)
+            # `success=False`, even though the PDF exists and `pdf_path` is reported.
+            # The run did not complete, and every CLI success branch prints the paths
+            # without ever printing `error` and exits 0 — so leaving `success=True`
+            # here reported a crashed run as a clean one. Keeping `pdf_path` populated
+            # means the finished work is still discoverable; `success` answers "did
+            # this run do what it was asked", which it did not.
+            return doc.model_copy(update={
+                "success": False,
+                "verdict": "error",
+                "error": (
+                    f"Pipeline raised after the document was produced: {e}. "
+                    f"The PDF at {ctx.output_path} is complete and usable; "
+                    "token usage is unavailable because the graph did not return."
+                ),
+            })
         return GeneratedDoc(
             success=False, doc_id=doc_id, doctype=ctx.doctype,
             data_json_path=ctx.data_json_path, verdict="error", error=str(e),
@@ -250,9 +301,25 @@ def result_from(ctx: StageContext, result, *, augment: bool = False) -> Generate
             execution_order=execution_order, token_usage=tokens,
         )
 
+    # Name the stage that stopped, when one left a verdict. A critic that could not
+    # judge (guardrail refusal -> retryable=False) halts the graph before the doc
+    # stage, so "PDF was not created" is true but says nothing about why; its summary
+    # is the only record of the real cause.
+    #
+    # "doc_loop", not `doc_stage.CRITIC_NAME`, for the same reason the success path
+    # above prefers it: `doc_critic` is a node of the *nested* loop graph, so it is
+    # never a key of the top-level result and looking it up here always missed —
+    # falling through to the accepted data verdict, which then failed the
+    # `not accepted` test and enriched nothing.
+    halted = (verdict_of(result, "doc_loop")
+              or verdict_of(result, data_stage.CRITIC_NAME))
+    error = "PDF was not created"
+    if halted is not None and not halted.accepted and halted.summary:
+        error = f"{error}: {halted.summary}"
+
     return GeneratedDoc(
         success=False, doc_id=doc_id, doctype=ctx.doctype,
         data_json_path=ctx.data_json_path, verdict="error",
         execution_order=execution_order, token_usage=tokens,
-        error="PDF was not created",
+        error=error,
     )

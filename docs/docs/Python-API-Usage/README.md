@@ -5,9 +5,11 @@ title: Python API Usage
 # Python API Usage
 
 The `Generator` class is the programmatic entry point to SEED. It is configured
-once, then exposes three methods that mirror the command line: `generate` for a
-single document, `generate_batch` for a diverse set, and `generate_packet` for a
-coordinated multi-document set. Each method returns a typed result.
+once, then exposes one verb per task, each mirroring the command line: `plan`
+turns whatever you have into a schema; `generate`, `generate_batch` and
+`generate_packet` make documents from one; `generate_structured` makes tabular
+data; and `plan_and_generate` does planning plus generation end-to-end. Each verb returns a typed
+result.
 
 ## Installation and setup
 
@@ -16,6 +18,16 @@ Install the package and configure Amazon Bedrock credentials in the environment
 
 ```bash
 pip install seed-data
+```
+
+The base install covers the document pipeline, and `plan` for every input kind
+except example data. The structured verbs — `generate_structured`, and `plan_and_generate` with
+`output="structured"` — need the `[structured]` extra
+(pandas/numpy/scipy/openpyxl). Called without it, they report the missing
+dependency rather than generating anything:
+
+```bash
+pip install "seed-data[structured]"
 ```
 
 Create a `Generator`, specifying the models and acceptance threshold to use:
@@ -172,15 +184,216 @@ for r in results:
     print(r.packet_id, r.success, len(r.sections), "sections")
 ```
 
+## Plan
+
+`plan` is the front door for turning whatever you already have into a schema.
+It takes one or more inputs, classifies each one, and returns a single
+`InferredSchema` describing every entity it found:
+
+```python
+schema = gen.plan(
+    "Customers and the orders they place with a regional coffee wholesaler",
+    "./samples/customers.csv",
+    "./ddl/orders.sql",
+    "./real/order_confirmation.pdf",
+    name="coffee",
+)
+```
+
+Inputs of different kinds can be combined in one call, as above — free-text
+descriptions, example data, formal schemas, documents, and ERD diagrams are
+detected per input, not per call. The detected kinds are:
+
+```python
+from seed_data import Generator
+
+Generator.available_input_types()
+# ['free_text', 'example_data', 'schema', 'document', 'erd']
+```
+
+Free-text, document, formal-schema and ERD inputs work in the base install.
+Profiling an `example_data` file uses pandas, so pass those with the
+`[structured]` extra installed.
+
+An `InferredSchema` is a list of entities, each with its own fields:
+
+```python
+for entity in schema.entities:
+    print(f"{entity.entity_name} — {len(entity.fields)} fields")
+    for field in entity.fields:
+        print(f"  {field.name:24} {field.type:10} "
+              f"required={field.required} nullable={field.nullable}")
+```
+
+`required` and `nullable` are independent: `required` says the key must be
+present, `nullable` says its value may be null. A required field can legitimately
+carry a null value when the source document omits it. `required` is `None` when
+the schema does not state it, which means "infer it from `nullable`".
+
+The schema is a pydantic model, so writing it out for review or reuse — and
+loading it back — is a one-liner in each direction:
+
+```python
+from pathlib import Path
+from seed_data import InferredSchema
+
+Path("./schema.json").write_text(schema.model_dump_json(indent=2))
+
+schema = InferredSchema.model_validate_json(Path("./schema.json").read_text())
+```
+
+Editing that JSON by hand is the supported way to correct anything planning got
+wrong before you generate from it.
+
+## Structured data
+
+`generate_structured` generates tabular data from an `InferredSchema` and returns
+a `StructuredResult`. It accepts an `InferredSchema` object, a path to an
+`InferredSchema` JSON file, or a bundled schema name:
+
+```python
+gen.generate_structured(schema, rows=500)           # an InferredSchema object
+gen.generate_structured("./schema.json", rows=500)  # a written InferredSchema
+gen.generate_structured("invoice", rows=500)        # a bundled schema name
+```
+
+The result names every file it wrote, how many rows landed in each, and how the
+data scored:
+
+```python
+result = gen.generate_structured(schema, rows=500, format="csv")
+
+print(result.success, result.format)
+for path in result.output_paths:
+    print(path)                  # ./output/customer.csv, ./output/order.csv
+print(result.row_counts)         # {'Customer': 500, 'Order': 500}
+print(result.evaluation)         # {'diversity': 0.82, 'fidelity': 0.91, ...}
+if not result.success:
+    print(result.error)
+```
+
+`generate_structured` reports failure through the result rather than raising, so
+always check `success` before reading `output_paths`, and print `error` when it is
+`False`.
+
+A `StructuredResult` carries the written files, the per-entity counts, and the
+quality scores the pipeline gated on:
+
+```python
+result.success           # bool
+result.schema            # the InferredSchema the data was generated from
+result.output_paths      # list[str], one file per entity
+result.format            # "csv", "parquet", "excel", or "json"
+result.row_counts        # {entity name: rows written}
+result.evaluation        # {metric name: score} — diversity, fidelity, coverage, structural
+result.token_usage       # {"inputTokens", "outputTokens", "totalTokens"}
+result.error             # populated on failure
+```
+
+`rows` is a target per entity, so `row_counts` can come in lower when records are
+filtered by validation. One file per entity is written into the generator's
+`output_dir`, named from the lowercased entity name with spaces replaced by
+underscores. All four formats:
+
+```python
+gen.generate_structured(schema, rows=500, format="csv")       # customer.csv
+gen.generate_structured(schema, rows=500, format="json")      # customer.json
+gen.generate_structured(schema, rows=500, format="excel")     # customer.xlsx
+gen.generate_structured(schema, rows=500, format="parquet")   # customer.parquet
+```
+
+`format="parquet"` needs no extra install beyond `[structured]`, which ships
+pyarrow.
+
+The natural next step is to load the result back into pandas:
+
+```python
+import os
+import pandas as pd
+
+frames = {
+    os.path.splitext(os.path.basename(path))[0]: pd.read_csv(path)
+    for path in result.output_paths
+}
+print(frames["customer"].shape)
+print(frames["order"].head())
+```
+
+## End-to-end (run)
+
+`plan_and_generate` chains `plan` into a generation verb, so no intermediate schema file is
+needed. For structured output it returns a `StructuredResult`:
+
+```python
+result = gen.plan_and_generate(
+    "Customers and the orders they place with a regional coffee wholesaler",
+    "./samples/customers.csv",
+    output="structured",
+    name="coffee",
+    rows=500,
+    format="csv",
+)
+print(result.output_paths, result.row_counts)
+```
+
+For documents it sends the same planned schema down the document pipeline:
+
+```python
+doc = gen.plan_and_generate(
+    "./real/order_confirmation.pdf",
+    output="documents",
+    scenario="Pacific-northwest coffee wholesaler",
+)
+
+batch = gen.plan_and_generate(
+    "./real/order_confirmation.pdf",
+    output="documents",
+    count=10,
+    scenario="Coffee wholesalers across different US regions",
+    entity="Order",
+)
+```
+
+The return type follows the arguments: `output="structured"` returns a
+`StructuredResult`; `output="documents"` returns a `GeneratedDoc` when `count` is
+1, and a `BatchResult` when `count` is greater than 1. Any other `output` value
+raises `ValueError`. When the modality is decided at runtime, branch on the type:
+
+```python
+from seed_data import BatchResult, GeneratedDoc, StructuredResult
+
+def summarize(result: StructuredResult | GeneratedDoc | BatchResult) -> str:
+    if isinstance(result, StructuredResult):
+        return f"{len(result.output_paths)} files: {result.row_counts}"
+    if isinstance(result, BatchResult):
+        return f"{result.count_succeeded} of {result.count_requested} documents"
+    if isinstance(result, GeneratedDoc):
+        return f"one document: {result.pdf_path}"
+    raise TypeError(f"unexpected result type {type(result).__name__}")
+
+print(summarize(gen.plan_and_generate("./real/order_confirmation.pdf", output="documents")))
+```
+
+`plan_and_generate` accepts `seed`, but has no equivalent of the CLI's
+`--save-schema`. For structured output the planned schema comes back on
+`result.schema`; for documents there is no handle on it. Note also that `seed`
+cannot pin the schema — planning is an LLM step — so a seeded re-run reproduces the
+values drawn for a given schema, not the schema itself. Call `plan` and the
+generation verb separately when you want to keep the schema on disk, review it
+before generating, or need one fixed schema across repeated runs.
+
 ## Specifying a schema
 
 Every method accepts a schema in three forms — a bundled name, a directory path, or
-an in-code [`Schema`](../API-Reference/generator.md#schema-define-a-document-type-in-code):
+an in-code [`Schema`](../API-Reference/generator.md#schema-define-a-document-type-in-code).
+`generate` and `generate_batch` accept a fourth: an `InferredSchema`, the type
+`plan` returns:
 
 ```python
 gen.generate("invoice")                     # bundled schema name
 gen.generate("./my-schemas/invoice")        # directory path
 gen.generate(my_schema_object)              # in-code Schema (below)
+gen.generate(inferred_schema)               # InferredSchema, e.g. from gen.plan(...)
 ```
 
 An in-code [`Schema`](../API-Reference/generator.md#schema-define-a-document-type-in-code)
@@ -212,6 +425,21 @@ schema = Schema(name="wire", json_schema={
 
 An in-code `Schema` behaves identically across `generate`, `generate_batch`, and
 `generate_packet`.
+
+An `InferredSchema` describes one or more entities, so `generate` and
+`generate_batch` take an `entity=` argument to pick which one is rendered as the
+document type. It defaults to the first entity:
+
+```python
+schema = gen.plan("Customers and their orders for a coffee wholesaler", name="coffee")
+
+doc   = gen.generate(schema, entity="Order", scenario="Pacific-northwest wholesaler")
+batch = gen.generate_batch(schema, entity="Order", count=10,
+                           scenario="Coffee wholesalers across different US regions")
+```
+
+The same `InferredSchema` object also feeds `generate_structured`, which uses
+every entity rather than one.
 
 ## Inferring a schema from documents
 
@@ -249,9 +477,89 @@ result = gen.generate_packet(out, scenario="First-time homebuyer in Portland, OR
 
 See [Schema from Documents](../Guides/schema-from-documents.md) for the full guide.
 
+## Evaluating what you generated
+
+`seed_data.evaluation` scores finished output against the schema it came from, for
+either modality.
+
+`evaluate_document_labels` scores the ground-truth labels a document run produced
+for field completeness and coverage, and flags fields that no document ever
+populated. It is pure Python, so it works in the base install:
+
+```python
+from seed_data.evaluation import evaluate_document_labels
+
+schema = gen.plan("Purchase orders for a coffee wholesaler", name="coffee")
+batch = gen.generate_batch(schema, entity="Order", count=10,
+                           scenario="Coffee wholesalers across different US regions")
+
+report = evaluate_document_labels(
+    [doc.data for doc in batch.succeeded], schema, entity_name="Order",
+)
+
+print(report.document_count, report.field_count)
+print(report.completeness_score, report.coverage_score, report.overall_score)
+print(report.per_field_presence)   # {field path: fraction of documents with a value}
+for issue in report.issues:
+    print(issue)
+```
+
+`critique_structured` is the tabular counterpart: an LLM reads a sample of the
+dataset (the first 25 rows per entity) and reviews it for intra-record logic,
+cross-entity referential integrity, temporal coherence, realism, and
+distributional tells:
+
+```python
+import os
+import pandas as pd
+from seed_data.evaluation import critique_structured
+
+result = gen.generate_structured(schema, rows=500, format="csv")
+by_stem = {os.path.splitext(os.path.basename(p))[0]: p for p in result.output_paths}
+records = {
+    entity: pd.read_csv(by_stem[entity.lower().replace(" ", "_")]).to_dict(orient="records")
+    for entity in result.row_counts
+}
+
+verdict = critique_structured(
+    records,
+    result.schema,
+    steering="Order dates must never precede the customer's signup date.",
+    model="haiku",
+    threshold=7,
+)
+print(verdict["score"], verdict["verdict"], verdict["summary"])
+for issue in verdict["issues"]:
+    print(issue)
+```
+
+It returns an advisory dict — `score`, `verdict`, `issues`, `summary` — and never
+raises on a failed review. `verdict` is `"accepted"` or `"rejected"` against
+`threshold`, or `"error"` with an extra `error` key if the reviewer was
+unreachable, so a finished generation run is never lost to a critique failure.
+`data` may also be a path to a JSON file holding the same entity-to-records
+mapping.
+
+The deterministic tabular scorers behind `StructuredResult.evaluation` are
+available directly as `run_evaluation`, which needs the `[structured]` extra:
+
+```python
+from seed_data.evaluation import run_evaluation
+
+report = run_evaluation(records, result.schema, quality_threshold=0.7)
+
+print(report.overall_quality_score, report.passes_quality_gate)
+print(report.overall_diversity_score, report.overall_fidelity_score)
+print(report.overall_coverage_score, report.overall_structural_score)
+for issue in report.issues:
+    print(issue)
+```
+
 ## See also
 
 - [CLI Usage](../CLI-Usage/README.md) — the same capabilities from the command line.
+- [Plan](../Guides/plan.md) — every input type and the `InferredSchema` it produces.
+- [Structured Data](../Guides/structured-data.md) — the full tabular guide.
 - [Schema from Documents](../Guides/schema-from-documents.md) — infer schemas from real documents.
 - [`Generator` API reference](../API-Reference/generator.md) — full method signatures.
 - [Creating a Document Type](../Guides/creating-a-document-type.md) — authoring a schema.
