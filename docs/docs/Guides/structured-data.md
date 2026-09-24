@@ -263,11 +263,27 @@ in `StructuredResult.evaluation` and in the CLI's `Quality:` line:
 | `coverage` | How much of the specified value space was explored: enum values seen at least once, the proportion of numeric ranges used, observed value combinations. Low means whole regions of the schema went untested. |
 | `structural` | Validity across entities: referential integrity, type conformance, and uniqueness. Low means broken foreign keys or duplicated unique keys. |
 
-`overall_quality_score` is a weighted blend of the four, and
-`passes_quality_gate` compares it to `quality_threshold`. `report.entity_reports`
+`overall_quality_score` is a weighted blend of the four. `passes_quality_gate`
+requires **both** that blend to reach `quality_threshold` **and** every dimension to
+clear its own minimum (diversity 0.5, fidelity 0.6, coverage 0.4, structural 0.7).
+The per-dimension check stops one collapsed score from hiding behind three
+healthy ones. A table whose primary keys are all duplicated, for example, fails
+the gate even though its blended score looks acceptable. `report.entity_reports`
 carries the same breakdown per entity, and `report.issues` lists specific
-problems — an entity with no records, a high constraint-violation rate, low
-referential integrity.
+problems: an entity with no records, a high constraint-violation rate, low
+referential integrity, duplicate values in unique fields.
+
+A few edge cases are scored deliberately:
+
+- Data that shares **no columns** with its schema fails. It is not scored as
+  vacuously perfect.
+- A dimension with **nothing to measure** is not penalized. Examples: an entity
+  with no enum or bounded numeric fields (coverage), a table of only foreign keys
+  (fidelity), a date field with a distribution (the numeric distribution check is
+  skipped).
+- Foreign-key columns are checked by **referential integrity** only. They are
+  exempt from type and range checks, because they copy their parent's key values
+  verbatim.
 
 For the document modality the counterpart is `evaluate_document_labels`, which
 scores document ground-truth labels for field completeness and coverage and flags

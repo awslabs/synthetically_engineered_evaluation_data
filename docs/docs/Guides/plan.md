@@ -124,8 +124,12 @@ seed-data plan ./contracts/customer.schema.json --name customer --output ./schem
 seed-data plan ./db/schema.sql --name warehouse --output ./schema.json
 ```
 
-A `.json` path only counts as a formal schema when the file **exists on disk**; a
-description that happens to end in `.json` is treated as free text instead.
+A data, schema or ERD path (`.csv`, `.xlsx`, `.json`, `.sql`, `.ddl`, `.dbml`,
+`.puml`, `.mmd`, …) is only treated as a file when it **exists on disk**. Otherwise
+it is treated as free text. A typo such as `custmers.csv` is therefore planned as
+a description, not silently accepted as an empty data file. Check the entities
+`plan` reports before generating. Document paths (`.pdf`, `.png`, `.jpg`, globs,
+`s3://`) are the exception: if nothing resolves they raise an error instead.
 
 ### Python
 

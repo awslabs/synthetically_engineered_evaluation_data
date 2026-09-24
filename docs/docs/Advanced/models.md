@@ -22,11 +22,18 @@ Each stage has its own flag and default:
 
 | Flag | Default | Stage |
 |------|---------|-------|
-| `--data-model` | `nova2-lite` | Data generation |
+| `--data-model` | `gpt-oss` | Data generation (documents), schema extraction (`plan`), structured generation |
 | `--doc-model` | `gpt-oss` | PDF generation |
 | `--critic-model` | `sonnet` | All critics |
 | `--aug-model` | `gpt-oss` | Augmentation decisions |
-| `--context-model` | `gpt-oss` | Shared context resolution (packets only) |
+| `--batch-model` | `nova2-lite` | Batch scenario planning |
+| `--context-model` | `nova2-lite` | Shared context resolution (packets only) |
+| `--infer-model` | `sonnet` | Schema inference from documents (`infer-schema`); must be vision-capable |
+
+Every subcommand that takes one of these flags uses the same default, so the
+two-step `plan` + `generate-structured` flow and the one-shot `plan-and-generate`
+run on the same models. `--infer-model` deliberately does not follow
+`--data-model`: it reads PDFs and images, and `gpt-oss` is text-only.
 
 Example, overriding models per stage:
 
