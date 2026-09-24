@@ -18,6 +18,8 @@ builds on:
 """
 from __future__ import annotations
 
+import asyncio
+
 from pydantic import BaseModel, Field
 from strands.multiagent.base import MultiAgentBase, NodeResult, Status, MultiAgentResult
 from strands.agent.agent_result import AgentResult
@@ -136,7 +138,16 @@ class FunctionNode(MultiAgentBase):
 
     async def invoke_async(self, task, invocation_state=None, **kwargs):
         task_text = task if isinstance(task, str) else str(task)
-        result_text = self.func(task_text, self.ctx)
+        # In a worker thread, not on the event loop: the bound functions are
+        # synchronous and the critics call `Agent.__call__` (a blocking wait on
+        # `future.result()`), so running them inline stalled the loop that the
+        # batch fan-out's sibling workers — and the graph's own node_timeout —
+        # live on. A 10-document batch ran at sequential wall clock, and a wedged
+        # critic could not be timed out, because nothing else could be scheduled
+        # while it held the loop. Threads are the same isolation the packet path
+        # already uses (one loop per ThreadPoolExecutor worker), and each node's
+        # ctx is its own, so there is no shared mutable state to race on.
+        result_text = await asyncio.to_thread(self.func, task_text, self.ctx)
         agent_result = AgentResult(
             stop_reason="end_turn",
             message=Message(role="assistant", content=[ContentBlock(text=str(result_text))]),

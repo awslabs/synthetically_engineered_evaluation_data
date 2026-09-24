@@ -38,8 +38,30 @@ from seed_data.schema.models import EntitySchema, FieldDefinition, InferredSchem
     ("Generate 100 fake customers with names and emails", InputType.FREE_TEXT),
     ("a description that ends in a word", InputType.FREE_TEXT),
 ])
-def test_detect_input_type(spec, expected):
+def test_detect_input_type(spec, expected, tmp_path):
+    # Non-document file types require the file to exist (see below); create it so
+    # this table keeps testing pure extension -> type mapping.
+    if expected in (InputType.EXAMPLE_DATA, InputType.SCHEMA, InputType.ERD):
+        real = tmp_path / spec
+        real.write_text("x")
+        spec = str(real)
     assert detect_input_type(spec) == expected
+
+
+@pytest.mark.parametrize("spec", [
+    "custmers.csv", "model.sql", "diagram.dbml", "sales.xlsx",
+])
+def test_detect_missing_file_is_free_text(spec):
+    """A typo'd path must not be accepted as a real input.
+
+    Classified by extension alone, `plan ./data/custmers.csv` reached
+    `analyze_example_data`, got `{"error": "File not found"}` back as a
+    *successful* tool result, and the model invented a schema from nothing —
+    while SCHEMA/ERD specs fell back to treating the literal path string as the
+    schema text. The .json branch always had this check; these three types were
+    the gap.
+    """
+    assert detect_input_type(spec) == InputType.FREE_TEXT
 
 
 def test_detect_json_file_is_schema_when_exists(tmp_path):
@@ -53,9 +75,11 @@ def test_detect_json_nonexistent_is_free_text():
     assert detect_input_type("something.json") == InputType.FREE_TEXT
 
 
-def test_detect_case_insensitive_extension():
+def test_detect_case_insensitive_extension(tmp_path):
     assert detect_input_type("REPORT.PDF") == InputType.DOCUMENT
-    assert detect_input_type("DATA.CSV") == InputType.EXAMPLE_DATA
+    csv = tmp_path / "DATA.CSV"
+    csv.write_text("a,b")
+    assert detect_input_type(str(csv)) == InputType.EXAMPLE_DATA
 
 
 # --- run_ingest orchestration (agent + infer_schema mocked) -----------------
@@ -93,7 +117,7 @@ def test_run_ingest_free_text_calls_extraction_agent(monkeypatch):
     assert captured.get("text_description") == "Generate customers with names"
 
 
-def test_run_ingest_merges_multiple_inputs(monkeypatch):
+def test_run_ingest_merges_multiple_inputs(monkeypatch, tmp_path):
     calls = []
 
     def fake_extract(**kwargs):
@@ -107,9 +131,12 @@ def test_run_ingest_merges_multiple_inputs(monkeypatch):
 
     monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
 
+    # Real file: a non-existent .sql spec is now (correctly) free text.
+    sql = tmp_path / "model.sql"
+    sql.write_text("CREATE TABLE t (id INT);")
     schema = run_ingest(
         "a free text description",
-        "model.sql",
+        str(sql),
         verbose=False,
     )
 
@@ -132,7 +159,7 @@ def test_run_ingest_documents_delegated(monkeypatch):
     assert [e.entity_name for e in schema.entities] == ["Invoice"]
 
 
-def test_run_ingest_erd_format_detection(monkeypatch):
+def test_run_ingest_erd_format_detection(monkeypatch, tmp_path):
     captured = {}
 
     def fake_extract(**kwargs):
@@ -141,7 +168,9 @@ def test_run_ingest_erd_format_detection(monkeypatch):
 
     monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
 
-    run_ingest("diagram.mmd", verbose=False)
+    mmd = tmp_path / "diagram.mmd"
+    mmd.write_text("erDiagram\n  A ||--o{ B : has")
+    run_ingest(str(mmd), verbose=False)
     assert captured.get("erd_format") == "mermaid"
 
 

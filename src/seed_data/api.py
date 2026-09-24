@@ -298,6 +298,7 @@ class Generator:
             timeout=self.timeout,
             augment=self.augment if augment is None else augment,
             critic_samples=self.critic_samples,
+            session=self.session,
             renderer=self.renderer,
         )
         if count == 1:

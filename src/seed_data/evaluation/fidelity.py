@@ -211,7 +211,13 @@ class FidelityMetrics:
                 continue
 
             series = data[field.name]
-            if field.distribution.type == DistributionType.NORMAL:
+            if field.distribution.type == DistributionType.NORMAL and field.type in ("integer", "float"):
+                # Numeric only: the generator supports NORMAL on date/datetime too
+                # (params are day offsets), and running the numeric KS on ISO date
+                # strings coerced them all to NaN -> "fewer than 2 values" -> a 1.0
+                # distance appended for perfectly correct dates, pinning fidelity at
+                # exactly the 0.6 gate threshold. Dates are simply not scored here:
+                # unmeasurable is not the same as worst-possible.
                 # Read through the *same* helpers the generator uses, so the evaluator
                 # scores against the parameters that were actually sampled from. Read
                 # raw, a spec of `{"mean": 100, "std": 0}` was generated with
@@ -232,7 +238,17 @@ class FidelityMetrics:
                 # data worst-possible because the *schema* omitted its weights.
                 if field.enum_values and isinstance(weights_list, list) and weights_list:
                     expected = dict(zip(field.enum_values, weights_list))
-                    observed = _hashable(series).dropna().value_counts().to_dict()
+                    # str()-normalized: `enum_values` is `list[str]` by model
+                    # validator, while `_coerce_enum` emits real ints/floats/bools —
+                    # compared raw, a numeric enum matching its weights exactly had
+                    # disjoint supports and scored JSD 1.0. The other two consumers
+                    # (`coverage.enum_coverage_ratio`, `_violates_constraint`)
+                    # already str()-normalize; this was the odd one out.
+                    observed_raw = _hashable(series).dropna().value_counts().to_dict()
+                    observed: dict = {}
+                    for key, count in observed_raw.items():
+                        skey = str(key)
+                        observed[skey] = observed.get(skey, 0) + count
                     jsd = self.distribution_distance_jsd(observed, expected)
                     results["distribution_distances"][field.name] = {"jsd": jsd}
                     dist_scores.append(1.0 - jsd)

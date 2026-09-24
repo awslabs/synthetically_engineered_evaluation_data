@@ -89,9 +89,14 @@ def positive_param(params: dict, name: str, default: float) -> float:
     or below (``lambda``, ``std``, ``sigma``).
     """
     raw = params.get(name, default)
+    if isinstance(raw, (list, tuple)):
+        # The same one-element-list unwrap as `scalar_param`: `params` is typed
+        # `float | list[float]`, and a response like {"mean":[2000.0],"std":[300.0]}
+        # previously had `mean` honoured while `std` silently fell back to 1.0 —
+        # producing a near-constant column, which the evaluator (sharing this
+        # helper) then scored as conforming.
+        raw = raw[0] if len(raw) == 1 else default
     try:
-        # A list is a valid `params` value per the model's type, so a scalar
-        # parameter can legitimately arrive as one.
         value = float(raw)
     except (TypeError, ValueError):
         logger.warning("Distribution parameter %s=%r is not a number — using %s", name, raw, default)

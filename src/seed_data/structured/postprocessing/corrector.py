@@ -76,7 +76,7 @@ class RecordCorrector:
         elif violation.violation_type == "length_violation":
             return self._correct_length(record.get(violation.field), field)
         elif violation.violation_type == "pattern_violation":
-            return self._correct_pattern(record.get(violation.field), field)
+            return self._correct_pattern(record.get(violation.field), field, violation, all_data)
         elif violation.violation_type == "uniqueness_violation":
             return self._correct_uniqueness(violation, field, all_data)
         return None
@@ -188,10 +188,25 @@ class RecordCorrector:
             suffix += 1
         return f"{base}_{suffix}"
 
-    def _correct_pattern(self, value, field: FieldDefinition):
-        """Generate a new value matching the field's regex pattern."""
+    def _correct_pattern(
+        self, value, field: FieldDefinition, violation: Violation,
+        all_data: dict[str, list[dict]],
+    ):
+        """Generate a new value matching the field's regex pattern.
+
+        For a ``unique`` field the live column values are excluded, exactly as
+        ``_correct_uniqueness`` does — repairing with an empty ``existing`` set
+        could mint a value already present in another row, and correction runs
+        only once, so the resulting uniqueness_violation (fixable, but never
+        re-corrected) survived into the exported data as a duplicate key.
+        """
         if not field.pattern:
             return value
         from seed_data.structured.generation import _generate_from_pattern
-        values = _generate_from_pattern(field.pattern, 1, set(), rng=self.rng)
+
+        existing: set[str] = set()
+        if field.unique:
+            records = all_data.get(violation.entity, [])
+            existing = {str(r.get(field.name)) for r in records if r.get(field.name) is not None}
+        values = _generate_from_pattern(field.pattern, 1, existing, rng=self.rng)
         return values[0] if values else value

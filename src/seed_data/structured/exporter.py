@@ -5,6 +5,8 @@ import os
 import pandas as pd
 from strands import tool
 
+from seed_data.utils import safe_path_segment
+
 logger = logging.getLogger(__name__)
 
 # Extensions this exporter owns, per format. Used both to pick the output path and
@@ -91,8 +93,19 @@ def export_data(data_json: str, export_format: str, output_dir: str) -> str:
     # prior csv when this run writes parquet). Scoped by name on purpose: the
     # output dir may be shared with the document pipeline or hold unrelated user
     # files, and a blanket wipe of the directory would destroy them.
+    # Entity names come from the LLM-inferred schema and become path components,
+    # so they get the same treatment as packet's `document_class`: unsanitized,
+    # an entity named "../victim" wrote outside output_dir — and the stale-clear
+    # loop below would `os.remove` there on the next run. `safe_path_segment` is
+    # the shared helper added for exactly this hazard. Computed once so the
+    # stale-clear and write loops always agree on the name.
+    safe_names = {
+        name: safe_path_segment(name.lower().replace(" ", "_"), f"entity-{n + 1}")
+        for n, name in enumerate(data)
+    }
+
     for entity_name in data:
-        safe_name = entity_name.lower().replace(" ", "_")
+        safe_name = safe_names[entity_name]
         for ext in _FORMAT_EXTS.values():
             stale = os.path.join(output_dir, f"{safe_name}.{ext}")
             if os.path.isfile(stale):
@@ -105,7 +118,7 @@ def export_data(data_json: str, export_format: str, output_dir: str) -> str:
 
         df = pd.DataFrame(records)
         record_counts[entity_name] = len(df)
-        safe_name = entity_name.lower().replace(" ", "_")
+        safe_name = safe_names[entity_name]
         # Format was validated above, so this lookup cannot KeyError.
         path = os.path.join(output_dir, f"{safe_name}.{_FORMAT_EXTS[export_format]}")
 

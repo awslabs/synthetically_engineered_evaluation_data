@@ -175,10 +175,30 @@ class StructuralMetrics:
             sum(type_scores) / len(type_scores) if type_scores
             else (1.0 if not schema.entities else 0.0)
         )
+
+        # Uniqueness as a *rate*, applied multiplicatively. The previous form —
+        # an absolute count capped at 0.5 of a 0.2-weighted term — could never
+        # move the score below 0.9, so a table whose every primary key was
+        # duplicated (20 violations in 40 rows) scored 0.911 and passed the gate;
+        # 10 duplicates in 10 rows and 10 in 10,000 also scored identically.
+        # Duplicate keys corrupt the table's identity, so the rate scales the
+        # whole structural score rather than renting 20% of it: rows measured
+        # only over entities that declare a unique field, violations/rows capped
+        # at 1.0.
+        rows_with_unique = sum(
+            len(all_data.get(e.entity_name, []))
+            for e in schema.entities
+            if any(f.unique for f in e.fields)
+            and all_data.get(e.entity_name) is not None
+        )
         total_unique_violations = sum(results["uniqueness_violations"].values())
-        uniqueness_penalty = min(total_unique_violations * 0.05, 0.5)
+        uniqueness_rate = (
+            1.0 - min(1.0, total_unique_violations / rows_with_unique)
+            if rows_with_unique else 1.0
+        )
+        results["uniqueness_rate"] = uniqueness_rate
 
         results["overall_score"] = (
-            0.4 * results["referential_integrity"] + 0.4 * avg_type + 0.2 * (1.0 - uniqueness_penalty)
-        )
+            0.5 * results["referential_integrity"] + 0.5 * avg_type
+        ) * uniqueness_rate
         return results

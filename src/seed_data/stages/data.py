@@ -49,6 +49,19 @@ def build_generator(ctx: StageContext) -> Agent:
 
 def _schema_errors(schema: dict, data: dict) -> list[CritiqueIssue]:
     """Deterministic JSON-Schema validation — exact, free, no LLM."""
+    # The schema itself may be invalid: `infer.py` hands the vision model's
+    # verbatim json_schema straight into this path, and a hand-edited schema dir
+    # can say `"type": "date"`. Unchecked, that raised UnknownType / TypeError /
+    # re.error out of the critic node and aborted the graph before any PDF. An
+    # invalid schema is not something regenerating the *data* can fix, so it is
+    # reported as a single critical issue rather than raised.
+    try:
+        jsonschema.Draft7Validator.check_schema(schema)
+    except jsonschema.SchemaError as e:
+        return [CritiqueIssue(
+            category="schema_invalid", severity="critical",
+            description=f"The schema itself is invalid, so data cannot be validated: {e.message}",
+        )]
     issues = []
     for e in jsonschema.Draft7Validator(schema).iter_errors(data):
         path = ".".join(str(p) for p in e.absolute_path) or "(root)"
@@ -89,6 +102,9 @@ def critique(ctx: StageContext) -> Verdict:
             summary=f"{len(schema_issues)} JSON Schema validation error(s) — fix before LLM critique.",
             feedback="\n".join(f"- [{i.severity}] {i.description}" for i in schema_issues),
             issues=schema_issues,
+            # An invalid *schema* cannot be fixed by regenerating the data; retrying
+            # would burn every attempt against the same broken schema.
+            retryable=not any(i.category == "schema_invalid" for i in schema_issues),
         )
 
     # LLM judgment: domain realism + arithmetic (with a calculator tool).

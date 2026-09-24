@@ -142,6 +142,7 @@ def resolve_shared_context(
     config: PacketConfig,
     extra: str = "",
     model: str = "nova2-lite",
+    session=None,
 ) -> dict[str, Any]:
     """Resolve shared context fields for a packet.
 
@@ -164,11 +165,11 @@ def resolve_shared_context(
 
     if config.shared_context:
         return _generate_values_for_explicit_context(
-            config, schema_summaries, extra, model,
+            config, schema_summaries, extra, model, session=session,
         )
 
     return _infer_and_generate_context(
-        config, schema_summaries, extra, model,
+        config, schema_summaries, extra, model, session=session,
     )
 
 
@@ -190,12 +191,13 @@ def _generate_values_for_explicit_context(
     schema_summaries: str,
     extra: str,
     model: str,
+    session=None,
 ) -> dict[str, Any]:
     """Generate values for explicitly defined shared context fields."""
     from strands import Agent
 
     agent = Agent(
-        model=make_model(model),
+        model=make_model(model, session=session),
         system_prompt=(
             "You generate realistic shared context values for a document packet. "
             "Be highly creative and diverse — vary names, ethnicities, locations, occupations, "
@@ -234,12 +236,13 @@ def _infer_and_generate_context(
     schema_summaries: str,
     extra: str,
     model: str,
+    session=None,
 ) -> dict[str, Any]:
     """Infer shared fields from schemas, then generate values."""
     from strands import Agent
 
     agent = Agent(
-        model=make_model(model),
+        model=make_model(model, session=session),
         system_prompt=(
             "You analyze document schemas to find fields that should be consistent "
             "across related documents, then generate realistic values. "
@@ -323,6 +326,7 @@ def generate_packet(
     critic_samples: bool = True,
     renderer: str = "xhtml2pdf",
     enable_preview: bool = False,
+    session=None,
 ) -> PacketResult:
     """Generate a single packet: resolve context, generate docs, merge, emit labels.
 
@@ -358,7 +362,9 @@ def generate_packet(
     # Step 1: Resolve shared context
     if shared_context is None:
         print(f"  Resolving shared context for packet {packet_id}...")
-        shared_context = resolve_shared_context(config, extra=extra, model=context_model)
+        shared_context = resolve_shared_context(
+            config, extra=extra, model=context_model, session=session,
+        )
 
     # Save shared context for reproducibility
     context_path = os.path.join(workspace_dir, "shared_context.json")
@@ -387,6 +393,11 @@ def generate_packet(
         augment=augment,
         critic_samples=critic_samples,
         renderer=renderer,
+        # Flows via **generate_kwargs into `stages.pipeline.generate(session=...)`.
+        # `Generator(session=...)` documents in-process credentials for every
+        # modality; packets were the one path that silently dropped it and fell
+        # back to ambient env credentials.
+        session=session,
     )
 
     # Step 4: Optionally shuffle order

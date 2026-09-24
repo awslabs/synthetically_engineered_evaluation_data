@@ -220,7 +220,16 @@ def generate(
     )
     doc_id = os.path.splitext(os.path.basename(ctx.output_path))[0]
 
-    graph = build_pipeline_graph(ctx, max_attempts=max_attempts, timeout=timeout, augment=augment)
+    # `node_timeout=timeout`: the per-node cap exists to unwedge a stuck node,
+    # but left at its 600s default it silently overrode the user's --timeout —
+    # the whole doc render loop lives inside ONE node (`doc_loop`), so three
+    # legitimate 3-minute generate->render->critique cycles blew the cap and the
+    # run failed despite `--timeout 7200`. The user's timeout is the bound they
+    # asked for; a wedged node still dies, just at that bound.
+    graph = build_pipeline_graph(
+        ctx, max_attempts=max_attempts, timeout=timeout, augment=augment,
+        node_timeout=timeout,
+    )
 
     if verbose:
         print(f"Doctype:    {ctx.doctype}")

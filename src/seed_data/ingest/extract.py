@@ -130,7 +130,13 @@ def extract_schema(
 
     if file_path:
         ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
-        if ext in ("csv", "json"):
+        if ext in ("csv", "json", "xls", "xlsx"):
+            # xls/xlsx belong here, not in the raw-document branch below:
+            # `detect_input_type` classifies them EXAMPLE_DATA, and
+            # `analyze_example_data`'s per-sheet Excel reader exists for them.
+            # Routed as document bytes, the whole workbook was inlined into the
+            # Bedrock request, the prompt never mentioned the tool, and the
+            # spreadsheet path this PR added was unreachable end to end.
             prompt_parts.append(f"- Example data file: {file_path}")
             prompt_parts.append("  → Use the analyze_example_data tool to read and summarize it.")
         elif erd_format == "image" or ext in ("png", "jpg", "jpeg"):
@@ -154,7 +160,14 @@ def extract_schema(
             if os.path.isfile(file_path):
                 with open(file_path, "rb") as f:
                     file_bytes = f.read()
-                doc_name = Path(file_path).stem
+                # Bedrock document names allow only [alnum, space, hyphen,
+                # paren, bracket] — `inputs._safe_doc_name` documents and applies
+                # the constraint for the vision path; unsanitized, an ordinary
+                # stem like "sales_data" or "q1.2024" failed the Converse call
+                # with a ValidationException.
+                from seed_data.inputs import _safe_doc_name
+
+                doc_name = _safe_doc_name(Path(file_path).stem)
                 prompt_parts.append(f"- Document (attached below, format: {ext}):")
                 prompt_parts.append("  → Analyze this document to extract all data entities, fields, relationships, and constraints.")
                 content_blocks.append({

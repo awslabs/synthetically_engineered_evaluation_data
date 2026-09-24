@@ -134,6 +134,9 @@ def build_batch_graph(
         name = f"worker_{i}"
         pipeline = build_pipeline_graph(
             ctx, max_attempts=max_attempts, timeout=timeout, augment=augment,
+            # Same reasoning as `generate`: the 600s default node cap overrode
+            # the caller's timeout for the whole per-document render loop.
+            node_timeout=timeout,
         )
         builder.add_node(pipeline, name)
         builder.add_edge("coordinator", name)

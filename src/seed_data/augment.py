@@ -87,7 +87,12 @@ def _coerce_to_default_shape(value, default):
     def _num(x):
         if isinstance(x, bool):
             return x
-        if want_int and isinstance(x, (int, float)):
+        # Truncate only integral values. An int-typed default does not mean the
+        # param is integer-only — augraphy's `p` defaults to the int `1` but is a
+        # probability, and `int(0.8) == 0` silently disabled the augmentation
+        # entirely (the critic then rejected "no visible change" until the
+        # attempt cap accepted an un-augmented PDF). main preserved 0.8 here.
+        if want_int and isinstance(x, (int, float)) and float(x).is_integer():
             return int(x)
         return x
 

@@ -2980,6 +2980,7 @@ dev = [
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pyarrow" },
     { name = "pymdown-extensions" },
     { name = "pytest" },
     { name = "ruff" },
@@ -2999,6 +3000,7 @@ test = [
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pyarrow" },
     { name = "pytest" },
     { name = "scipy" },
 ]
@@ -3046,6 +3048,7 @@ dev = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", specifier = ">=15.0" },
     { name = "pymdown-extensions" },
     { name = "pytest" },
     { name = "ruff", specifier = ">=0.15,<0.16" },
@@ -3063,6 +3066,7 @@ test = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", specifier = ">=15.0" },
     { name = "pytest" },
     { name = "scipy", specifier = ">=1.12" },
 ]

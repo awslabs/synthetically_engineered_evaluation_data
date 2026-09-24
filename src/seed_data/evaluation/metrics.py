@@ -122,7 +122,13 @@ def evaluate_document_labels(
         report.issues.append("No document labels provided.")
         return report
 
-    required_leaves = [(p, f) for p, f in leaves if f.is_required]
+    # `requires_value`, not `is_required`: a required-and-nullable leaf (4 of the
+    # bundled fcc-invoice's 8 required leaves) may legitimately be null, and
+    # `models.py` documents `requires_value` as the property for exactly this
+    # decision — `fidelity.constraint_violation_rate` already uses it. Keyed off
+    # `is_required`, a document that filled everything and nulled those leaves per
+    # the schema's own null_description scored completeness 0.5.
+    required_leaves = [(p, f) for p, f in leaves if f.requires_value]
     present_counts = {path: 0 for path, _ in leaves}
     completeness_per_doc = []
 
@@ -145,7 +151,10 @@ def evaluate_document_labels(
         else:
             completeness_per_doc.append(1.0)
 
-    n = len(labels)
+    # Divide by the labels actually scored: `len(labels)` counted skipped
+    # non-object entries as documents that omitted every field, so
+    # `per_field_presence` disagreed with `completeness_score` in the same report.
+    n = len(completeness_per_doc) or 1
     report.per_field_presence = {path: present_counts[path] / n for path in present_counts}
     report.completeness_score = (
         sum(completeness_per_doc) / len(completeness_per_doc) if completeness_per_doc else 0.0
@@ -270,6 +279,36 @@ def run_evaluation(
             f"Low referential integrity: {structural_result['referential_integrity']:.1%}"
         )
 
+    # Duplicate unique-key violations were previously never surfaced as an issue,
+    # so total primary-key duplication passed silently — the report showed a green
+    # gate and zero issues for a table whose every key appeared twice.
+    total_unique_violations = sum(structural_result.get("uniqueness_violations", {}).values())
+    if total_unique_violations:
+        issues.append(
+            f"{total_unique_violations} duplicate value(s) in unique fields "
+            f"(uniqueness rate: {structural_result.get('uniqueness_rate', 0.0):.1%})"
+        )
+
+    # The gate requires every dimension to clear its own bar as well as the
+    # blended overall. On the blend alone, a collapsed dimension hid behind three
+    # healthy ones — total primary-key duplication (structural 0.5) still blended
+    # to 0.81 and "passed". This also keeps the report's gate consistent with the
+    # per-dimension gate `structured/pipeline`'s evaluate step applies, so the two
+    # consumers of this report cannot disagree about whether a dataset passed.
+    from seed_data.common.config import QUALITY_THRESHOLDS
+
+    dimension_scores = {
+        "diversity": overall_diversity,
+        "fidelity": overall_fidelity,
+        "coverage": overall_coverage,
+        "structural": overall_structural,
+    }
+    dimensions_pass = all(
+        score >= QUALITY_THRESHOLDS[dim]
+        for dim, score in dimension_scores.items()
+        if dim in QUALITY_THRESHOLDS
+    )
+
     return EvaluationReport(
         entity_reports=entity_reports,
         structural=structural_result,
@@ -278,6 +317,6 @@ def run_evaluation(
         overall_coverage_score=overall_coverage,
         overall_structural_score=overall_structural,
         overall_quality_score=overall_quality,
-        passes_quality_gate=overall_quality >= quality_threshold,
+        passes_quality_gate=overall_quality >= quality_threshold and dimensions_pass,
         issues=issues,
     )

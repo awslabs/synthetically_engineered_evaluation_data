@@ -185,25 +185,54 @@ def _expand_char_class(char_class: str) -> str:
     if negated:
         inner = inner[1:]
 
-    chars: list[str] = []
+    # Tokenize first, then expand ranges over the tokens. Escapes have to be
+    # resolved *before* the range logic runs — reading `inner` character by
+    # character treated a backslash as a literal member of the pool, so
+    # `[A-Z0-9\-]{5}` emitted values containing backslashes and `[\d]{4}` drew
+    # from the two characters 'd' and '\'. Those values fail their own pattern,
+    # and `_correct_pattern` regenerates through this same expander, so the
+    # violations survived correction and were exported.
+    shorthands = {
+        "d": string.digits,
+        "w": string.ascii_letters + string.digits + "_",
+        "s": " ",
+    }
+    # Each token is (character_set, was_escaped). The flag matters for '-':
+    # an escaped `\-` is always the literal hyphen, never a range operator.
+    tokens: list[tuple[str, bool]] = []
     i = 0
     while i < len(inner):
-        # A '-' is a range operator only between two characters; at either end
-        # of the class it is a literal hyphen.
-        is_range = (
-            inner[i] == "-"
-            and i > 0
-            and i + 1 < len(inner)
-        )
-        if is_range:
-            # Already consumed the low end on the previous iteration.
-            low, high = inner[i - 1], inner[i + 1]
-            if ord(low) <= ord(high):
-                chars.extend(chr(c) for c in range(ord(low) + 1, ord(high) + 1))
+        if inner[i] == "\\" and i + 1 < len(inner):
+            nxt = inner[i + 1]
+            tokens.append((shorthands.get(nxt, nxt), True))
             i += 2
             continue
-        chars.append(inner[i])
+        tokens.append((inner[i], False))
         i += 1
+
+    chars: list[str] = []
+    j = 0
+    while j < len(tokens):
+        text, escaped = tokens[j]
+        # An unescaped '-' is a range operator only between two single-character
+        # tokens (`\d-x` keeps it literal: the left token is multi-character).
+        # At either end of the class it is a literal hyphen.
+        is_range = (
+            text == "-"
+            and not escaped
+            and 0 < j < len(tokens) - 1
+            and len(tokens[j - 1][0]) == 1
+            and len(tokens[j + 1][0]) == 1
+        )
+        if is_range:
+            # The low end was already appended on the previous iteration.
+            low, high = tokens[j - 1][0], tokens[j + 1][0]
+            if ord(low) <= ord(high):
+                chars.extend(chr(c) for c in range(ord(low) + 1, ord(high) + 1))
+            j += 2
+            continue
+        chars.extend(text)
+        j += 1
 
     pool = "".join(dict.fromkeys(chars))  # de-duplicate, preserve order
 
@@ -456,14 +485,18 @@ def _needs_llm(field: FieldDefinition, fk_fields: set[str]) -> bool:
     # sent to the LLM.
     if not field.requires_value:
         return False
-    # Anything left is a textual/semantic type with no programmatic generator —
-    # string, but also email, phone, uuid, url, name, address, etc. All need the
-    # LLM. Restricting this to type == "string" (the old behaviour) left those
-    # semantic types unfilled: the programmatic path never emits them, so every
-    # record failed a non-null check and the whole entity was filtered to empty.
-    # Container types (object/array) are not supported in tabular generation and
-    # must NOT be force-filled as strings, so exclude them explicitly.
-    return field.type not in ("object", "array")
+    # Anything left is a field with no programmatic generator — string and the
+    # semantic types (email, phone, uuid, ...), but also required *containers*
+    # (object/array). All need the LLM. Containers were previously excluded here
+    # on the theory that they "must not be force-filled as strings" — but with no
+    # branch in `_generate_programmatic` either, a required container was filled
+    # by neither pass, every row carried an unfixable nullable_violation, and the
+    # whole entity was filtered to empty: `seed-data generate-structured pay-stub`
+    # (whose `Deductions` array is required) exported zero rows. The LLM fill
+    # handles nested JSON fine — the write-back copies whatever JSON value the
+    # model returns, the prompt shows sample records that demonstrate the shape,
+    # and the no-response fallback cycles real sample values rather than strings.
+    return True
 
 
 def _bulk_generation_model(model: str | None = None, session=None):
@@ -723,15 +756,24 @@ def _fill_string_fields_with_llm(
             json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
             if json_match:
                 llm_values = json.loads(json_match.group())
+                # Count records the model actually wrote to, not `len(batch)`:
+                # a short response fills only the first `len(llm_values)` records,
+                # and crediting the whole batch made the completion log overstate
+                # the LLM-filled count whenever a batch came back partial.
+                batch_filled = 0
                 for i, record in enumerate(batch):
                     if i < len(llm_values) and isinstance(llm_values[i], dict):
+                        wrote = False
                         for fname in fields_to_fill:
                             if fname in llm_values[i]:
                                 record[fname] = llm_values[i][fname]
-                filled_count += len(batch)
+                                wrote = True
+                        if wrote:
+                            batch_filled += 1
+                filled_count += batch_filled
                 consecutive_failures = 0
                 logger.info("LLM string batch: filled %d records for %s (total: %d/%d)",
-                            len(batch), entity_name, filled_count, total_count)
+                            batch_filled, entity_name, filled_count, total_count)
             else:
                 # `continue`, not `break`: one bad batch is not a reason to abandon the
                 # remaining ones. Breaking left every later record unfilled, and the

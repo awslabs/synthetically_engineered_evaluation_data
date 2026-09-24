@@ -51,12 +51,21 @@ def detect_input_type(spec: str) -> InputType:
     if ext in SUPPORTED_EXTS:
         return InputType.DOCUMENT
 
+    # Extension-classified *file* types require the file to exist, exactly as the
+    # .json branch always has. Without the check, a typo'd path ("custmers.csv")
+    # was accepted as example data, `analyze_example_data` returned a
+    # `File not found` error the model treated as a successful tool result, and
+    # `plan` wrote an invented schema and exited 0 — while the SCHEMA/ERD paths
+    # fell back to treating the literal path string as the schema text. A phrase
+    # that merely ends in one of these extensions is a free-text description.
+    # (DOCUMENT stays extension-only above: that path already raises
+    # FileNotFoundError when nothing resolves, and it accepts globs/S3.)
     if ext in _EXAMPLE_DATA_EXTS:
-        return InputType.EXAMPLE_DATA
+        return InputType.EXAMPLE_DATA if os.path.isfile(spec) else InputType.FREE_TEXT
     if ext in _SQL_EXTS:
-        return InputType.SCHEMA
+        return InputType.SCHEMA if os.path.isfile(spec) else InputType.FREE_TEXT
     if ext in _ERD_EXTS:
-        return InputType.ERD
+        return InputType.ERD if os.path.isfile(spec) else InputType.FREE_TEXT
     if ext == ".json":
         # A .json file that exists on disk is treated as a JSON-Schema definition;
         # otherwise it's most likely a bare description that happens to end in .json.

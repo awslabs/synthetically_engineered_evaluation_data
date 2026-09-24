@@ -160,6 +160,16 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
     # original enum on the way back out (`_coerce_enum_values` casts on the JSON
     # name, so handing it "float" would silently stop restoring numeric enums).
     raw_jtype = sub.get("type", "string")
+    # draft-07's *list* form (`"type": ["string", "null"]`) is the standard sibling
+    # of the anyOf nullable idiom `_unwrap_nullable` handles. Unhandled, the list
+    # reached `_CANONICAL_TYPES.get(...)` and crashed with `TypeError: unhashable
+    # type: 'list'` — after the paid vision call, since `ingest/pipeline` feeds this
+    # the model's verbatim schema dict and nothing upstream forbids the form.
+    if isinstance(raw_jtype, list):
+        if "null" in raw_jtype:
+            has_null = True
+        non_null_types = [t for t in raw_jtype if t != "null"]
+        raw_jtype = non_null_types[0] if non_null_types else "string"
     jtype = _CANONICAL_TYPES.get(raw_jtype, raw_jtype)
     description = prop.get("description") or sub.get("description") or ""
 
@@ -194,7 +204,14 @@ def _parse_property(name: str, prop: dict, required: set[str]) -> FieldDefinitio
         # validator and make `model_dump_json` warn) and remember the values' real
         # JSON type so the enum rebuilds faithfully.
         non_null = [v for v in sub["enum"] if v is not None]
-        if any(not isinstance(v, str) for v in non_null):
+        # A base type is recorded when any member is non-string OR when a null
+        # member exists. The null case matters even for pure-string enums:
+        # `enum_values` stores null as the string "None", and only the coercion
+        # path (which needs a recorded base type) restores it — without one, a
+        # source `enum: ["active", "inactive", null]` re-emitted the literal
+        # string "None", so the validator rejected the null the source allowed
+        # and accepted a value it never contained.
+        if any(not isinstance(v, str) for v in non_null) or None in sub["enum"]:
             # Inferred from the *members* when the property declares no `type` —
             # draft-07 allows `{"enum": [1, 2, 3]}` with no type at all, and
             # `raw_jtype` defaults to "string" there, so keying off it recorded a
@@ -310,6 +327,11 @@ _ENUM_CASTERS: dict[str, "callable"] = {
     # unparseable member was silently coerced to False.
     "boolean": _to_bool,
     "bool": _to_bool,
+    # Identity casters: present so a *string* enum with a null member still runs
+    # through the coercion path, whose "None" -> None restoration happens before
+    # any caster is applied.
+    "string": str,
+    "str": str,
 }
 
 

@@ -576,9 +576,14 @@ def test_needs_llm_excludes_programmatic_and_container_types():
     # programmatically generated → not LLM
     for jtype in ("integer", "float", "boolean", "date", "datetime"):
         assert _needs_llm(FieldDefinition(name="f", type=jtype, nullable=False), set()) is False
-    # container types are unsupported in tabular and must not be force-filled
+    # Required containers go to the LLM: previously excluded here with no branch in
+    # `_generate_programmatic` either, so a required `Deductions` array was filled by
+    # neither pass, every row was an unfixable nullable_violation, and the bundled
+    # pay-stub schema exported ZERO rows. (This test used to pin that exclusion.)
     for jtype in ("object", "array"):
-        assert _needs_llm(FieldDefinition(name="f", type=jtype, nullable=False), set()) is False
+        assert _needs_llm(FieldDefinition(name="f", type=jtype, nullable=False), set()) is True
+        # ...but an optional container still needs no LLM call — filled with None.
+        assert _needs_llm(FieldDefinition(name="f", type=jtype, required=False), set()) is False
     # enum / unique / distribution / FK are all programmatic
     assert _needs_llm(FieldDefinition(name="s", type="enum", enum_values=["a"]), set()) is False
     assert _needs_llm(FieldDefinition(name="id", type="string", unique=True), set()) is False
@@ -1285,16 +1290,20 @@ def test_export_failure_message_is_not_replaced():
     assert "filtered by validation" not in (result.error or "")
 
 
-def test_string_fk_survives_correction():
-    """A type error on an FK must not be "fixable".
+def test_string_fk_survives_the_whole_postprocessing_pipeline():
+    """FK columns are exempt from type/constraint checks; referential integrity is theirs.
 
-    `_as_float` leaving the string in place only helps if nothing rewrites it. The
-    validator marked the resulting type_error `fixable=True`, and `_correct_type`
-    coerced it to `min_value or 0` — turning every FK in the column into 0 and
-    destroying referential integrity, which is worse than the mismatch it "fixed".
+    This site has now been wrong three ways: `float(v)` crashed the run; keeping the
+    string with a `fixable=True` type_error had `_correct_type` rewrite every FK to
+    `min_value or 0`; and `fixable=False` fed the unfixable-record filter, which
+    deleted the entire child table (6 -> 0 rows). The earlier version of this test
+    only exercised `correct_dataset`, never the filter — which is exactly how the
+    third defect got through. It now runs the FULL pipeline.
     """
     from seed_data.schema.models import InferredSchema
-    from seed_data.structured.postprocessing.corrector import RecordCorrector
+    from seed_data.structured.postprocessing.pipeline import (
+        PostProcessingConfig, PostProcessingPipeline,
+    )
     from seed_data.structured.postprocessing.validator import RecordValidator
 
     schema = InferredSchema.model_validate({"entities": [
@@ -1307,18 +1316,28 @@ def test_string_fk_survives_correction():
              "source_entity": "Order", "source_field": "customer_id",
              "target_entity": "Customer", "target_field": "id",
              "cardinality": "one_to_many"}]}]})
-    data = {"Customer": [{"id": "CUS-0001"}, {"id": "CUS-0002"}],
-            "Order": [{"id": 1, "customer_id": "CUS-0001"},
-                      {"id": 2, "customer_id": "CUS-0002"}]}
+    data = {"Customer": [{"id": f"CUS-{i:04d}"} for i in (1, 2, 3)],
+            "Order": [{"id": i, "customer_id": f"CUS-{(i % 3) + 1:04d}"}
+                      for i in range(6)]}
 
+    # No type_error is emitted for the FK at all — it is a schema defect, not a
+    # value defect, and every automated "fix" for it was worse than the mismatch.
     report = RecordValidator().validate_dataset(data, schema)
-    fk_type_errors = [v for v in report.violations
-                      if v.field == "customer_id" and v.violation_type == "type_error"]
-    assert fk_type_errors, "the mismatch must still be reported"
-    assert all(not v.fixable for v in fk_type_errors), "an FK must never be auto-corrected"
+    assert [v for v in report.violations if v.field == "customer_id"] == []
 
-    corrected = RecordCorrector(seed=1).correct_dataset(data, report.violations, schema)
-    assert [r["customer_id"] for r in corrected["Order"]] == ["CUS-0001", "CUS-0002"]
+    result = PostProcessingPipeline(schema, PostProcessingConfig(), seed=1).run(data)
+    assert result.final_count == {"Customer": 3, "Order": 6}, result.final_count
+    assert result.filtered_count == 0
+    assert [r["customer_id"] for r in result.data["Order"]] == [
+        f"CUS-{(i % 3) + 1:04d}" for i in range(6)
+    ]
+
+    # ...and a genuinely dangling FK is still caught and re-pointed (fixable).
+    dangling = {"Customer": [{"id": "CUS-0001"}],
+                "Order": [{"id": 1, "customer_id": "CUS-9999"}]}
+    rep2 = RecordValidator().validate_dataset(dangling, schema)
+    refs = [v for v in rep2.violations if v.violation_type == "fk_violation"]
+    assert refs and all(v.fixable for v in refs)
 
 
 def test_persistent_fill_failure_gives_up_but_intermittent_does_not():
