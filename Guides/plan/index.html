@@ -1,0 +1,2707 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Synthetically Engineered Evaluation Data">
+      
+      
+      
+        <link rel="canonical" href="https://awslabs.github.io/synthetically_engineered_evaluation_data/Guides/plan/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../structured-data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Plan - Synthetically Engineered Evaluation Data</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Synthetically Engineered Evaluation Data" class="md-header__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Synthetically Engineered Evaluation Data
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Synthetically Engineered Evaluation Data
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Getting-Started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CLI-Usage/" class="md-tabs__link">
+          
+  
+  
+  CLI Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Python-API-Usage/" class="md-tabs__link">
+          
+  
+  
+  Python API Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Advanced/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../API-Reference/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Synthetically Engineered Evaluation Data" class="md-nav__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Synthetically Engineered Evaluation Data
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Synthetically Engineered Evaluation Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLI-Usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Python-API-Usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#free-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Free text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#formal-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formal schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Formal schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#erd-diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERD diagrams
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ERD diagrams">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combining-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combining inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-inferredschema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The InferredSchema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The InferredSchema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relationship-to-json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to JSON Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Relationship to JSON Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-superset-adds-and-why-it-cant-be-json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the superset adds, and why it can't be JSON Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../structured-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structured Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-document-type/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a Document Type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema-from-documents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema from Documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../single-document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generation-choices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Choices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/renderers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renderers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/augmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Augmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/packet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/critique/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Critique
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#free-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Free text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Free text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#formal-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formal schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Formal schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Documents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#erd-diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERD diagrams
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ERD diagrams">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combining-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combining inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-inferredschema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The InferredSchema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The InferredSchema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#relationship-to-json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to JSON Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Relationship to JSON Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-superset-adds-and-why-it-cant-be-json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the superset adds, and why it can't be JSON Schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="plan">Plan</h1>
+<p>Planning is the <strong>one front door</strong> into SEED. The <code>plan</code> verb takes any description
+of a dataset — a sentence of prose, a CSV of real rows, a JSON Schema, a SQL
+<code>CREATE TABLE</code>, a scanned PDF, an ERD diagram — and turns it into a single canonical
+<code>InferredSchema</code>. That one schema then drives either output modality, so you
+describe your data once and choose the shape it comes out in afterwards.</p>
+<p>Two things you can do with the result:</p>
+<ul>
+<li><strong>Structured</strong> — feed the schema to <code>generate-structured</code> for tabular
+  CSV/Parquet/Excel/JSON. See <a href="../structured-data/">Structured Data</a>.</li>
+<li><strong>Documents</strong> — feed the <em>same</em> schema to <code>generate-documents</code> for rendered
+  PDFs with paired ground-truth labels.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">A planned schema is a draft for review</p>
+<p>Planning infers structure and constraints from whatever you gave it. A wrong
+<code>required</code> field, a too-narrow numeric range, or a missed relationship would
+skew every record and every document you later generate, so <code>seed-data
+plan</code> <strong>writes the schema and stops</strong> for you to review. Read
+<code>schema.json</code>, fix anything off, then generate.</p>
+</div>
+<p>Every input is classified automatically — you never declare what you are handing
+over. Detection is by URI scheme and file extension, and anything without a
+recognized extension is treated as a free-text description. The five
+classifications are listed by <code>Generator.available_input_types()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span>
+
+<span class="n">Generator</span><span class="o">.</span><span class="n">available_input_types</span><span class="p">()</span>
+<span class="c1"># [&#39;free_text&#39;, &#39;example_data&#39;, &#39;schema&#39;, &#39;document&#39;, &#39;erd&#39;]</span>
+</code></pre></div>
+<h2 id="free-text">Free text</h2>
+<p>The lowest-friction input: describe the dataset in prose. Nothing needs to exist
+on disk.</p>
+<h3 id="cli">CLI</h3>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>plan<span class="w"> </span><span class="s2">&quot;Retail bank customers with credit scores and account tiers, plus the orders each customer placed&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>banking<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<p><code>plan</code> writes one <code>InferredSchema</code> JSON file and prints what it found:</p>
+<div class="highlight"><pre><span></span><code>============================================================
+Wrote InferredSchema to: ./schema.json
+Entities: Customer, Order
+Generate structured data with:
+  seed-data generate-structured ./schema.json --rows 100 --format csv
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inputs</code></td>
+<td>required</td>
+<td>One or more free-text description(s), file paths/globs, and/or <code>s3://</code> URIs</td>
+</tr>
+<tr>
+<td><code>--name</code></td>
+<td><code>dataset</code></td>
+<td>Logical dataset name</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>./schema.json</code></td>
+<td>Path to write the <code>InferredSchema</code> JSON</td>
+</tr>
+<tr>
+<td><code>--quiet</code></td>
+<td>off</td>
+<td>Suppress progress output</td>
+</tr>
+</tbody>
+</table>
+<h3 id="python">Python</h3>
+<p><code>Generator.plan(...)</code> returns a typed <code>InferredSchema</code> — not a dict — so it
+drops straight into the generation verbs:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span>
+
+<span class="n">gen</span> <span class="o">=</span> <span class="n">Generator</span><span class="p">()</span>
+<span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span>
+    <span class="s2">&quot;Retail bank customers with credit scores and account tiers&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;banking&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">([</span><span class="n">e</span><span class="o">.</span><span class="n">entity_name</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">entities</span><span class="p">])</span>
+</code></pre></div>
+<h2 id="example-data">Example data</h2>
+<p>Point <code>plan</code> at real rows and it reads them, summarizes each column (types,
+cardinality, null counts, ranges, sample values), and infers semantic types
+(email, phone, date, enum) and constraints from what it sees. <code>.csv</code>, <code>.json</code>,
+<code>.xls</code>, and <code>.xlsx</code> are recognized.</p>
+<h3 id="cli_1">CLI</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># a CSV of real rows -&gt; a schema shaped like that data</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./samples/customers.csv<span class="w"> </span>--name<span class="w"> </span>customers<span class="w"> </span>--output<span class="w"> </span>./schema.json
+
+<span class="c1"># a spreadsheet works the same way</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./samples/sales.xlsx<span class="w"> </span>--name<span class="w"> </span>sales<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<h3 id="python_1">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;./samples/customers.csv&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;customers&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Real rows are the strongest signal available for value distributions: a column of
+observed credit scores yields a far better range and shape than the phrase
+"credit score" does.</p>
+<h2 id="formal-schema">Formal schema</h2>
+<p>If the structure is already written down, hand it over directly. Both <strong>JSON
+Schema</strong> (<code>.json</code>) and <strong>SQL DDL</strong> (<code>.sql</code>, <code>.ddl</code>) are recognized, and the
+format is chosen from the extension.</p>
+<h3 id="cli_2">CLI</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># a JSON Schema document</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./contracts/customer.schema.json<span class="w"> </span>--name<span class="w"> </span>customer<span class="w"> </span>--output<span class="w"> </span>./schema.json
+
+<span class="c1"># SQL DDL — CREATE TABLE statements, including foreign keys</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./db/schema.sql<span class="w"> </span>--name<span class="w"> </span>warehouse<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<p>A data, schema or ERD path (<code>.csv</code>, <code>.xlsx</code>, <code>.json</code>, <code>.sql</code>, <code>.ddl</code>, <code>.dbml</code>,
+<code>.puml</code>, <code>.mmd</code>, …) is only treated as a file when it <strong>exists on disk</strong>. Otherwise
+it is treated as free text. A typo such as <code>custmers.csv</code> is therefore planned as
+a description, not silently accepted as an empty data file. Check the entities
+<code>plan</code> reports before generating. Document paths (<code>.pdf</code>, <code>.png</code>, <code>.jpg</code>, globs,
+<code>s3://</code>) are the exception: if nothing resolves they raise an error instead.</p>
+<h3 id="python_2">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;./db/schema.sql&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;warehouse&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="documents">Documents</h2>
+<p>Documents and images are read with a <strong>vision model</strong>, reusing the same inference
+path as <a href="../schema-from-documents/">Schema from Documents</a>. Inputs may be <strong>PDF,
+PNG, or JPEG</strong>, from local paths, globs, directories, or <code>s3://</code> URIs — an
+<code>s3://</code> URI is always classified as a document.</p>
+<h3 id="cli_3">CLI</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># one real invoice -&gt; a schema of the fields it contains</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./samples/invoice.pdf<span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span>--output<span class="w"> </span>./schema.json
+
+<span class="c1"># globs and s3:// both work</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span><span class="s1">&#39;./samples/*.pdf&#39;</span><span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span>--output<span class="w"> </span>./schema.json
+seed-data<span class="w"> </span>plan<span class="w"> </span>s3://my-bucket/invoices/<span class="w"> </span>--name<span class="w"> </span>invoice<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<h3 id="python_3">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;./samples/invoice.pdf&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;invoice&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><code>--name</code> matters most for this input kind: it becomes the document-type name the
+vision inference works against.</p>
+<h2 id="erd-diagrams">ERD diagrams</h2>
+<p>An entity-relationship diagram already states the entities, their fields, and the
+foreign keys between them. <code>plan</code> parses <strong>DBML</strong> (<code>.dbml</code>), <strong>PlantUML</strong>
+(<code>.puml</code>, <code>.plantuml</code>), and <strong>Mermaid</strong> (<code>.mmd</code>, <code>.mermaid</code>).</p>
+<h3 id="cli_4">CLI</h3>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>plan<span class="w"> </span>./design/warehouse.dbml<span class="w"> </span>--name<span class="w"> </span>warehouse<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<h3 id="python_4">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;./design/warehouse.dbml&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;warehouse&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>An ERD is the best input for <strong>multi-entity</strong> datasets, because the relationships
+are explicit rather than inferred.</p>
+<h2 id="combining-inputs">Combining inputs</h2>
+<p><code>plan</code> accepts several inputs of <strong>different kinds in one call</strong>. Each is
+classified and routed independently, and the resulting entities are merged into
+one <code>InferredSchema</code>.</p>
+<h3 id="cli_5">CLI</h3>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>plan<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>./design/warehouse.dbml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>./samples/customers.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">&quot;Orders skew heavily toward Q4; about 8% are refunded&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>warehouse<span class="w"> </span>--output<span class="w"> </span>./schema.json
+</code></pre></div>
+<h3 id="python_5">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span>
+    <span class="s2">&quot;./design/warehouse.dbml&quot;</span><span class="p">,</span>              <span class="c1"># entities + relationships</span>
+    <span class="s2">&quot;./samples/customers.csv&quot;</span><span class="p">,</span>              <span class="c1"># observed value distributions</span>
+    <span class="s2">&quot;Orders skew heavily toward Q4&quot;</span><span class="p">,</span>         <span class="c1"># the domain rule no file states</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;warehouse&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Combining sharpens the result because the input kinds are good at different
+things. The ERD or DDL fixes the <strong>structure</strong> and the foreign keys; the example
+data fixes the <strong>value distributions</strong>; the free text supplies the <strong>domain rules
+that live nowhere in either</strong> — seasonality, plausible ratios, business
+constraints. Planning from all of them together gets you all three in one schema instead of
+one of the three plus guesswork.</p>
+<h2 id="the-inferredschema">The InferredSchema</h2>
+<p>The output is one <code>InferredSchema</code>: a list of <strong>entities</strong>, each with a name, a
+description, its <strong>fields</strong>, and its relationships. It is the same model both
+modalities consume, importable from <code>seed_data</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;entities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;entity_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Customer&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;A retail banking customer&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;customer_id&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Primary key, format CUST-000000&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;nullable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;unique&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;pattern&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;^CUST-[0-9]{6}$&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;credit_score&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;integer&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FICO score at signup&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;nullable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;min_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;max_value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">850</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;distribution&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;normal&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;mean&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">690</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;std&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">70</span><span class="p">}</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tier&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;enum&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Account tier&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;nullable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;enum_values&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;basic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;plus&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;premier&quot;</span><span class="p">],</span>
+<span class="w">          </span><span class="nt">&quot;distribution&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;categorical_weighted&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;weights&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.6</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">]}</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;relationships&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">      </span><span class="nt">&quot;structured_relationships&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">      </span><span class="nt">&quot;generation_guidance&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;US retail bank; signup dates within the last 5 years.&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;entity_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;One purchase made by a customer&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;fields&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;order_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Primary key&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;unique&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;customer_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;string&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FK to Customer&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;required&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;relationships&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;belongs_to: Customer&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;structured_relationships&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;source_entity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Order&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;source_field&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;customer_id&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;target_entity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Customer&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;target_field&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;customer_id&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;cardinality&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;one_to_many&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The parts worth understanding before you edit it:</p>
+<ul>
+<li><strong><code>required</code> and <code>nullable</code> are independent.</strong> <code>required</code> says the <em>key must be
+  present</em>; <code>nullable</code> says the <em>value may be null</em>. A required-and-nullable
+  field is normal and common — the key always appears, and its value is null when
+  the source has nothing to put there. Do not conflate the two: marking a field
+  non-nullable when reality includes nulls forces invented values into every row.</li>
+<li><strong><code>distribution</code></strong> shapes generated values: <code>uniform</code>, <code>normal</code>,
+  <code>exponential</code>, <code>log_normal</code>, <code>categorical_weighted</code>, <code>skewed_left</code>, or
+  <code>skewed_right</code>, each with its own <code>params</code>. Absent a distribution, values are
+  drawn without a target shape.</li>
+<li><strong>Relationships</strong> come in two forms. <code>relationships</code> is free text
+  (<code>"belongs_to: Customer"</code>) for the generator to read; <code>structured_relationships</code>
+  is the machine-checkable form — source entity/field, target entity/field, and a
+  cardinality of <code>one_to_one</code>, <code>one_to_many</code>, or <code>many_to_many</code>. The structured
+  form is what referential-integrity enforcement and scoring use, so it is the
+  one to add if a foreign key was missed.</li>
+<li><strong><code>generation_guidance</code></strong> is per-entity free text: realism rules, value
+  conventions, layout notes for the document pipeline.</li>
+<li>Other field constraints: <code>unique</code>, <code>min_value</code> / <code>max_value</code>, <code>min_length</code> /
+  <code>max_length</code>, <code>pattern</code>, <code>enum_values</code>, <code>default</code>, and <code>children</code> for nested
+  object and array fields.</li>
+</ul>
+<h3 id="relationship-to-json-schema">Relationship to JSON Schema</h3>
+<p><code>InferredSchema</code> is <strong>not a competing format</strong>. JSON Schema is the interchange
+format, and <code>InferredSchema</code> is a deliberate superset of it: everything JSON
+Schema can say about a field, it says the same way (<code>pattern</code>, <code>minimum</code> /
+<code>maximum</code>, <code>minLength</code> / <code>maxLength</code>, <code>enum</code>, <code>required</code>, nested <code>properties</code>,
+array <code>items</code>), plus the generation metadata JSON Schema has no vocabulary for.</p>
+<p>Both directions ship in <code>seed_data.schema.io</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">seed_data.schema.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_json_schema</span><span class="p">,</span> <span class="n">to_json_schema</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;customer.schema.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">from_json_schema</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">))</span>       <span class="c1"># standard -&gt; canonical</span>
+
+<span class="n">document</span> <span class="o">=</span> <span class="n">to_json_schema</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">entity_name</span><span class="o">=</span><span class="s2">&quot;Customer&quot;</span><span class="p">)</span>  <span class="c1"># canonical -&gt; standard</span>
+</code></pre></div>
+<p><code>from_schema_dir</code> is the directory-level form of the same import, for a folder of
+per-entity JSON Schema files.</p>
+<p>Handing <code>seed-data plan</code> a <code>.json</code> file that exists on disk routes through
+<code>from_json_schema</code> — that is what the <a href="#formal-schema">Formal schema</a> path above
+does, so <strong>you never have to convert anything by hand</strong>.</p>
+<h4 id="what-the-superset-adds-and-why-it-cant-be-json-schema">What the superset adds, and why it can't be JSON Schema</h4>
+<p>JSON Schema answers "is this one document valid?". Generation needs to answer
+"how do I synthesize a correlated multi-entity dataset?" — a different question,
+and these four fields are what carry the difference:</p>
+<table>
+<thead>
+<tr>
+<th><code>InferredSchema</code> field</th>
+<th>What it holds</th>
+<th>Why JSON Schema can't express it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>distribution</code></td>
+<td><code>DistributionSpec</code> — <code>normal</code>, <code>log_normal</code>, <code>categorical_weighted</code>, … with <code>params</code></td>
+<td>JSON Schema constrains the <em>range</em> a value may fall in, never the <em>shape</em> of a population. <code>{"minimum": 300, "maximum": 850}</code> accepts a column of all 300s.</td>
+</tr>
+<tr>
+<td><code>structured_relationships</code></td>
+<td><code>RelationshipDefinition</code> — source/target entity + field, cardinality</td>
+<td>Cross-document foreign keys are outside JSON Schema's scope; <code>$ref</code> composes schemas, it does not declare that one instance's field must equal another instance's.</td>
+</tr>
+<tr>
+<td><code>generation_guidance</code></td>
+<td>Per-entity free text steering realism</td>
+<td>Instructions to a generator, not constraints on a value.</td>
+</tr>
+<tr>
+<td><code>reference_samples</code></td>
+<td>Real example rows to imitate</td>
+<td>A validator has no use for examples; <code>examples</code> is annotation-only and carries no generation semantics.</td>
+</tr>
+</tbody>
+</table>
+<p>Two structural differences also matter:</p>
+<ul>
+<li><strong>Multi-entity.</strong> One <code>InferredSchema</code> holds many entities; a JSON Schema
+  document describes one object. <code>to_json_schema</code> therefore serializes <strong>one
+  entity at a time</strong> (<code>entity_name=</code> picks which; the first by default).</li>
+<li>
+<p><strong>The round trip is lossy in one direction.</strong> Starting from a JSON Schema
+  document, <code>from_json_schema</code> → <code>to_json_schema</code> returns what you gave it —
+  types, <code>required</code>, <code>pattern</code>, bounds, lengths, <code>enum</code>, and <code>x-probability</code> all
+  come back unchanged. Starting from an <code>InferredSchema</code>, exporting and reimporting
+  <strong>loses</strong> the four superset fields above and three more that <code>to_json_schema</code>
+  does not emit: <code>unique</code>, <code>default</code>, and <code>structured_relationships</code>.</p>
+<p>So export to JSON Schema for interop with external validators, but keep the
+<code>InferredSchema</code> JSON as your source of truth — don't use a round trip through
+JSON Schema as a way to store or edit a schema.</p>
+</li>
+</ul>
+<h4 id="custom-extensions">Custom extensions</h4>
+<p>Where a JSON Schema extension is genuinely needed, SEED uses the standard <code>x-</code>
+prefix convention. Currently one such key is read and written:
+<code>x-probability</code>, which maps to <code>FieldDefinition.presence_probability</code> and lets a
+field be <em>sometimes present</em> across generated documents. It survives the round
+trip in both directions. If the superset fields above ever need to travel inside
+a JSON Schema document rather than beside it, the same <code>x-</code> convention is the
+route, and distribution metadata could be aligned with an external vocabulary
+should a standard one emerge.</p>
+<h3 id="cli_6">CLI</h3>
+<p>The file <code>--output</code> wrote is plain JSON. Read it, edit it in any editor, and pass
+it back to either generation command:</p>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>plan<span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="w"> </span>--name<span class="w"> </span>banking<span class="w"> </span>--output<span class="w"> </span>./schema.json
+<span class="c1"># review and edit ./schema.json, then:</span>
+seed-data<span class="w"> </span>generate-structured<span class="w"> </span>./schema.json<span class="w"> </span>--rows<span class="w"> </span><span class="m">500</span><span class="w"> </span>--format<span class="w"> </span>csv
+seed-data<span class="w"> </span>generate-documents<span class="w"> </span>./schema.json<span class="w"> </span>--entity<span class="w"> </span>Customer<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span>
+</code></pre></div>
+<h3 id="python_6">Python</h3>
+<p><code>InferredSchema</code> is a pydantic model, so reading, editing, saving, and reloading
+all use its standard methods:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">InferredSchema</span>
+
+<span class="n">gen</span> <span class="o">=</span> <span class="n">Generator</span><span class="p">()</span>
+<span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;Retail bank customers and their orders&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;banking&quot;</span><span class="p">)</span>
+
+<span class="c1"># read</span>
+<span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">schema</span><span class="o">.</span><span class="n">entities</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">entity</span><span class="o">.</span><span class="n">entity_name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">entity</span><span class="o">.</span><span class="n">fields</span><span class="p">),</span> <span class="s2">&quot;fields&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">entity</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="si">:</span><span class="s2">16</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">type</span><span class="si">:</span><span class="s2">10</span><span class="si">}</span><span class="s2"> required=</span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">is_required</span><span class="si">}</span><span class="s2"> nullable=</span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="n">nullable</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># edit in place — the model is mutable</span>
+<span class="n">customer</span> <span class="o">=</span> <span class="n">schema</span><span class="o">.</span><span class="n">entities</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">customer</span><span class="o">.</span><span class="n">generation_guidance</span> <span class="o">=</span> <span class="s2">&quot;US retail bank, signup dates within the last 5 years.&quot;</span>
+<span class="n">customer</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">min_value</span> <span class="o">=</span> <span class="mi">300</span>
+<span class="n">customer</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">max_value</span> <span class="o">=</span> <span class="mi">850</span>
+
+<span class="c1"># save for review or reuse</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;./schema.json&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">schema</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+
+<span class="c1"># reload later</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;./schema.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">InferredSchema</span><span class="o">.</span><span class="n">model_validate_json</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+</code></pre></div>
+<p><code>generate_structured</code> also accepts the <strong>path</strong> to that JSON file, or a bundled
+schema name, if you would rather not load it yourself.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="../structured-data/">Structured Data</a>: generate tabular data from a planned schema.</li>
+<li><a href="../schema-from-documents/">Schema from Documents</a>: the document-only inference path, with clarifying questions and packet splitting.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid@11/dist/mermaid.min.js"></script>
+      
+    
+  </body>
+</html>

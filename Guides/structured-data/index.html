@@ -1,0 +1,2617 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Synthetically Engineered Evaluation Data">
+      
+      
+      
+        <link rel="canonical" href="https://awslabs.github.io/synthetically_engineered_evaluation_data/Guides/structured-data/">
+      
+      
+        <link rel="prev" href="../plan/">
+      
+      
+        <link rel="next" href="../creating-a-document-type/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Structured Data - Synthetically Engineered Evaluation Data</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#structured-data" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Synthetically Engineered Evaluation Data" class="md-header__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Synthetically Engineered Evaluation Data
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Structured Data
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Synthetically Engineered Evaluation Data
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Getting-Started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CLI-Usage/" class="md-tabs__link">
+          
+  
+  
+  CLI Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Python-API-Usage/" class="md-tabs__link">
+          
+  
+  
+  Python API Usage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../Advanced/" class="md-tabs__link">
+          
+  
+  
+  Advanced
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../API-Reference/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Synthetically Engineered Evaluation Data" class="md-nav__button md-logo" aria-label="Synthetically Engineered Evaluation Data" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Synthetically Engineered Evaluation Data
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/awslabs/synthetically_engineered_evaluation_data" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    awslabs/synthetically_engineered_evaluation_data
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Synthetically Engineered Evaluation Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Getting-Started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLI-Usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Python-API-Usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structured Data
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structured Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#generating-from-a-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating from a schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating from a schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export formats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-entity-schemas-and-referential-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-entity schemas and referential integrity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controlling-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controlling volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Controlling volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-structuredresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading StructuredResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluating-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluating the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#both-modalities-from-one-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Both modalities from one schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Both modalities from one schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-run-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The run shortcut
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The run shortcut">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creating-a-document-type/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a Document Type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema-from-documents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema from Documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../single-document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../packets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generation-choices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Choices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/renderers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renderers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../Advanced/augmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Augmentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/generator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/packet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Packet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/critique/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Critique
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../API-Reference/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#generating-from-a-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating from a schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating from a schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#export-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export formats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-entity-schemas-and-referential-integrity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-entity schemas and referential integrity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controlling-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controlling volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Controlling volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-structuredresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading StructuredResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluating-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluating the result
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#both-modalities-from-one-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Both modalities from one schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Both modalities from one schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-run-shortcut" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The run shortcut
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The run shortcut">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="structured-data">Structured Data</h1>
+<p>SEED generates <strong>tabular and relational</strong> synthetic data — CSV, Parquet, Excel,
+JSON — from the same <code>InferredSchema</code> and through the same critique machinery the
+document pipeline uses. One schema, two output shapes: rows when you need a
+dataset, PDFs when you need documents.</p>
+<p>Structured generation is opt-in, because it pulls in pandas and the file-format
+engines (openpyxl, pyarrow):</p>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;seed-data[structured]&quot;</span>
+</code></pre></div>
+<p>The base <code>pip install seed-data</code> stays lean and covers documents only; it never
+needs this extra. Structured commands raise a clear <code>ImportError</code> telling you to
+install it.</p>
+<p>Two ways in:</p>
+<ul>
+<li><strong>From a schema</strong> — you already have an <code>InferredSchema</code> (from
+  <a href="../plan/">plan</a>, from a bundled schema, or hand-authored). See
+  <a href="#generating-from-a-schema">Generating from a schema</a>.</li>
+<li><strong>End to end</strong> — inputs straight to rows in one shot, no intermediate schema
+  file. See <a href="#the-run-shortcut">The run shortcut</a>.</li>
+</ul>
+<h2 id="generating-from-a-schema">Generating from a schema</h2>
+<p>Generation runs a graph pipeline: distribution inference, sample generation, bulk
+generation, then deterministic evaluation with retry and schema-revision loops
+before export. If quality scores fall short the pipeline regenerates with
+feedback, and after repeated failures it revises the schema and starts over.</p>
+<h3 id="cli">CLI</h3>
+<p><code>generate-structured</code> accepts a bundled schema name, a path to an
+<code>InferredSchema</code> JSON, or a schema directory:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># from a planned schema</span>
+seed-data<span class="w"> </span>generate-structured<span class="w"> </span>./schema.json<span class="w"> </span>--rows<span class="w"> </span><span class="m">500</span><span class="w"> </span>--format<span class="w"> </span>csv<span class="w"> </span>--output<span class="w"> </span>./data
+
+<span class="c1"># from a bundled schema name</span>
+seed-data<span class="w"> </span>generate-structured<span class="w"> </span>invoice<span class="w"> </span>--rows<span class="w"> </span><span class="m">200</span><span class="w"> </span>--format<span class="w"> </span>parquet<span class="w"> </span>--output<span class="w"> </span>./data
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema</code></td>
+<td>required</td>
+<td>Bundled schema name, path to an <code>InferredSchema</code> JSON, or a schema directory</td>
+</tr>
+<tr>
+<td><code>--rows</code></td>
+<td><code>100</code></td>
+<td>Target records per entity</td>
+</tr>
+<tr>
+<td><code>--format</code></td>
+<td><code>csv</code></td>
+<td><code>csv</code>, <code>parquet</code>, <code>excel</code>, or <code>json</code></td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>./output</code></td>
+<td>Output directory</td>
+</tr>
+<tr>
+<td><code>--quiet</code></td>
+<td>off</td>
+<td>Suppress progress output</td>
+</tr>
+</tbody>
+</table>
+<p>On success it prints per-entity row counts, the files written, and the quality
+scores:</p>
+<div class="highlight"><pre><span></span><code>============================================================
+  Customer: 500 rows
+  Order: 500 rows
+Files: ./data/customer.csv, ./data/order.csv
+Quality: diversity=0.71, fidelity=0.88, coverage=0.62, structural=0.95
+</code></pre></div>
+<h3 id="python">Python</h3>
+<p><code>Generator.generate_structured(...)</code> returns a typed <code>StructuredResult</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span>
+
+<span class="n">gen</span> <span class="o">=</span> <span class="n">Generator</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="s2">&quot;./schema.json&quot;</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;csv&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">output_paths</span><span class="p">)</span>
+</code></pre></div>
+<p>The schema argument accepts an <code>InferredSchema</code> object, a path to an
+<code>InferredSchema</code> JSON, or a bundled schema name — so a planned schema goes
+straight in without a round trip through disk:</p>
+<div class="highlight"><pre><span></span><code><span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="s2">&quot;./design/warehouse.dbml&quot;</span><span class="p">,</span> <span class="s2">&quot;./samples/customers.csv&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;warehouse&quot;</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;parquet&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Note that <code>rows</code>, <code>format</code>, and <code>verbose</code> are the only per-call arguments. Output
+directory, models, threshold, and session live on the <code>Generator</code> — configure
+once, generate many.</p>
+<h2 id="export-formats">Export formats</h2>
+<p>Four formats, chosen with <code>--format</code> / <code>format=</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Extension</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>csv</code></td>
+<td><code>.csv</code></td>
+<td>The default</td>
+</tr>
+<tr>
+<td><code>json</code></td>
+<td><code>.json</code></td>
+<td>Records-oriented, indented</td>
+</tr>
+<tr>
+<td><code>excel</code></td>
+<td><code>.xlsx</code></td>
+<td>Written with openpyxl, from the <code>[structured]</code> extra</td>
+</tr>
+<tr>
+<td><code>parquet</code></td>
+<td><code>.parquet</code></td>
+<td>Written with pyarrow, from the <code>[structured]</code> extra</td>
+</tr>
+</tbody>
+</table>
+<p>Every format works with the <code>[structured]</code> extra alone. If a parquet engine is
+somehow missing (a hand-pinned environment, say), the export fails fast with a
+message naming the install to run — before writing or clearing any files.</p>
+<p>Each entity is written to <strong>its own file</strong> in the output directory. The file name
+is the entity name lowercased with spaces replaced by underscores, plus the
+format's extension. Entities named <code>Customer</code> and <code>Order</code> at <code>--format csv</code>
+produce:</p>
+<div class="highlight"><pre><span></span><code>data/
+├── customer.csv
+└── order.csv
+</code></pre></div>
+<p>An entity named <code>Line Item</code> becomes <code>line_item.csv</code>. A re-run clears only the
+files this exporter would produce for the current entities, across every format —
+so switching from <code>csv</code> to <code>parquet</code> does not leave a stale <code>customer.csv</code> behind,
+and unrelated files in a shared output directory are left alone.</p>
+<h2 id="multi-entity-schemas-and-referential-integrity">Multi-entity schemas and referential integrity</h2>
+<p>An <code>InferredSchema</code> with several entities generates all of them in one run, and
+the foreign keys between them are honored — child records reference parent
+records that actually exist.</p>
+<p>What drives this is each entity's <code>structured_relationships</code>: source
+entity/field, target entity/field, and a cardinality of <code>one_to_one</code>,
+<code>one_to_many</code>, or <code>many_to_many</code>. Generation is told to maintain integrity across
+entities, then post-processing <strong>validates every foreign-key value against the
+parent's keys</strong> and corrects or filters records that do not resolve. What
+survives is scored: <code>referential_integrity</code> is the fraction of FK references that
+resolve to an existing parent record, and it is a major term in the <code>structural</code>
+score.</p>
+<p>Relationships that come from an ERD or SQL DDL are explicit, which is why those
+inputs give the best multi-entity results. If planning missed a foreign key, add it
+to <code>structured_relationships</code> by hand before generating — free-text
+<code>relationships</code> entries like <code>"belongs_to: Customer"</code> steer the generator but are
+not what integrity enforcement and scoring read. See
+<a href="../plan/#the-inferredschema">The InferredSchema</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">row_counts</span><span class="p">)</span>          <span class="c1"># {&#39;Customer&#39;: 500, &#39;Order&#39;: 500}</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">evaluation</span><span class="p">[</span><span class="s2">&quot;structural&quot;</span><span class="p">])</span>
+</code></pre></div>
+<h2 id="controlling-volume">Controlling volume</h2>
+<p><code>--rows</code> / <code>rows=</code> is the target record count <strong>per entity</strong>, not in total. A
+three-entity schema at <code>--rows 500</code> targets 1,500 records.</p>
+<h3 id="cli_1">CLI</h3>
+<div class="highlight"><pre><span></span><code>seed-data<span class="w"> </span>generate-structured<span class="w"> </span>./schema.json<span class="w"> </span>--rows<span class="w"> </span><span class="m">5000</span><span class="w"> </span>--format<span class="w"> </span>parquet
+</code></pre></div>
+<h3 id="python_1">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;parquet&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>It is a <em>target</em>, not a guarantee. Post-processing filters records that violate
+schema constraints, so <code>result.row_counts</code> is the authoritative count of what
+landed on disk. Start small while you are still reviewing a schema, then scale up
+once the counts and scores look right.</p>
+<h2 id="reading-structuredresult">Reading StructuredResult</h2>
+<p><code>StructuredResult</code> sits alongside <code>GeneratedDoc</code> and <code>BatchResult</code> — the
+structured verb returns this, never a bare dict:</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span><span class="o">.</span><span class="n">success</span>          <span class="c1"># bool — True when files were written</span>
+<span class="n">result</span><span class="o">.</span><span class="n">schema</span>           <span class="c1"># the InferredSchema the data was generated from</span>
+<span class="n">result</span><span class="o">.</span><span class="n">output_paths</span>     <span class="c1"># list[str] — every file written</span>
+<span class="n">result</span><span class="o">.</span><span class="n">format</span>           <span class="c1"># &quot;csv&quot; | &quot;parquet&quot; | &quot;excel&quot; | &quot;json&quot;</span>
+<span class="n">result</span><span class="o">.</span><span class="n">row_counts</span>       <span class="c1"># dict[str, int] — rows actually written, per entity</span>
+<span class="n">result</span><span class="o">.</span><span class="n">evaluation</span>       <span class="c1"># dict[str, float] — diversity/fidelity/coverage/structural</span>
+<span class="n">result</span><span class="o">.</span><span class="n">token_usage</span>      <span class="c1"># {&quot;inputTokens&quot;, &quot;outputTokens&quot;, &quot;totalTokens&quot;}, as in GeneratedDoc</span>
+<span class="n">result</span><span class="o">.</span><span class="n">error</span>            <span class="c1"># populated on failure</span>
+</code></pre></div>
+<p>A run can complete and still write nothing — for example if every record failed a
+non-null constraint and was filtered out. That counts as a failure:
+<code>success=False</code> with <code>error</code> explaining why, rather than a silent empty
+directory.</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;failed:&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">row_counts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">entity</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> rows&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="evaluating-the-result">Evaluating the result</h2>
+<p>Two complementary evaluators, both imported from <code>seed_data.evaluation</code>. One is an
+LLM reviewer, the other is deterministic scoring.</p>
+<p><code>critique_structured</code> is the <strong>semantic</strong> review: an LLM reads the data against
+the schema and reports what a human reviewer would notice. It checks
+intra-record logic, cross-entity referential integrity, temporal coherence,
+realism, and distributional tells. Large datasets are sampled (the first 25 rows
+per entity) before prompting, which also keeps a critique reproducible.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">seed_data.evaluation</span><span class="w"> </span><span class="kn">import</span> <span class="n">critique_structured</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;./data/customer.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Customer&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)}</span>
+
+<span class="n">review</span> <span class="o">=</span> <span class="n">critique_structured</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">,</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span>
+    <span class="n">steering</span><span class="o">=</span><span class="s2">&quot;Credit scores must be consistent with the account tier.&quot;</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;haiku&quot;</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">review</span><span class="p">[</span><span class="s2">&quot;score&quot;</span><span class="p">],</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;verdict&quot;</span><span class="p">])</span>   <span class="c1"># 1-10, &quot;accepted&quot; / &quot;rejected&quot;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">review</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">issue</span> <span class="ow">in</span> <span class="n">review</span><span class="p">[</span><span class="s2">&quot;issues&quot;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot; -&quot;</span><span class="p">,</span> <span class="n">issue</span><span class="p">)</span>
+</code></pre></div>
+<p><code>data</code> may also be a <strong>path</strong> to a JSON file containing the
+entity-name-to-records mapping. Critique is advisory and never raises: if the
+model call fails you get <code>verdict="error"</code>, <code>score=0</code>, and an <code>error</code> key, so a
+finished generation run is never lost because the reviewer was unreachable.
+<code>verdict</code> is <code>"accepted"</code> when <code>score &gt;= threshold</code>, otherwise <code>"rejected"</code>.</p>
+<p><code>run_evaluation</code> is the <strong>deterministic</strong> scorer — pure pandas, no model calls.
+This is the same evaluation the generation pipeline runs internally, exposed so
+you can score data yourself. It needs the <code>[structured]</code> extra.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data.evaluation</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_evaluation</span>
+
+<span class="n">report</span> <span class="o">=</span> <span class="n">run_evaluation</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span> <span class="n">quality_threshold</span><span class="o">=</span><span class="mf">0.7</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">overall_quality_score</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">passes_quality_gate</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">issues</span><span class="p">)</span>
+</code></pre></div>
+<p>Four dimensions, each in <code>[0, 1]</code> and higher-is-better — the same keys that appear
+in <code>StructuredResult.evaluation</code> and in the CLI's <code>Quality:</code> line:</p>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>What it measures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diversity</code></td>
+<td>Value variation: normalized entropy, unique-value ratio, and text dispersion. Low means repetitive, same-y rows.</td>
+</tr>
+<tr>
+<td><code>fidelity</code></td>
+<td>Conformance to the schema: the rate of constraint violations, plus how closely values match any declared distribution. Low means the data ignores its own schema.</td>
+</tr>
+<tr>
+<td><code>coverage</code></td>
+<td>How much of the specified value space was explored: enum values seen at least once, the proportion of numeric ranges used, observed value combinations. Low means whole regions of the schema went untested.</td>
+</tr>
+<tr>
+<td><code>structural</code></td>
+<td>Validity across entities: referential integrity, type conformance, and uniqueness. Low means broken foreign keys or duplicated unique keys.</td>
+</tr>
+</tbody>
+</table>
+<p><code>overall_quality_score</code> is a weighted blend of the four. <code>passes_quality_gate</code>
+requires <strong>both</strong> that blend to reach <code>quality_threshold</code> <strong>and</strong> every dimension to
+clear its own minimum (diversity 0.5, fidelity 0.6, coverage 0.4, structural 0.7).
+The per-dimension check stops one collapsed score from hiding behind three
+healthy ones. A table whose primary keys are all duplicated, for example, fails
+the gate even though its blended score looks acceptable. <code>report.entity_reports</code>
+carries the same breakdown per entity, and <code>report.issues</code> lists specific
+problems: an entity with no records, a high constraint-violation rate, low
+referential integrity, duplicate values in unique fields.</p>
+<p>A few edge cases are scored deliberately:</p>
+<ul>
+<li>Data that shares <strong>no columns</strong> with its schema fails. It is not scored as
+  vacuously perfect.</li>
+<li>A dimension with <strong>nothing to measure</strong> is not penalized. Examples: an entity
+  with no enum or bounded numeric fields (coverage), a table of only foreign keys
+  (fidelity), a date field with a distribution (the numeric distribution check is
+  skipped).</li>
+<li>Foreign-key columns are checked by <strong>referential integrity</strong> only. They are
+  exempt from type and range checks, because they copy their parent's key values
+  verbatim.</li>
+</ul>
+<p>For the document modality the counterpart is <code>evaluate_document_labels</code>, which
+scores document ground-truth labels for field completeness and coverage and flags
+fields never populated in any document. It is pure Python and works in the base
+install with no extra.</p>
+<h2 id="both-modalities-from-one-schema">Both modalities from one schema</h2>
+<p>This is the payoff of unification. One planned <code>InferredSchema</code> drives structured
+generation <strong>and</strong> document generation, so a tabular dataset and a set of PDFs
+about the same domain come from the same declared fields, types, and constraints —
+not two schemas you have to keep in sync by hand.</p>
+<h3 id="cli_2">CLI</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># plan once</span>
+seed-data<span class="w"> </span>plan<span class="w"> </span>./design/warehouse.dbml<span class="w"> </span>./samples/customers.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>warehouse<span class="w"> </span>--output<span class="w"> </span>./schema.json
+
+<span class="c1"># review ./schema.json, then generate rows from it</span>
+seed-data<span class="w"> </span>generate-structured<span class="w"> </span>./schema.json<span class="w"> </span>--rows<span class="w"> </span><span class="m">1000</span><span class="w"> </span>--format<span class="w"> </span>csv<span class="w"> </span>--output<span class="w"> </span>./data
+
+<span class="c1"># ...and PDFs from the very same schema</span>
+seed-data<span class="w"> </span>generate-documents<span class="w"> </span>./schema.json<span class="w"> </span>--entity<span class="w"> </span>Customer<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--output<span class="w"> </span>./docs
+</code></pre></div>
+<p><code>generate-documents</code> is the modern spelling of the default <code>--schema-dir</code> mode,
+and it is what lets a planned or inferred <code>InferredSchema</code> drive the document
+pipeline. For a multi-entity schema, <code>--entity</code> selects which entity to render as
+the document type; it defaults to the first.</p>
+<h3 id="python_2">Python</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">seed_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span>
+
+<span class="n">gen</span> <span class="o">=</span> <span class="n">Generator</span><span class="p">()</span>
+<span class="n">schema</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span>
+    <span class="s2">&quot;./design/warehouse.dbml&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;./samples/customers.csv&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;warehouse&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># tabular</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_structured</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;csv&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">rows</span><span class="o">.</span><span class="n">row_counts</span><span class="p">)</span>
+
+<span class="c1"># documents — same schema object</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="s2">&quot;Customer&quot;</span><span class="p">,</span> <span class="n">scenario</span><span class="o">=</span><span class="s2">&quot;Pacific Northwest region&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">doc</span><span class="o">.</span><span class="n">data_json_path</span><span class="p">)</span>
+
+<span class="c1"># or a diverse batch of documents</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">generate_batch</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">scenario</span><span class="o">=</span><span class="s2">&quot;Pacific Northwest region&quot;</span><span class="p">,</span>
+                           <span class="n">entity</span><span class="o">=</span><span class="s2">&quot;Customer&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="the-run-shortcut">The run shortcut</h2>
+<p><code>plan_and_generate</code> does planning and generation in a single call, so you go from inputs to
+artifacts without an intermediate schema file.</p>
+<h3 id="cli_3">CLI</h3>
+<div class="admonition note">
+<p class="admonition-title">On <code>plan-and-generate</code>, <code>--output</code> is the modality</p>
+<p>On <code>plan-and-generate</code> — and <strong>only</strong> on <code>plan-and-generate</code> — <code>--output</code> selects the <em>modality</em>
+(<code>structured</code> or <code>documents</code>) and <code>--output-dir</code> selects the <em>path</em>. On every
+other command <code>--output</code> is a path. Passing a directory to <code>--output</code> here
+fails the choices check rather than silently writing somewhere unexpected.</p>
+</div>
+<div class="highlight"><pre><span></span><code><span class="c1"># free text -&gt; CSV, in one shot</span>
+seed-data<span class="w"> </span>plan-and-generate<span class="w"> </span><span class="s2">&quot;Retail bank customers with credit scores and account tiers&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>structured<span class="w"> </span>--rows<span class="w"> </span><span class="m">500</span><span class="w"> </span>--format<span class="w"> </span>csv<span class="w"> </span>--output-dir<span class="w"> </span>./data
+
+<span class="c1"># the same inputs -&gt; a batch of PDFs</span>
+seed-data<span class="w"> </span>plan-and-generate<span class="w"> </span>./samples/invoice.pdf<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>documents<span class="w"> </span>--count<span class="w"> </span><span class="m">5</span><span class="w"> </span>--scenario<span class="w"> </span><span class="s2">&quot;Midwest food distributors&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-dir<span class="w"> </span>./docs
+
+<span class="c1"># keep the planned schema as well</span>
+seed-data<span class="w"> </span>plan-and-generate<span class="w"> </span>./design/warehouse.dbml<span class="w"> </span>--output<span class="w"> </span>structured<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--save-schema<span class="w"> </span>./schema.json<span class="w"> </span>--output-dir<span class="w"> </span>./data
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inputs</code></td>
+<td>required</td>
+<td>One or more free-text description(s), file paths/globs, and/or <code>s3://</code> URIs</td>
+</tr>
+<tr>
+<td><code>--output</code></td>
+<td><code>structured</code></td>
+<td>Which modality to generate: <code>structured</code> or <code>documents</code></td>
+</tr>
+<tr>
+<td><code>--output-dir</code></td>
+<td><code>./output</code></td>
+<td>Directory to write artifacts to</td>
+</tr>
+<tr>
+<td><code>--name</code></td>
+<td><code>dataset</code></td>
+<td>Logical dataset name</td>
+</tr>
+<tr>
+<td><code>--save-schema</code></td>
+<td></td>
+<td>Also write the planned <code>InferredSchema</code> JSON here</td>
+</tr>
+<tr>
+<td><code>--rows</code></td>
+<td><code>100</code></td>
+<td>structured only: target records per entity</td>
+</tr>
+<tr>
+<td><code>--format</code></td>
+<td><code>csv</code></td>
+<td>structured only: <code>csv</code>, <code>parquet</code>, <code>excel</code>, or <code>json</code></td>
+</tr>
+<tr>
+<td><code>--count</code></td>
+<td><code>1</code></td>
+<td>documents only: how many to generate</td>
+</tr>
+<tr>
+<td><code>--scenario</code></td>
+<td></td>
+<td>documents only: what to generate this run</td>
+</tr>
+<tr>
+<td><code>--entity</code></td>
+<td></td>
+<td>documents only: which entity of a multi-entity schema to render</td>
+</tr>
+<tr>
+<td><code>--augment</code></td>
+<td>off</td>
+<td>documents only: apply image augmentation</td>
+</tr>
+<tr>
+<td><code>--data-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for data generation</td>
+</tr>
+<tr>
+<td><code>--doc-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for PDF generation</td>
+</tr>
+<tr>
+<td><code>--critic-model</code></td>
+<td><code>sonnet</code></td>
+<td>Model for critics</td>
+</tr>
+<tr>
+<td><code>--batch-model</code></td>
+<td><code>nova2-lite</code></td>
+<td>Model for scenario planning</td>
+</tr>
+<tr>
+<td><code>--aug-model</code></td>
+<td><code>gpt-oss</code></td>
+<td>Model for augmentation decisions</td>
+</tr>
+<tr>
+<td><code>--renderer</code></td>
+<td><code>xhtml2pdf</code></td>
+<td><code>xhtml2pdf</code> (pure Python), <code>weasyprint</code>, or <code>reportlab</code></td>
+</tr>
+<tr>
+<td><code>--threshold</code></td>
+<td><code>5</code></td>
+<td>Critic acceptance score, 1–10</td>
+</tr>
+<tr>
+<td><code>--timeout</code></td>
+<td><code>3600</code></td>
+<td>Safety timeout in seconds</td>
+</tr>
+<tr>
+<td><code>--quiet</code></td>
+<td>off</td>
+<td>Suppress progress output</td>
+</tr>
+</tbody>
+</table>
+<p><code>--save-schema</code> is worth using on any run you might repeat: the schema is written
+before generation starts, so you keep it even if generation fails, and you can
+review and reuse it instead of re-planning.</p>
+<h3 id="python_3">Python</h3>
+<p><code>Generator.plan_and_generate(...)</code> mirrors the flags. Its return type follows the output
+modality — <code>StructuredResult</code> for <code>output="structured"</code>, <code>GeneratedDoc</code> for
+<code>output="documents"</code> with <code>count=1</code>, and <code>BatchResult</code> for <code>output="documents"</code>
+with <code>count &gt; 1</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">gen</span> <span class="o">=</span> <span class="n">Generator</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span><span class="p">)</span>
+
+<span class="c1"># structured -&gt; StructuredResult</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan_and_generate</span><span class="p">(</span><span class="s2">&quot;Retail bank customers and their orders&quot;</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;csv&quot;</span><span class="p">)</span>
+
+<span class="c1"># one document -&gt; GeneratedDoc</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan_and_generate</span><span class="p">(</span><span class="s2">&quot;./samples/invoice.pdf&quot;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;documents&quot;</span><span class="p">,</span>
+              <span class="n">scenario</span><span class="o">=</span><span class="s2">&quot;Midwest food distributor&quot;</span><span class="p">)</span>
+
+<span class="c1"># many documents -&gt; BatchResult</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">gen</span><span class="o">.</span><span class="n">plan_and_generate</span><span class="p">(</span><span class="s2">&quot;./samples/invoice.pdf&quot;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;documents&quot;</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                <span class="n">scenario</span><span class="o">=</span><span class="s2">&quot;Regional US food distributors&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>An <code>output</code> other than <code>"structured"</code> or <code>"documents"</code> raises <code>ValueError</code>.</p>
+<h2 id="output-layout">Output layout</h2>
+<p>Structured output is one file per entity, directly in the output directory.
+Documents keep their existing layout, so pointing both modalities at one root is
+safe:</p>
+<div class="highlight"><pre><span></span><code>output/
+├── customer.csv                        # structured: one file per entity
+├── order.csv
+├── data/&lt;doc_id&gt;.json                  # documents: ground-truth JSON label
+├── generation_scripts/&lt;doc_id&gt;.html    # documents: HTML used to render
+└── pdfs/&lt;doc_id&gt;.pdf                   # documents: rendered PDF
+</code></pre></div>
+<h2 id="related">Related</h2>
+<ul>
+<li><a href="../plan/">Plan</a>: turn any input into the <code>InferredSchema</code> these commands consume.</li>
+<li><a href="../../CLI-Usage/">CLI Usage</a>: every command and its flags.</li>
+<li><a href="../../Python-API-Usage/">Python API Usage</a>: the same capabilities from Python.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.select", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid@11/dist/mermaid.min.js"></script>
+      
+    
+  </body>
+</html>
