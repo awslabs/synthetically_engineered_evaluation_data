@@ -128,16 +128,16 @@ def test_infer_schema_requires_name_and_output():
     assert "name" in (r.stderr + r.stdout).lower()
 
 
-def test_infer_schema_bad_model_choice_errors():
-    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", "/tmp/x",
+def test_infer_schema_bad_model_choice_errors(tmp_path):
+    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", str(tmp_path / "x"),
              "--infer-model", "not-a-real-model")
     assert r.returncode == 2
     assert "invalid choice" in r.stderr.lower()
 
 
-def test_infer_schema_packet_with_then_generate_rejected():
+def test_infer_schema_packet_with_then_generate_rejected(tmp_path):
     # --packet and --then-generate are mutually exclusive -> clean argparse error
-    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", "/tmp/x",
+    r = _run("infer-schema", "x.pdf", "--name", "x", "--output", str(tmp_path / "x"),
              "--packet", "--then-generate")
     assert r.returncode == 2
     assert "then-generate" in (r.stderr + r.stdout).lower()
