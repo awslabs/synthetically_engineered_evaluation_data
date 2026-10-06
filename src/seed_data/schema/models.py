@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Cardinality(str, Enum):
@@ -178,8 +178,64 @@ class EntitySchema(BaseModel):
         return v
 
 
+def entity_key(name: str) -> str:
+    """The identity two entity names share if they would collide downstream.
+
+    Structured export writes one file per entity named
+    ``name.lower().replace(" ", "_")``, and generated data is keyed by name, so
+    "Customer" and "customer" are the same entity as far as output goes.
+    """
+    return name.strip().lower().replace(" ", "_")
+
+
+def merge_entities(entities: list[EntitySchema]) -> list[EntitySchema]:
+    """Fold same-name entities (by :func:`entity_key`) into one, keeping order.
+
+    ``plan`` extracts each input separately, so a CSV of customers plus a text
+    description of customers yields two ``Customer`` entities — and without this
+    the second silently overwrote the first's table. Fields are unioned by name
+    with the first definition winning on conflict; relationships, guidance and
+    reference samples are combined.
+    """
+    merged: dict[str, EntitySchema] = {}
+    for entity in entities:
+        key = entity_key(entity.entity_name)
+        if key not in merged:
+            merged[key] = entity.model_copy(deep=True)
+            continue
+        into = merged[key]
+        known = {f.name for f in into.fields}
+        into.fields.extend(f.model_copy(deep=True) for f in entity.fields if f.name not in known)
+        into.description = into.description or entity.description
+        into.relationships.extend(r for r in entity.relationships if r not in into.relationships)
+        seen = {(r.source_field, r.target_entity, r.target_field) for r in into.structured_relationships}
+        into.structured_relationships.extend(
+            r for r in entity.structured_relationships
+            if (r.source_field, r.target_entity, r.target_field) not in seen
+        )
+        if entity.generation_guidance and entity.generation_guidance not in into.generation_guidance:
+            into.generation_guidance = "\n\n".join(
+                g for g in (into.generation_guidance, entity.generation_guidance) if g
+            )
+        into.reference_samples.extend(entity.reference_samples)
+    return list(merged.values())
+
+
 class InferredSchema(BaseModel):
     entities: list[EntitySchema] = Field(description="List of entity schemas with full definitions")
+
+    @model_validator(mode="after")
+    def _entity_names_are_unique(self):
+        # Output is keyed by entity name (one table/file per entity): a repeated
+        # name would silently overwrite data, so refuse it at construction.
+        keys = [entity_key(e.entity_name) for e in self.entities]
+        dupes = sorted({e.entity_name for e in self.entities if keys.count(entity_key(e.entity_name)) > 1})
+        if dupes:
+            raise ValueError(
+                f"duplicate entity names {dupes}: entity names must be unique "
+                "(case-insensitive, spaces = underscores); merge or rename them"
+            )
+        return self
 
 
 class GeneratedSamples(BaseModel):

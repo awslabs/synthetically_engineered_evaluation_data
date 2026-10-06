@@ -61,6 +61,14 @@ if TYPE_CHECKING:
     from seed_data.schema import Schema
 
 
+class ScenarioPlan(BaseModel):
+    """Planned scenarios plus the token usage of the planning call."""
+    scenarios: list[str]
+    token_usage: dict = Field(
+        default_factory=lambda: {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    )
+
+
 class BatchResult(BaseModel):
     """Typed result of a batch run — the per-document results plus a rollup."""
     count_requested: int
@@ -212,6 +220,7 @@ class Generator:
         entity: str | None = None,
         seed: int | None = None,
         on_document: Callable[[int, int, GeneratedDoc], None] | None = None,
+        scenarios: list[str] | None = None,
         verbose: bool = True,
     ) -> BatchResult:
         """Generate a diverse batch of documents from one high-level scenario.
@@ -231,6 +240,10 @@ class Generator:
             seed: optional seed for scenario planning (regression-stable sets).
             on_document: optional ``callback(index, total, GeneratedDoc)`` fired as
                 each document's result is collected — for host-side progress UIs.
+            scenarios: pre-planned scenarios from :meth:`plan_scenarios`. Skips
+                planning; ``count`` must equal ``len(scenarios)``. Use it to plan a
+                large set once and generate it in waves (e.g. to enforce a budget
+                between waves) without losing diversity across waves.
         """
         from seed_data.stages.batch import generate_batch as _batch
 
@@ -241,7 +254,7 @@ class Generator:
             renderer=self.renderer, critic_samples=self.critic_samples,
             augment=self.augment if augment is None else augment,
             verbose=verbose, session=self.session, seed=seed,
-            on_document=on_document,
+            on_document=on_document, scenarios=scenarios,
         )
         resolved = self._resolve_for_documents(schema, entity=entity)
         if resolved is not None:
@@ -256,6 +269,29 @@ class Generator:
             count_failed=len(docs) - succeeded,
             documents=docs,
         )
+
+    def plan_scenarios(
+        self,
+        scenario: str,
+        *,
+        count: int,
+        seed: int | None = None,
+        verbose: bool = True,
+    ) -> ScenarioPlan:
+        """Diversify one high-level scenario into ``count`` specific ones.
+
+        The same planning step :meth:`generate_batch` runs first, exposed so a host
+        can plan once and pass slices back via ``generate_batch(scenarios=...)``.
+        The result carries the planner's token usage, which per-document
+        ``token_usage`` does not include.
+        """
+        from seed_data.stages.batch import plan_scenarios_with_usage
+
+        scenarios, usage = plan_scenarios_with_usage(
+            count, scenario, model=self.models.batch, session=self.session,
+            seed=seed, verbose=verbose,
+        )
+        return ScenarioPlan(scenarios=scenarios, token_usage=usage)
 
     def generate_packet(
         self,

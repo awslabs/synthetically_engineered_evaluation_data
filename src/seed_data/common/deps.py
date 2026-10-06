@@ -1,6 +1,7 @@
 """Optional-dependency guards.
 
-The base ``pip install seed-data`` deliberately omits the tabular stack, so every
+The base ``pip install seed-data`` deliberately omits the tabular stack (and the
+image-augmentation stack — see :func:`require_augment`), so every
 entry point into structured generation or tabular evaluation can be reached
 without pandas installed. Left unguarded, those paths fail with a bare
 ``ModuleNotFoundError: No module named 'pandas'`` raised from somewhere deep in
@@ -17,9 +18,20 @@ from importlib.util import find_spec
 
 # pandas is the load-bearing import: every tabular module reaches it directly or
 # via numpy/scipy, so its absence is a reliable proxy for "extra not installed".
-# numpy and scipy are NOT checked — they arrive as transitive base dependencies
-# of augraphy, so probing them would pass even on a lean install.
+# numpy and scipy are NOT checked — the `[augment]` extra pulls them in too, so
+# probing them would pass on an install that has augmentation but no tables.
 _STRUCTURED_PROBE = "pandas"
+
+# augraphy is what `seed_data.augment` imports first; it drags in opencv, so its
+# presence means the whole augmentation stack resolved.
+_AUGMENT_PROBE = "augraphy"
+
+
+def _importable(module: str) -> bool:
+    try:
+        return find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def structured_available() -> bool:
@@ -31,10 +43,12 @@ def structured_available() -> bool:
     escape from the check itself. Any failure to locate the module is treated as
     unavailable, which is the useful answer either way.
     """
-    try:
-        return find_spec(_STRUCTURED_PROBE) is not None
-    except (ImportError, ValueError):
-        return False
+    return _importable(_STRUCTURED_PROBE)
+
+
+def augment_available() -> bool:
+    """Whether the ``[augment]`` extra's image-augmentation stack can be imported."""
+    return _importable(_AUGMENT_PROBE)
 
 
 def require_structured(feature: str) -> None:
@@ -55,5 +69,29 @@ def require_structured(feature: str) -> None:
         "not installed. Install them with:\n\n"
         "    pip install 'seed-data[structured]'\n\n"
         "The base install covers document generation only; see the "
+        "'Install options' section of the README."
+    )
+
+
+def require_augment(feature: str) -> None:
+    """Raise an actionable :class:`ImportError` if the augmentation stack is missing.
+
+    Called where augmentation is *requested*, before any model call, so a missing
+    extra costs nothing — rather than surfacing as a failed node after the
+    document has already been generated and paid for.
+
+    Args:
+        feature: what the caller was trying to do (e.g. ``"--augment"``).
+
+    Raises:
+        ImportError: if the ``[augment]`` extra is not installed.
+    """
+    if augment_available():
+        return
+    raise ImportError(
+        f"{feature} needs the optional image-augmentation dependencies, which are "
+        "not installed. Install them with:\n\n"
+        "    pip install 'seed-data[augment]'\n\n"
+        "Document generation without augmentation does not need them; see the "
         "'Install options' section of the README."
     )

@@ -525,6 +525,8 @@ def _generate_subdocuments(
         List of SectionResult in the same order as doc_plan.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from seed_data.metering import submit_in_context
     from seed_data.stages.pipeline import generate as _generate
 
     def _generate_one(index: int, planned_doc: PlannedDocument) -> tuple[int, SectionResult]:
@@ -595,7 +597,7 @@ def _generate_subdocuments(
     results: list[SectionResult | None] = [None] * len(doc_plan)
     with ThreadPoolExecutor(max_workers=doc_workers) as pool:
         futures = {
-            pool.submit(_generate_one, i, doc): i
+            submit_in_context(pool, _generate_one, i, doc): i
             for i, doc in enumerate(doc_plan)
         }
         for future in as_completed(futures):

@@ -30,7 +30,7 @@ CRITIC_NAME = "data_critic"
 
 def build_generator(ctx: StageContext) -> Agent:
     """Build the data-generator agent for this document."""
-    from strands_tools.calculator import calculator
+    from seed_data.tools import calculator
 
     system_prompt = prompts.render(
         "data_generator",
@@ -108,7 +108,7 @@ def critique(ctx: StageContext) -> Verdict:
         )
 
     # LLM judgment: domain realism + arithmetic (with a calculator tool).
-    from strands_tools.calculator import calculator
+    from seed_data.tools import calculator
 
     system_prompt = prompts.render(
         "data_critic",

@@ -188,6 +188,7 @@ def test_total_primary_key_duplication_fails_the_gate():
 # --- stages/, ingest/, augment, packet -----------------------------------------
 
 def test_fractional_augraphy_probability_is_not_truncated():
+    pytest.importorskip("augraphy", reason="requires the [augment] optional dependencies")
     from seed_data.augment import _build_augmentation, _coerce_to_default_shape
 
     assert _build_augmentation("InkBleed", {"p": 0.8}).p == 0.8

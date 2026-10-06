@@ -167,6 +167,7 @@ def test_json_schema_number_reaches_the_numeric_generator():
     were classified as free text — skipping seeded numeric generation, min/max
     enforcement and type conformance.
     """
+    pytest.importorskip("numpy", reason="requires the [structured] optional dependencies")
     from seed_data.structured.generation import _needs_llm
 
     inferred = from_json_schema({
@@ -479,3 +480,51 @@ def test_boolean_enum_preserves_its_null_member():
     inferred = from_json_schema({"title": "T", "type": "object",
                                  "properties": {"flag": {"enum": [True, False, None]}}})
     assert to_json_schema(inferred)["properties"]["flag"]["enum"] == [True, False, None]
+
+
+# --- unique entity names / merging same-name entities ----------------------------
+
+def _entity(name, fields=(), **kw):
+    from seed_data.schema.models import EntitySchema, FieldDefinition
+    return EntitySchema(entity_name=name,
+                        fields=[FieldDefinition(name=f, type="string") for f in fields], **kw)
+
+
+def test_inferred_schema_rejects_duplicate_entity_names():
+    """Output is one file per entity name: a duplicate overwrote a table (seen live)."""
+    from seed_data.schema.models import InferredSchema
+    with pytest.raises(ValueError, match="duplicate entity names"):
+        InferredSchema(entities=[_entity("Customer"), _entity("Customer")])
+    with pytest.raises(ValueError, match="duplicate entity names"):
+        InferredSchema(entities=[_entity("Order Line"), _entity("order_line")])   # same file
+    InferredSchema(entities=[_entity("Customer"), _entity("Order")])
+
+
+def test_merge_entities_folds_same_name_entities_and_keeps_order():
+    from seed_data.schema.models import RelationshipDefinition, merge_entities
+    rel = RelationshipDefinition(source_entity="Customer", source_field="tier_id",
+                                 target_entity="Tier", target_field="id", cardinality="one_to_many")
+    merged = merge_entities([
+        _entity("Customer", ["id", "email"], description="", relationships=["belongs_to: Tier"],
+                structured_relationships=[rel], generation_guidance="Emails are lowercase.",
+                reference_samples=[{"id": 1}]),
+        _entity("Tier", ["id", "name"]),
+        _entity("customer", ["email", "lifetime_value"], description="A shopper",
+                relationships=["belongs_to: Tier"], structured_relationships=[rel],
+                generation_guidance="Values in USD.", reference_samples=[{"id": 2}]),
+    ])
+    assert [e.entity_name for e in merged] == ["Customer", "Tier"]
+    c = merged[0]
+    assert [f.name for f in c.fields] == ["id", "email", "lifetime_value"]   # union, first wins
+    assert c.description == "A shopper"
+    assert c.relationships == ["belongs_to: Tier"]
+    assert len(c.structured_relationships) == 1
+    assert c.generation_guidance == "Emails are lowercase.\n\nValues in USD."
+    assert c.reference_samples == [{"id": 1}, {"id": 2}]
+
+
+def test_merge_entities_does_not_mutate_inputs():
+    from seed_data.schema.models import merge_entities
+    a, b = _entity("Customer", ["id"]), _entity("Customer", ["email"])
+    merge_entities([a, b])
+    assert [f.name for f in a.fields] == ["id"]

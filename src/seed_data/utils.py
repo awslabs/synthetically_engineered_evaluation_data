@@ -8,8 +8,13 @@ import shutil
 from strands.models import BedrockModel
 from botocore.config import Config
 
+from seed_data.metering import metered
 from seed_data.model_registry import MODELS
 from seed_data.session import get_boto_session
+
+# Every model reports its calls' token usage to the meter active at creation
+# (seed_data.metering) — the only way plan/structured spend becomes visible.
+_MeteredBedrockModel = metered(BedrockModel)
 
 # GitHub location of the schema library, for docs and CLI messaging.
 SCHEMA_LIBRARY_URL = (
@@ -114,7 +119,7 @@ def make_model(model_key: str, thinking_budget: int = 0, role: str = "",
         kwargs["additional_request_fields"] = {
             "thinking": {"type": "enabled", "budget_tokens": thinking_budget}
         }
-    return BedrockModel(**kwargs)
+    return _MeteredBedrockModel(**kwargs)
 
 
 def load_schema_dir(schema_dir: str) -> tuple[dict, str, list[str]]:

@@ -13,6 +13,10 @@ BYPASS_TOOL_CONSENT=true python -m seed_data \
   --augment
 ```
 
+Augmentation is an optional extra. Install it with `pip install "seed-data[augment]"`
+(it is included in `[all]` and `[dev]`). Without it, `--augment` stops immediately with
+an install hint, before any model call.
+
 ## How It Works
 
 Augmentation uses [augraphy](https://github.com/sparkfish/augraphy), a library of document degradation effects. When `--augment` is set, two stages are added after the clean PDF is produced:

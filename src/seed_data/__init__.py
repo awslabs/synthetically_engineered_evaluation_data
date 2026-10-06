@@ -17,18 +17,21 @@ __all__ = [
     "GeneratedDoc",
     "BatchResult",
     "StructuredResult",
+    "ScenarioPlan",
     "InferredSchema",
     "MODELS",
+    "token_meter",
 ]
 
 
 def __getattr__(name):
-    if name in ("Generator", "BatchResult", "StructuredResult"):
-        from seed_data.api import BatchResult, Generator, StructuredResult
+    if name in ("Generator", "BatchResult", "StructuredResult", "ScenarioPlan"):
+        from seed_data.api import BatchResult, Generator, ScenarioPlan, StructuredResult
         return {
             "Generator": Generator,
             "BatchResult": BatchResult,
             "StructuredResult": StructuredResult,
+            "ScenarioPlan": ScenarioPlan,
         }[name]
     if name == "Schema":
         from seed_data.schema import Schema
@@ -42,4 +45,7 @@ def __getattr__(name):
     if name == "GeneratedDoc":
         from seed_data.stages.pipeline import GeneratedDoc
         return GeneratedDoc
+    if name == "token_meter":
+        from seed_data.metering import token_meter
+        return token_meter
     raise AttributeError(f"module 'seed_data' has no attribute {name!r}")

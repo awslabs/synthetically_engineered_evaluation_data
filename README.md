@@ -54,7 +54,8 @@ export AWS_PROFILE=your-profile-name
 # Generate a single FCC invoice
 uv run seed-data --schema-dir fcc-invoice
 
-# Generate a diverse batch of 4 invoices with augmentation
+# Generate a diverse batch of 4 invoices with augmentation (needs the [augment] extra;
+# `uv sync` installs it via the dev group)
 uv run seed-data --schema-dir fcc-invoice \
   --count 4 --augment \
   --scenario "FCC broadcast invoices for packaged food companies in the midwest"
@@ -293,7 +294,8 @@ Note: pip resolves dependencies fresh and does not use `uv.lock`.
 |---|---|---|
 | `pip install seed-data` | base only | Documents. Stays lean — no pandas |
 | `pip install "seed-data[structured]"` | pandas, openpyxl, pyarrow | Structured (tabular) generation |
-| `pip install "seed-data[all]"` | every optional feature | Both modalities |
+| `pip install "seed-data[augment]"` | augraphy, opencv-python | `--augment` scan/fax aging effects |
+| `pip install "seed-data[all]"` | every optional feature | Both modalities, plus augmentation |
 | `pip install -e ".[dev]"` | `[all]` + pytest, ruff, mkdocs | Contributing |
 
 The base install is CI-enforced to import and pass its test suite with no pandas
@@ -302,10 +304,10 @@ before. Structured commands raise a clear `ImportError` telling you to install
 the extra; the document pipeline never needs it. All four output formats —
 including `--format parquet` — work with `[structured]` alone.
 
-The extra also pins numpy and scipy, but those are not what makes it heavy: both
-already arrive in the base install as transitive dependencies of `augraphy`. They
-are named in the extra only to declare the versions this code uses directly.
-pandas is the dependency the base install genuinely omits.
+Augmentation is opt-in too: `--augment` (or `augment=True`) without the
+`[augment]` extra fails immediately with an install hint, before any model call.
+Keeping opencv out of the base install is what lets it build on Alpine/musl
+images, where opencv ships no wheels.
 
 ### PDF renderers
 

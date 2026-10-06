@@ -52,30 +52,35 @@ def run_structured(
     """
     from seed_data.api import StructuredResult
     from seed_data.logs import configure_progress_logging
+    from seed_data.metering import token_meter
     from seed_data.structured.pipeline import run_graph_pipeline
 
     # The pipeline reports progress through `logger.info`; without a handler those
     # records were dropped and a multi-minute run printed nothing at all.
     configure_progress_logging(verbose)
 
-    try:
-        _summary, ps = run_graph_pipeline(
-            schema,
-            output_dir=output_dir,
-            export_format=export_format,
-            target_count=target_count,
-            seed=seed,
-            model=getattr(models, "data", None),
-            session=session,
-        )
-    except Exception as e:  # noqa: BLE001 - surface failures as a typed result
-        logger.exception("Structured generation failed")
-        return StructuredResult(
-            success=False,
-            schema=schema,
-            format=export_format,
-            error=str(e),
-        )
+    # Metered across every agent the pipeline builds — graph nodes and the
+    # parallel fill workers alike. `token_usage` was previously never set.
+    with token_meter() as meter:
+        try:
+            _summary, ps = run_graph_pipeline(
+                schema,
+                output_dir=output_dir,
+                export_format=export_format,
+                target_count=target_count,
+                seed=seed,
+                model=getattr(models, "data", None),
+                session=session,
+            )
+        except Exception as e:  # noqa: BLE001 - surface failures as a typed result
+            logger.exception("Structured generation failed")
+            return StructuredResult(
+                success=False,
+                schema=schema,
+                format=export_format,
+                error=str(e),
+                token_usage=meter.usage,
+            )
 
     output_paths: list[str] = []
     row_counts: dict[str, int] = {}
@@ -117,6 +122,7 @@ def run_structured(
         format=export_format,
         row_counts=row_counts,
         evaluation=ps.evaluation_scores,
+        token_usage=meter.usage,
         error=error,
     )
 

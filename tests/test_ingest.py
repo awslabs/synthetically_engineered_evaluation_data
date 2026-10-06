@@ -4,6 +4,7 @@
 directly. The `run_ingest` orchestration is tested with the schema-extraction
 agent and infer_schema mocked out, so nothing here needs Bedrock credentials.
 """
+import json
 import pytest
 
 from seed_data.ingest import InputType, detect_input_type, run_ingest
@@ -499,3 +500,27 @@ def test_analyze_example_data_summarizes_a_workbook(tmp_path):
     assert sorted(result["entities_found"]) == ["Customer", "Order"]
     assert "Entity: Customer" in result["summary"]
     assert "Entity: Order" in result["summary"]
+
+
+def test_run_ingest_merges_the_same_entity_from_two_inputs(monkeypatch, tmp_path):
+    """Regression (seen on a real account): a CSV plus a free-text description of
+    the same entity produced two `Customer` entities, and structured export then
+    wrote one table over the other."""
+    def fake_extract(**kwargs):
+        return _fake_schema("Customer").model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+    csv = tmp_path / "customers.csv"
+    csv.write_text("name,tier\nA,gold\n")
+    schema = run_ingest("customers with loyalty tiers", str(csv), verbose=False)
+    assert [e.entity_name for e in schema.entities] == ["Customer"]
+
+
+def test_extraction_output_with_a_repeated_entity_is_merged_not_rejected(monkeypatch):
+    def fake_extract(**kwargs):
+        one = _fake_schema("Customer").model_dump()["entities"][0]
+        return json.dumps({"entities": [one, {**one, "description": "dup"}]})
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+    schema = run_ingest("customers", verbose=False)
+    assert [e.entity_name for e in schema.entities] == ["Customer"]

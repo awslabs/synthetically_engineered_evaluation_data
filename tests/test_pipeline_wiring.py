@@ -13,6 +13,9 @@ the agents; it only assembles the graph.
 """
 import os
 
+import pytest
+
+from seed_data.common.deps import augment_available
 from seed_data.stages.base import StageContext, ModelConfig
 from seed_data.stages.pipeline import build_context, build_pipeline_graph
 
@@ -28,6 +31,12 @@ def _ctx(tmp_path) -> StageContext:
     )
 
 
+# Building the augment stage needs the optional `[augment]` extra.
+needs_augment = pytest.mark.skipif(
+    not augment_available(), reason="requires the [augment] optional dependencies",
+)
+
+
 # --- the default (no-augment) pipeline builds -------------------------------
 
 def test_build_pipeline_graph_default(tmp_path):
@@ -39,6 +48,7 @@ def test_build_pipeline_graph_default(tmp_path):
 
 # --- the augment pipeline builds (regression guard for the ctx bug) ---------
 
+@needs_augment
 def test_build_pipeline_graph_with_augment(tmp_path):
     """Regression: build_critic once omitted the required ctx, so this raised
     TypeError at build time for every augment run. Must build cleanly."""
@@ -59,7 +69,8 @@ def test_build_context_from_resolved(tmp_path):
     assert ctx.schema_dict["title"] == "invoice"
     # a graph builds from a real build_context, in both modes
     build_pipeline_graph(ctx)
-    build_pipeline_graph(ctx, augment=True)
+    if augment_available():
+        build_pipeline_graph(ctx, augment=True)
 
 
 def test_failed_result_names_the_halting_critic():

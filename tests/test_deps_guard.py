@@ -52,10 +52,10 @@ def test_structured_available_survives_a_raising_finder(monkeypatch):
 
 
 def test_structured_available_probes_pandas_not_numpy(monkeypatch):
-    """numpy/scipy must not be the probe — they are base deps via augraphy.
+    """numpy/scipy must not be the probe — the `[augment]` extra pulls them in too.
 
-    Probing them would report the extra as present on a lean install, which is the
-    bug this indirection exists to avoid.
+    Probing them would report the structured extra as present on an install that
+    only has augmentation, which is the bug this indirection exists to avoid.
     """
     from seed_data.common import deps
 
@@ -277,3 +277,77 @@ def test_models_is_still_exported_from_the_package_root():
 
     assert seed_data.MODELS is leaf_models
     assert "MODELS" in seed_data.__all__
+
+
+# --- [augment] extra -----------------------------------------------------------
+
+def test_require_augment_passes_when_available(monkeypatch):
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: True)
+    from seed_data.common.deps import require_augment
+    require_augment("anything")  # must not raise
+
+
+def test_require_augment_message_is_actionable(monkeypatch):
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    from seed_data.common.deps import require_augment
+
+    with pytest.raises(ImportError) as exc:
+        require_augment("--augment")
+
+    msg = str(exc.value)
+    assert "--augment" in msg
+    assert "seed-data[augment]" in msg
+    assert "pip install" in msg
+
+
+def test_augment_available_probes_augraphy(monkeypatch):
+    from seed_data.common import deps
+
+    assert deps._AUGMENT_PROBE == "augraphy"
+    monkeypatch.setattr(deps, "find_spec", lambda name: None if name == "augraphy" else object())
+    assert deps.augment_available() is False
+
+
+def test_augment_available_survives_a_raising_finder(monkeypatch):
+    from seed_data.common import deps
+
+    def raising(name):
+        raise ImportError("No module named 'augraphy'")
+
+    monkeypatch.setattr(deps, "find_spec", raising)
+    assert deps.augment_available() is False
+
+
+def test_augmented_graph_build_raises_before_any_node_runs(monkeypatch, tmp_path):
+    """Asking for augmentation without the extra must fail at graph build — before
+    the data generator spends tokens — not as a failed augment node afterwards."""
+    import os
+    from seed_data.stages.base import ModelConfig, StageContext
+    from seed_data.stages.pipeline import build_pipeline_graph
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    ctx = StageContext(
+        schema_dict={"title": "invoice", "type": "object"},
+        output_path=os.path.join(tmp_path, "pdfs", "doc.pdf"),
+        data_json_path=os.path.join(tmp_path, "data", "doc.json"),
+        script_path=os.path.join(tmp_path, "scripts", "doc.html"),
+        models=ModelConfig(), output_dir=str(tmp_path), threshold=7,
+    )
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        build_pipeline_graph(ctx, augment=True)
+    build_pipeline_graph(ctx, augment=False)  # the un-augmented path is unaffected
+
+
+def test_augmented_batch_raises_before_scenario_planning(monkeypatch):
+    """generate_batch plans scenarios with a paid model call before it builds any
+    per-document graph, so the guard has to sit ahead of the planner."""
+    from seed_data.stages import batch
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+
+    def planner_must_not_run(*a, **k):
+        raise AssertionError("scenario planner ran before the augment guard")
+
+    monkeypatch.setattr(batch, "plan_scenarios", planner_must_not_run)
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        batch.generate_batch(schema_dir="unused", count=2, brief="x", augment=True)

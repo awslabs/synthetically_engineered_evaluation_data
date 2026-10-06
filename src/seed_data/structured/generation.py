@@ -984,6 +984,8 @@ def generate_bulk(
     if entities_needing_llm:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
+        from seed_data.metering import submit_in_context
+
         def _fill_entity(args):
             # `llm_fields` is Phase 1's own list, carried here rather than recomputed:
             # `all_data` has since gained every generated entity, so recomputing the
@@ -1005,7 +1007,10 @@ def generate_bulk(
 
         max_workers = min(len(entities_needing_llm), 4)
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_fill_entity, args): args[0] for args in entities_needing_llm}
+            # In-context submit: the fill agents are built in these workers and must
+            # bind the caller's token meter (seed_data.metering).
+            futures = {submit_in_context(pool, _fill_entity, args): args[0]
+                       for args in entities_needing_llm}
             for future in as_completed(futures):
                 entity_name = futures[future]
                 try:

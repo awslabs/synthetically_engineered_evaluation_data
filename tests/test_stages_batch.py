@@ -258,3 +258,69 @@ def test_a_raising_worker_does_not_lose_the_other_documents(tmp_path, monkeypatc
     assert sum(1 for d in docs if d.success) == 2, "rendered documents must survive"
     failed = [d for d in docs if not d.success]
     assert failed and "worker_2 exploded" in (failed[0].error or "")
+
+
+# --- pre-planned scenarios + planner usage (budget-checked waves) -------------
+
+def test_generate_batch_with_preplanned_scenarios_skips_the_planner(tmp_path, monkeypatch):
+    def planner_must_not_run(*a, **k):
+        raise AssertionError("planner ran although scenarios were supplied")
+    monkeypatch.setattr(batch_mod, "plan_scenarios", planner_must_not_run)
+
+    seen = []
+    def fake_build_context(*, extra, output_dir, **kw):
+        seen.append(extra)
+        return _ctx(str(tmp_path), len(seen))
+    monkeypatch.setattr(batch_mod, "build_context", fake_build_context)
+
+    class _Graph:
+        def __call__(self, task):
+            raise RuntimeError("stop after context build")
+    monkeypatch.setattr(batch_mod, "build_batch_graph",
+                        lambda contexts, **kw: (_Graph(), [f"worker_{i}" for i in range(len(contexts))]))
+
+    docs = batch_mod.generate_batch(schema_dir="unused", count=2, brief="ignored",
+                                    scenarios=["s-a", "s-b"], verbose=False)
+    assert seen == ["s-a", "s-b"]
+    assert len(docs) == 2
+
+
+def test_generate_batch_rejects_count_scenarios_mismatch():
+    import pytest
+    with pytest.raises(ValueError, match="count=3"):
+        batch_mod.generate_batch(schema_dir="unused", count=3, brief="x",
+                                 scenarios=["only", "two"], verbose=False)
+
+
+def test_plan_scenarios_with_usage_reports_planner_tokens(monkeypatch):
+    class _Plan:
+        scenarios = ["a", "b"]
+
+    class _Result:
+        structured_output = _Plan()
+        class metrics:
+            accumulated_usage = {"inputTokens": 120, "outputTokens": 30, "totalTokens": 150}
+
+    class _FakeAgent:
+        def __init__(self, *a, **k): pass
+        def __call__(self, *a, **k): return _Result()
+
+    monkeypatch.setattr(batch_mod, "Agent", _FakeAgent)
+    monkeypatch.setattr(batch_mod, "make_model", lambda *a, **k: None)
+
+    scenarios, usage = batch_mod.plan_scenarios_with_usage(count=2, brief="b", verbose=False)
+    assert scenarios == ["a", "b"]
+    assert usage == {"inputTokens": 120, "outputTokens": 30, "totalTokens": 150}
+    # the list-returning wrapper is unchanged for existing callers
+    assert batch_mod.plan_scenarios(count=2, brief="b", verbose=False) == ["a", "b"]
+
+
+def test_generator_plan_scenarios_returns_typed_plan(monkeypatch):
+    from seed_data import Generator
+    monkeypatch.setattr(batch_mod, "plan_scenarios_with_usage",
+                        lambda count, brief, **kw: (["x"] * count, {"inputTokens": 1,
+                                                                    "outputTokens": 2,
+                                                                    "totalTokens": 3}))
+    plan = Generator().plan_scenarios("theme", count=2, verbose=False)
+    assert plan.scenarios == ["x", "x"]
+    assert plan.token_usage["totalTokens"] == 3

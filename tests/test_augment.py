@@ -10,7 +10,13 @@ Covers the three fixes for the "augment wedges generate_batch" report:
 """
 import os
 
-from seed_data.stages.base import StageContext, ModelConfig, Verdict
+import pytest
+
+# The augmentation stack is the optional `[augment]` extra; the lean base-install
+# CI job has no augraphy, and every test here imports or builds the augment stage.
+pytest.importorskip("augraphy", reason="requires the [augment] optional dependencies")
+
+from seed_data.stages.base import StageContext, ModelConfig, Verdict  # noqa: E402
 
 
 def _ctx(tmp_path, threshold=7) -> StageContext:
