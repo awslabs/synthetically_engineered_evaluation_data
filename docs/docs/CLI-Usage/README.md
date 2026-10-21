@@ -221,6 +221,10 @@ seed-data --schema-dir w2 --augment --renderer weasyprint --output ./out
 seed-data --schema-dir ./my-schemas/purchase-order --scenario "Office supplies, net-30"
 ```
 
+`--augment`, on any command, needs the optional augmentation extra:
+`pip install "seed-data[augment]"` (included in `[all]` and `[dev]`). Without it
+the command stops with an install hint before any model call.
+
 Each run executes the full single-document pipeline — data generation, schema
 validation, PDF rendering, and visual critique — and writes three paired artifacts:
 

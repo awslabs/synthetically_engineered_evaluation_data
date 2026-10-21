@@ -147,7 +147,7 @@ def critique_structured(
     )
 
     try:
-        from strands_tools.calculator import calculator
+        from seed_data.tools import calculator
 
         agent = Agent(
             model=make_model(model, session=session),

@@ -1,5 +1,8 @@
 """Strands @tool wrappers used by agents in the graph."""
+import ast as _ast
 import json
+import math as _math
+import operator as _op
 import os
 
 from strands import tool
@@ -21,6 +24,99 @@ def random_roll(percent_chance: int) -> dict:
     import random
     result = random.randint(1, 100) <= percent_chance
     return {"status": "success", "content": [{"text": str(result).lower()}]}
+
+
+# -- calculator ---------------------------------------------------------------
+#
+# Replaces strands_tools.calculator, which is deprecated (an error from
+# strands-tools 0.9). Its suggested replacement, the `shell` tool, would widen the
+# boundary from "evaluate an expression" to "run arbitrary commands" for agents fed
+# caller-supplied schemas and briefs; this keeps calculator's AST-allowlist model.
+
+_CALC_MAX_LEN = 2000
+_CALC_MAX_EXPONENT = 64
+_CALC_MAX_ABS = 1e18
+_CALC_BINOPS = {_ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
+                _ast.Div: _op.truediv, _ast.FloorDiv: _op.floordiv, _ast.Mod: _op.mod,
+                _ast.Pow: _op.pow}
+_CALC_UNARY = {_ast.UAdd: _op.pos, _ast.USub: _op.neg}
+# int.__round__ computes 10 ** -ndigits, so an unbounded ndigits is a CPU bomb:
+# round(5, -10**18) never returns, and a pipeline timeout cannot stop the thread.
+_CALC_MAX_NDIGITS = 15
+
+
+def _calc_round(x, ndigits=None):
+    if ndigits is not None and abs(ndigits) > _CALC_MAX_NDIGITS:
+        raise ValueError(f"round() ndigits beyond +/-{_CALC_MAX_NDIGITS}")
+    return round(x, ndigits)
+
+
+def _calc_sum(*args):
+    # sum(1, 2, 3) or sum([1, 2, 3]): models write both.
+    return sum(args[0]) if len(args) == 1 and isinstance(args[0], list) else sum(args)
+
+
+_CALC_FUNCS = {"abs": abs, "round": _calc_round, "min": min, "max": max, "sum": _calc_sum,
+               "sqrt": _math.sqrt, "floor": _math.floor, "ceil": _math.ceil}
+
+
+def _calc_eval(node):
+    if isinstance(node, _ast.Expression):
+        return _calc_eval(node.body)
+    if isinstance(node, _ast.Constant) and type(node.value) in (int, float):
+        return node.value
+    if isinstance(node, _ast.UnaryOp) and type(node.op) in _CALC_UNARY:
+        return _CALC_UNARY[type(node.op)](_calc_eval(node.operand))
+    if isinstance(node, _ast.BinOp) and type(node.op) in _CALC_BINOPS:
+        left, right = _calc_eval(node.left), _calc_eval(node.right)
+        if isinstance(node.op, _ast.Pow) and abs(right) > _CALC_MAX_EXPONENT:
+            raise ValueError(f"exponent larger than {_CALC_MAX_EXPONENT}")
+        result = _CALC_BINOPS[type(node.op)](left, right)
+        if isinstance(result, complex):    # a negative base to a fractional power
+            raise ValueError("result is not a real number")
+        if abs(result) > _CALC_MAX_ABS:
+            raise ValueError("result out of range")
+        return result
+    if (isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name)
+            and node.func.id in _CALC_FUNCS and not node.keywords):
+        return _CALC_FUNCS[node.func.id](*(_calc_arg(a) for a in node.args))
+    raise ValueError(f"unsupported expression element: {type(node).__name__}")
+
+
+def _calc_arg(node):
+    # A list/tuple literal is allowed only as a function argument (sum([1, 2])),
+    # never as an operand, where `[0] * 10**9` would allocate gigabytes.
+    if isinstance(node, (_ast.List, _ast.Tuple)):
+        return [_calc_eval(e) for e in node.elts]
+    return _calc_eval(node)
+
+
+def evaluate_arithmetic(expression: str):
+    """Evaluate an arithmetic expression with no names, attributes or imports."""
+    if len(expression) > _CALC_MAX_LEN:
+        raise ValueError(f"expression longer than {_CALC_MAX_LEN} characters")
+    return _calc_eval(_ast.parse(expression.replace("^", "**"), mode="eval"))
+
+
+@tool
+def calculator(expression: str) -> dict:
+    """Evaluate an arithmetic expression exactly — use it for every sum, product and total.
+
+    Supports numbers, + - * / // % ** (or ^), parentheses, and abs, round, min,
+    max, sum, sqrt, floor, ceil; sum, min and max also take a list. Examples:
+    "round(12.5 * 3 + 7.25, 2)", "sum([12.5, 7.25, 3])".
+
+    Args:
+        expression: The arithmetic expression to evaluate.
+    """
+    try:
+        value = evaluate_arithmetic(expression)
+    except (ValueError, TypeError, SyntaxError, ZeroDivisionError, OverflowError,
+            RecursionError, MemoryError) as e:
+        return {"status": "error", "content": [{"text": f"Cannot evaluate {expression!r}: {e}"}]}
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e15:
+        value = int(value)
+    return {"status": "success", "content": [{"text": f"{expression} = {value}"}]}
 
 
 @tool

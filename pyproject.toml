@@ -14,8 +14,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "strands-agents",
-    "strands-agents-tools",
+    # Floors matter: an unbounded spec lets a resolver that can't satisfy current
+    # Strands (e.g. no wheel for one of its deps under --no-build) fall back to the
+    # empty 0.0.1 placeholder release, which installs fine and fails on import.
+    "strands-agents>=1.45",
+    "strands-agents-tools>=0.8",
     "pydantic>=2",
     "reportlab",
     # xhtml2pdf 0.2.14 imports ShowBoundaryValue from reportlab.platypus.frames,
@@ -28,12 +31,10 @@ dependencies = [
     "python-dotenv",
     "boto3",
     "jinja2",
-    "augraphy",
     "pypdfium2",
     # Security floor: <6.16.1 has several DoS issues (unbounded memory/runtime
     # and an infinite loop) on crafted PDFs — and this package reads user PDFs.
     "pypdf>=6.16.1",
-    "opencv-python",
     "pyyaml",
 ]
 
@@ -41,8 +42,7 @@ dependencies = [
 # Note: the `dev` extra must be kept in sync with [dependency-groups].dev below
 [project.optional-dependencies]
 # Optional structured-data generation stack. pandas and openpyxl are genuinely
-# additional; numpy and scipy are already pulled in transitively by the base
-# `augraphy` dependency and are pinned here only to state the versions this code
+# additional, and numpy and scipy are pinned to state the versions this code
 # needs directly. Opt in with `pip install seed-data[structured]`.
 structured = [
     "pandas>=2.0",
@@ -51,9 +51,17 @@ structured = [
     "openpyxl>=3.1",   # engine for --format excel
     "pyarrow>=15.0",   # engine for --format parquet
 ]
-# Everything a user could opt into. Currently just the structured stack, but a
-# single install target that stays correct as more extras are added.
-all = ["seed-data[structured]"]
+# Image augmentation (`--augment`): scan/fax aging effects. Kept out of the base
+# install because opencv-python ships no musllinux wheels, so a base install would
+# not build on Alpine (the AgentCore tool image), and un-augmented documents never
+# need it.
+augment = [
+    "augraphy",
+    "opencv-python",
+]
+# Everything a user could opt into: a single install target that stays correct as
+# more extras are added.
+all = ["seed-data[structured,augment]"]
 dev = [
     # dev implies the full feature set, so `pip install -e ".[dev]"` can run the
     # structured tests instead of skipping them via importorskip.
@@ -120,6 +128,9 @@ test = [
     "openpyxl>=3.1",
     "pyarrow>=15.0",   # kept in sync with the `structured` extra: without it the
                        # parquet happy-path tests skip permanently in CI
+    # augmentation stack — kept in sync with the `augment` extra
+    "augraphy",
+    "opencv-python",
 ]
 lint = [
     # Pin to a minor range so a ruff upgrade can't silently change what the CI

@@ -52,10 +52,10 @@ def test_structured_available_survives_a_raising_finder(monkeypatch):
 
 
 def test_structured_available_probes_pandas_not_numpy(monkeypatch):
-    """numpy/scipy must not be the probe — they are base deps via augraphy.
+    """numpy/scipy must not be the probe — the `[augment]` extra pulls them in too.
 
-    Probing them would report the extra as present on a lean install, which is the
-    bug this indirection exists to avoid.
+    Probing them would report the structured extra as present on an install that
+    only has augmentation, which is the bug this indirection exists to avoid.
     """
     from seed_data.common import deps
 
@@ -277,3 +277,152 @@ def test_models_is_still_exported_from_the_package_root():
 
     assert seed_data.MODELS is leaf_models
     assert "MODELS" in seed_data.__all__
+
+
+# --- [augment] extra -----------------------------------------------------------
+
+def test_require_augment_passes_when_available(monkeypatch):
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: True)
+    from seed_data.common.deps import require_augment
+    require_augment("anything")  # must not raise
+
+
+def test_require_augment_message_is_actionable(monkeypatch):
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    from seed_data.common.deps import require_augment
+
+    with pytest.raises(ImportError) as exc:
+        require_augment("--augment")
+
+    msg = str(exc.value)
+    assert "--augment" in msg
+    assert "seed-data[augment]" in msg
+    assert "pip install" in msg
+
+
+def test_augment_available_probes_augraphy(monkeypatch):
+    from seed_data.common import deps
+
+    assert deps._AUGMENT_PROBE == "augraphy"
+    monkeypatch.setattr(deps, "find_spec", lambda name: None if name == "augraphy" else object())
+    assert deps.augment_available() is False
+
+
+def test_augment_available_survives_a_raising_finder(monkeypatch):
+    from seed_data.common import deps
+
+    def raising(name):
+        raise ImportError("No module named 'augraphy'")
+
+    monkeypatch.setattr(deps, "find_spec", raising)
+    assert deps.augment_available() is False
+
+
+def test_augmented_graph_build_raises_before_any_node_runs(monkeypatch, tmp_path):
+    """Asking for augmentation without the extra must fail at graph build — before
+    the data generator spends tokens — not as a failed augment node afterwards."""
+    import os
+    from seed_data.stages.base import ModelConfig, StageContext
+    from seed_data.stages.pipeline import build_pipeline_graph
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    ctx = StageContext(
+        schema_dict={"title": "invoice", "type": "object"},
+        output_path=os.path.join(tmp_path, "pdfs", "doc.pdf"),
+        data_json_path=os.path.join(tmp_path, "data", "doc.json"),
+        script_path=os.path.join(tmp_path, "scripts", "doc.html"),
+        models=ModelConfig(), output_dir=str(tmp_path), threshold=7,
+    )
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        build_pipeline_graph(ctx, augment=True)
+    build_pipeline_graph(ctx, augment=False)  # the un-augmented path is unaffected
+
+
+def test_augmented_batch_raises_before_scenario_planning(monkeypatch):
+    """generate_batch plans scenarios with a paid model call before it builds any
+    per-document graph, so the guard has to sit ahead of the planner."""
+    from seed_data.stages import batch
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+
+    def planner_must_not_run(*a, **k):
+        raise AssertionError("scenario planner ran before the augment guard")
+
+    monkeypatch.setattr(batch, "plan_scenarios", planner_must_not_run)
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        batch.generate_batch(schema_dir="unused", count=2, brief="x", augment=True)
+
+
+def _fail_if_called(what):
+    def paid_step(*a, **k):
+        raise AssertionError(f"{what} ran before the augment guard")
+    return paid_step
+
+
+def test_augmented_packet_raises_before_shared_context(monkeypatch, tmp_path):
+    """Shared-context resolution is a paid call made before any sub-document graph.
+    Left to the graph build, a missing extra ended as one printed failure per
+    section and "No sub-documents were generated successfully"."""
+    from seed_data import Generator, packet
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    monkeypatch.setattr(packet, "resolve_shared_context", _fail_if_called("shared-context resolution"))
+
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        Generator(output_dir=str(tmp_path)).generate_packet("lending-package", augment=True)
+
+
+@pytest.mark.parametrize("instance_augment, call_augment", [(True, None), (False, True)],
+                         ids=["instance-setting", "per-call-override"])
+@pytest.mark.parametrize("verb", [
+    lambda gen, augment: gen.plan_and_generate("invoices", output="documents", augment=augment),
+    lambda gen, augment: gen.generate_from_samples("s.pdf", name="invoice", augment=augment),
+    lambda gen, augment: gen.generate_batch_from_samples(
+        "s.pdf", name="invoice", count=2, scenario="x", augment=augment),
+], ids=["plan_and_generate", "generate_from_samples", "generate_batch_from_samples"])
+def test_augmented_document_verbs_raise_before_planning_or_inference(
+    monkeypatch, verb, instance_augment, call_augment,
+):
+    from seed_data import Generator
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    monkeypatch.setattr(Generator, "plan", _fail_if_called("planning"))
+    monkeypatch.setattr(Generator, "infer_schema", _fail_if_called("schema inference"))
+
+    with pytest.raises(ImportError, match=r"seed-data\[augment\]"):
+        verb(Generator(augment=instance_augment), call_augment)
+
+
+def test_augment_setting_does_not_block_structured_plan_and_generate(monkeypatch):
+    """Augmentation is documents-only: a Generator(augment=True) still plans tables."""
+    from seed_data import Generator
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    monkeypatch.setattr("seed_data.common.deps.structured_available", lambda: True)
+
+    def plan(self, *a, **k):
+        raise RuntimeError("reached planning")
+    monkeypatch.setattr(Generator, "plan", plan)
+
+    with pytest.raises(RuntimeError, match="reached planning"):
+        Generator(augment=True).plan_and_generate("customers", output="structured")
+
+
+@pytest.mark.parametrize("command, argv, paid", [
+    ("_plan_and_generate", ["invoices", "--output", "documents", "--augment"], "plan"),
+    ("_infer_schema", ["s.pdf", "--name", "invoice", "--output", "unused-out",
+                       "--then-generate", "--augment"], "infer_schema"),
+], ids=["plan-and-generate", "infer-schema-then-generate"])
+def test_cli_augment_without_the_extra_exits_before_any_paid_step(
+    monkeypatch, capsys, command, argv, paid,
+):
+    from seed_data import __main__ as cli
+    from seed_data import Generator
+
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: False)
+    monkeypatch.setattr(Generator, paid, _fail_if_called(paid))
+
+    with pytest.raises(SystemExit) as exc:
+        getattr(cli, command)(argv)
+    assert exc.value.code == 1
+    assert "seed-data[augment]" in capsys.readouterr().err

@@ -2963,10 +2963,8 @@ wheels = [
 name = "seed-data"
 source = { editable = "." }
 dependencies = [
-    { name = "augraphy" },
     { name = "boto3" },
     { name = "jinja2" },
-    { name = "opencv-python" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pypdf" },
@@ -2982,18 +2980,26 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "augraphy" },
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "scipy" },
 ]
+augment = [
+    { name = "augraphy" },
+    { name = "opencv-python" },
+]
 dev = [
+    { name = "augraphy" },
     { name = "mkdocs" },
     { name = "mkdocs-awesome-nav" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings-python" },
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -3012,11 +3018,13 @@ structured = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "augraphy" },
     { name = "mkdocs" },
     { name = "mkdocs-awesome-nav" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings-python" },
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -3036,7 +3044,9 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "augraphy" },
     { name = "numpy" },
+    { name = "opencv-python" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -3046,7 +3056,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "augraphy" },
+    { name = "augraphy", marker = "extra == 'augment'" },
     { name = "boto3" },
     { name = "jinja2" },
     { name = "mkdocs", marker = "extra == 'dev'" },
@@ -3054,7 +3064,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.7.7" },
     { name = "mkdocstrings-python", marker = "extra == 'dev'" },
     { name = "numpy", marker = "extra == 'structured'", specifier = ">=1.26" },
-    { name = "opencv-python" },
+    { name = "opencv-python", marker = "extra == 'augment'" },
     { name = "openpyxl", marker = "extra == 'structured'", specifier = ">=3.1" },
     { name = "pandas", marker = "extra == 'structured'", specifier = ">=2.0" },
     { name = "pillow" },
@@ -3070,21 +3080,23 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15,<0.16" },
     { name = "scipy", marker = "extra == 'structured'", specifier = ">=1.12" },
     { name = "seed-data", extras = ["all"], marker = "extra == 'dev'" },
-    { name = "seed-data", extras = ["structured"], marker = "extra == 'all'" },
-    { name = "strands-agents" },
-    { name = "strands-agents-tools" },
+    { name = "seed-data", extras = ["augment", "structured"], marker = "extra == 'all'" },
+    { name = "strands-agents", specifier = ">=1.45" },
+    { name = "strands-agents-tools", specifier = ">=0.8" },
     { name = "weasyprint", specifier = ">=70.0" },
     { name = "xhtml2pdf", specifier = ">=0.2.17" },
 ]
-provides-extras = ["structured", "all", "dev"]
+provides-extras = ["structured", "augment", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "augraphy" },
     { name = "mkdocs" },
     { name = "mkdocs-awesome-nav" },
     { name = "mkdocs-material", specifier = ">=9.7.7" },
     { name = "mkdocstrings-python" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "opencv-python" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pyarrow", specifier = ">=15.0" },
@@ -3102,7 +3114,9 @@ docs = [
 ]
 lint = [{ name = "ruff", specifier = ">=0.15,<0.16" }]
 test = [
+    { name = "augraphy" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "opencv-python" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
     { name = "pyarrow", specifier = ">=15.0" },

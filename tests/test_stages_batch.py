@@ -258,3 +258,98 @@ def test_a_raising_worker_does_not_lose_the_other_documents(tmp_path, monkeypatc
     assert sum(1 for d in docs if d.success) == 2, "rendered documents must survive"
     failed = [d for d in docs if not d.success]
     assert failed and "worker_2 exploded" in (failed[0].error or "")
+
+
+# --- pre-planned scenarios + planner usage (budget-checked waves) -------------
+
+def _stub_fanout(monkeypatch, tmp_path):
+    """Stub the planner (must not run), context build and graph; return the
+    scenario each context was built for."""
+    def planner_must_not_run(*a, **k):
+        raise AssertionError("planner ran although scenarios were supplied")
+    monkeypatch.setattr(batch_mod, "plan_scenarios", planner_must_not_run)
+
+    seen = []
+    def fake_build_context(*, extra, output_dir, **kw):
+        seen.append(extra)
+        return _ctx(str(tmp_path), len(seen))
+    monkeypatch.setattr(batch_mod, "build_context", fake_build_context)
+
+    class _Graph:
+        def __call__(self, task):
+            raise RuntimeError("stop after context build")
+    monkeypatch.setattr(batch_mod, "build_batch_graph",
+                        lambda contexts, **kw: (_Graph(), [f"worker_{i}" for i in range(len(contexts))]))
+    return seen
+
+
+def test_generate_batch_with_preplanned_scenarios_skips_the_planner(tmp_path, monkeypatch):
+    seen = _stub_fanout(monkeypatch, tmp_path)
+    # count defaults to len(scenarios), and there is no brief to give
+    docs = batch_mod.generate_batch(schema_dir="unused", scenarios=["s-a", "s-b"], verbose=False)
+    assert seen == ["s-a", "s-b"]
+    assert len(docs) == 2
+
+
+def test_generate_batch_rejects_count_scenarios_mismatch():
+    import pytest
+    with pytest.raises(ValueError, match="count=3"):
+        batch_mod.generate_batch(schema_dir="unused", count=3, brief="x",
+                                 scenarios=["only", "two"], verbose=False)
+
+
+def test_generate_batch_needs_count_unless_scenarios_are_given():
+    import pytest
+    with pytest.raises(TypeError, match="count"):
+        batch_mod.generate_batch(schema_dir="unused", brief="x", verbose=False)
+
+
+def test_generator_generate_batch_takes_preplanned_scenarios_alone(tmp_path, monkeypatch):
+    import pytest
+    from seed_data import Generator
+
+    seen = _stub_fanout(monkeypatch, tmp_path)
+    gen = Generator(output_dir=str(tmp_path))
+    result = gen.generate_batch("invoice", scenarios=["s-a", "s-b"], verbose=False)
+    assert seen == ["s-a", "s-b"]
+    assert result.count_requested == 2
+
+    with pytest.raises(TypeError, match="scenario="):
+        gen.generate_batch("invoice", count=2, verbose=False)
+
+
+def test_plan_scenarios_with_usage_meters_the_planner_model(monkeypatch):
+    """The real Agent and structured-output tool, with a scripted model behind the
+    real `make_model`: usage comes from the token meter bound at model creation —
+    the mechanism every other call uses — and reaches an enclosing meter too."""
+    from seed_data.metering import metered, token_meter
+    from tests.scripted_model import ScriptedModel
+
+    usage = {"inputTokens": 120, "outputTokens": 30, "totalTokens": 150}
+
+    class _Planner(metered(ScriptedModel)):
+        def __init__(self, **bedrock_kwargs):     # model_id, boto_session, ... from make_model
+            super().__init__("_ScenarioPlan", {"scenarios": ["a", "b"]}, usage=usage)
+
+    monkeypatch.setattr("seed_data.utils._MeteredBedrockModel", _Planner)
+
+    with token_meter() as host:
+        scenarios, got = batch_mod.plan_scenarios_with_usage(
+            count=2, brief="b", session=object(), verbose=False,
+        )
+    assert scenarios == ["a", "b"]
+    assert got == usage
+    assert host.usage == usage
+    # the list-returning wrapper is unchanged for existing callers
+    assert batch_mod.plan_scenarios(count=2, brief="b", session=object(), verbose=False) == ["a", "b"]
+
+
+def test_generator_plan_scenarios_returns_typed_plan(monkeypatch):
+    from seed_data import Generator
+    monkeypatch.setattr(batch_mod, "plan_scenarios_with_usage",
+                        lambda count, brief, **kw: (["x"] * count, {"inputTokens": 1,
+                                                                    "outputTokens": 2,
+                                                                    "totalTokens": 3}))
+    plan = Generator().plan_scenarios("theme", count=2, verbose=False)
+    assert plan.scenarios == ["x", "x"]
+    assert plan.token_usage["totalTokens"] == 3

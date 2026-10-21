@@ -499,3 +499,38 @@ def test_analyze_example_data_summarizes_a_workbook(tmp_path):
     assert sorted(result["entities_found"]) == ["Customer", "Order"]
     assert "Entity: Customer" in result["summary"]
     assert "Entity: Order" in result["summary"]
+
+
+def test_run_ingest_merges_the_same_entity_from_two_inputs(monkeypatch, tmp_path):
+    """Regression (seen on a real account): a CSV plus a free-text description of
+    the same entity produced two `Customer` entities, and structured export then
+    wrote one table over the other."""
+    def fake_extract(**kwargs):
+        return _fake_schema("Customer").model_dump_json()
+
+    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
+    csv = tmp_path / "customers.csv"
+    csv.write_text("name,tier\nA,gold\n")
+    schema = run_ingest("customers with loyalty tiers", str(csv), verbose=False)
+    assert [e.entity_name for e in schema.entities] == ["Customer"]
+
+
+def test_a_repeated_entity_in_one_answer_is_merged_on_the_real_structured_output_path(monkeypatch):
+    """The model describes one entity twice. The uniqueness check used to run inside
+    Strands' structured-output tool, which bounced the answer back for another paid
+    turn, every turn, so extraction failed before any merge. Only the model is
+    scripted here: the Agent, its structured-output tool and `extract_schema` are real.
+    """
+    from tests.scripted_model import ScriptedModel
+
+    model = ScriptedModel("FlatInferredSchema", {"entities": [
+        {"entity_name": "Customer", "fields": [{"name": "id", "type": "integer"}]},
+        {"entity_name": "customer", "fields": [{"name": "email", "type": "email"}]},
+    ]})
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: model)
+
+    schema = run_ingest("customers and their emails", verbose=False)
+
+    assert model.turns == 1 and model.tool_feedback == []
+    assert [e.entity_name for e in schema.entities] == ["Customer"]
+    assert [f.name for f in schema.entities[0].fields] == ["id", "email"]
