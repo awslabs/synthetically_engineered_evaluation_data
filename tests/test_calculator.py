@@ -14,6 +14,10 @@ from seed_data.tools import calculator, evaluate_arithmetic
     ("floor(2.7) + ceil(2.1) + sqrt(16)", 9.0),
     ("-(3 - 5) * +2", 4),
     ("1199.99 * 0.0825", pytest.approx(98.999175)),
+    # The docstring advertises sum; models write it with a list, as in Python.
+    ("sum([12.5, 7.25, 3])", 22.75),
+    ("max((1, 5)) + min([4, 2])", 7),
+    ("round(1234.5, -2)", 1200.0),
 ])
 def test_evaluates_arithmetic(expr, expected):
     assert evaluate_arithmetic(expr) == expected
@@ -25,11 +29,15 @@ def test_evaluates_arithmetic(expr, expected):
     "(1).real",
     "x + 1",
     "[1, 2]",
+    "[0] * 10",               # lists only as function arguments, never operands
+    "sum([[1]])",
     "lambda: 1",
     "9 ** 9 ** 9",            # exponent bomb
     "10 ** 30",               # result out of range
     "'a' * 3",
     "round(1, ndigits=2)",    # keywords not allowed
+    "round(5, -10 ** 18)",    # int rounding computes 10 ** 10**18: would never return
+    "(-8) ** 0.5",            # complex result
     "1" * 3000,               # too long
 ])
 def test_rejects_anything_but_arithmetic(expr):

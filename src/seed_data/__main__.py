@@ -159,6 +159,17 @@ def _infer_schema(argv):
             "Infer the packet, then run: seed-data packet <output_dir>"
         )
 
+    if args.then_generate and args.augment:
+        # Checked before inference, a paid vision call: the generation tail would
+        # raise for a missing `[augment]` extra only after it.
+        from seed_data.common.deps import require_augment
+
+        try:
+            require_augment("seed-data infer-schema --then-generate --augment")
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
     # Wire the clarifying-dialogue callback to a terminal prompt — but ONLY when
     # stdin is a real TTY, so background/CI/piped runs never block on input().
     on_question = None
@@ -541,6 +552,16 @@ def _plan_and_generate(argv):
 
         try:
             require_structured("seed-data plan-and-generate --output structured")
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+    elif args.augment:
+        # Likewise for documents: the graph build would raise for a missing
+        # `[augment]` extra only after planning had been paid for.
+        from seed_data.common.deps import require_augment
+
+        try:
+            require_augment("seed-data plan-and-generate --augment")
         except ImportError as e:
             print(e, file=sys.stderr)
             sys.exit(1)

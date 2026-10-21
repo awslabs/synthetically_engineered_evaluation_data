@@ -23,6 +23,7 @@ from typing import Any
 
 import pypdf
 
+from seed_data.common.deps import require_augment
 from seed_data.utils import load_schema_dir, make_model, safe_path_segment
 
 
@@ -355,6 +356,12 @@ def generate_packet(
     Returns:
         PacketResult with merged PDF path, section results, and metadata.
     """
+    if augment:
+        # Before shared-context resolution, a paid model call. Left to each
+        # sub-document's graph build, the missing extra surfaced only after it — as a
+        # printed failure per section and a packet error that never named the cause.
+        require_augment("augmentation (augment=True / --augment)")
+
     packet_id = packet_id or uuid.uuid4().hex[:12]
     workspace_dir = os.path.join(output_dir, "artifacts", packet_id)
     os.makedirs(workspace_dir, exist_ok=True)

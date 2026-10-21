@@ -7,12 +7,11 @@ to the existing vision path (:func:`seed_data.infer.infer_schema`), enriching th
 ``Schema`` into an ``InferredSchema``. The results are merged into a single schema.
 """
 
-import json
 import logging
 
 from seed_data.ingest.detect import InputType, detect_input_type
 from seed_data.logs import configure_progress_logging
-from seed_data.schema.models import EntitySchema, InferredSchema, merge_entities
+from seed_data.schema.models import InferredSchema, merge_entities
 
 logger = logging.getLogger(__name__)
 
@@ -126,11 +125,9 @@ def _extract_one(
     else:  # pragma: no cover - defensive
         raise ValueError(f"Unhandled input type: {itype}")
 
-    # Merge before validating: InferredSchema rejects duplicate entity names, and a
-    # model that describes one entity twice should be folded, not fail the input.
-    data = json.loads(result)
-    entities = [EntitySchema.model_validate(e) for e in data.get("entities", [])]
-    return InferredSchema(entities=merge_entities(entities))
+    # Already folded: `extract_schema` canonicalizes through `schema.flat.to_canonical`,
+    # which merges an entity the model described twice.
+    return InferredSchema.model_validate_json(result)
 
 
 def _read_text(spec: str) -> str:

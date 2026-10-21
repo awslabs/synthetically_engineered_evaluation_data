@@ -151,6 +151,19 @@ def test_numeric_pii_values_are_checked():
     assert out.entities[0].reference_samples == [{"active": True}]
 
 
+def test_a_field_shared_by_two_entities_is_scrubbed_in_both():
+    """`model_copy(deep=True)` keeps aliasing: the shared field was walked twice, and
+    the second walk read the first walk's rewritten description and raised."""
+    shared = _field("rep", type="enum", enum_values=["Jane Doe"])
+    schema = InferredSchema(entities=[EntitySchema(entity_name="A", fields=[shared]),
+                                      EntitySchema(entity_name="B", fields=[shared])])
+    out, report = scrub_schema(schema, FakeDetector())
+
+    assert [e.fields[0].enum_values for e in out.entities] == [None, None]
+    assert report.retyped == ["entities[A].fields[rep]", "entities[B].fields[rep]"]
+    assert shared.enum_values == ["Jane Doe"]          # input untouched
+
+
 # --- legacy Schema (JSON Schema) ----------------------------------------------
 
 def _doc_schema():
@@ -213,6 +226,20 @@ def test_json_schema_scrub_does_not_mutate_input_or_carry_samples(tmp_path):
     assert out.sample_pdfs == []          # real documents never ride along
 
 
+def test_a_sub_schema_shared_by_two_properties_is_scrubbed_at_both():
+    """Same aliasing through `copy.deepcopy`, for a dict reused in code."""
+    addr = {"type": "object", "properties": {
+        "contact": {"type": "string", "enum": ["Jane Doe", "John Smith"]}}}
+    schema = Schema(name="invoice", json_schema={
+        "type": "object", "properties": {"billing": addr, "shipping": addr}})
+    out, report = scrub_schema(schema, FakeDetector())
+
+    for side in ("billing", "shipping"):
+        assert "enum" not in out.json_schema["properties"][side]["properties"]["contact"]
+    assert report.removed == ["properties.billing.properties.contact.enum",
+                              "properties.shipping.properties.contact.enum"]
+
+
 # --- fail closed, batching, report hygiene --------------------------------------
 
 @pytest.mark.parametrize("detector", [RaisingDetector(), ShortDetector()])
@@ -231,6 +258,35 @@ def test_detector_error_message_carries_no_values():
     with pytest.raises(ScrubError) as exc:
         scrub_schema(_inferred(description="Jane Doe"), LeakyDetector())
     assert "Jane" not in str(exc.value)
+
+
+@pytest.mark.parametrize("answer", [
+    lambda texts: [None] + [[] for _ in texts[1:]],                   # not a list per input
+    lambda texts: [[{"type": "NAME", "match": t}] for t in texts],    # not PIIFinding
+], ids=["none-for-an-input", "dict-findings"])
+def test_malformed_detector_answers_fail_closed(answer):
+    """The length check alone let these through to a `TypeError` mid-walk, which a
+    host catching `ScrubError` to block storage would not catch."""
+    class Malformed:
+        def detect(self, texts):
+            return answer(texts)
+
+    schema = _inferred(description="Jane Doe", fields=[_field("a", description="plain")])
+    with pytest.raises(ScrubError, match="malformed"):
+        scrub_schema(schema, Malformed())
+
+
+@pytest.mark.parametrize("match", ["jane doe", ""], ids=["not-in-text", "empty"])
+def test_a_finding_whose_span_is_not_in_its_input_fails_closed(match):
+    """Spans are redacted by literal replacement. One that is not in the text (an
+    adapter that normalized case, say) used to be skipped, storing the name."""
+    class Normalizing:
+        def detect(self, texts):
+            return [[PIIFinding("NAME", match)] if "Jane Doe" in t else [] for t in texts]
+
+    with pytest.raises(ScrubError, match="does not occur") as exc:
+        scrub_schema(_inferred(description="Accounts like Jane Doe's"), Normalizing())
+    assert "jane" not in str(exc.value).lower()
 
 
 def test_one_batched_detector_call_with_unique_strings():
@@ -252,6 +308,17 @@ def test_report_never_contains_values():
         for value in PII:
             assert value not in dumped
         assert report.changed
+
+
+def test_findings_are_counted_once_per_distinct_string():
+    """Counted at lookup, a string used as both description and default counted
+    twice, and a value after an earlier hit in the same sample never counted."""
+    schema = _inferred(
+        fields=[_field("owner", description="John Smith", default="John Smith")],
+        reference_samples=[{"a": "John Smith", "b": "555-0100"}],
+    )
+    _, report = scrub_schema(schema, FakeDetector())
+    assert report.findings_by_type == {"NAME": 1, "PHONE": 1}
 
 
 def test_unsupported_type_raises():

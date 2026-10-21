@@ -193,31 +193,60 @@ def merge_entities(entities: list[EntitySchema]) -> list[EntitySchema]:
 
     ``plan`` extracts each input separately, so a CSV of customers plus a text
     description of customers yields two ``Customer`` entities — and without this
-    the second silently overwrote the first's table. Fields are unioned by name
-    with the first definition winning on conflict; relationships, guidance and
-    reference samples are combined.
+    the second silently overwrote the first's table. Fields are unioned by name,
+    compared the same way (``Email`` and ``email`` would be two columns of one
+    table), with the first definition winning on conflict; relationships, guidance
+    and reference samples are combined.
+
+    Every entity's structured relationships are then rewritten to name the
+    surviving entity and field, and deduplicated. Generation resolves a foreign key
+    by exact name, so an ``Order`` pointing at the folded-away ``customer`` would
+    otherwise lose its parent. The inputs are not modified.
     """
     merged: dict[str, EntitySchema] = {}
     for entity in entities:
         key = entity_key(entity.entity_name)
+        incoming = entity.model_copy(deep=True)
         if key not in merged:
-            merged[key] = entity.model_copy(deep=True)
+            merged[key] = incoming
             continue
         into = merged[key]
-        known = {f.name for f in into.fields}
-        into.fields.extend(f.model_copy(deep=True) for f in entity.fields if f.name not in known)
-        into.description = into.description or entity.description
-        into.relationships.extend(r for r in entity.relationships if r not in into.relationships)
-        seen = {(r.source_field, r.target_entity, r.target_field) for r in into.structured_relationships}
-        into.structured_relationships.extend(
-            r for r in entity.structured_relationships
-            if (r.source_field, r.target_entity, r.target_field) not in seen
-        )
-        if entity.generation_guidance and entity.generation_guidance not in into.generation_guidance:
+        known = {entity_key(f.name) for f in into.fields}
+        for f in incoming.fields:
+            if entity_key(f.name) not in known:
+                known.add(entity_key(f.name))
+                into.fields.append(f)
+        into.description = into.description or incoming.description
+        into.relationships.extend(r for r in incoming.relationships if r not in into.relationships)
+        into.structured_relationships.extend(incoming.structured_relationships)
+        if incoming.generation_guidance and incoming.generation_guidance not in into.generation_guidance:
             into.generation_guidance = "\n\n".join(
-                g for g in (into.generation_guidance, entity.generation_guidance) if g
+                g for g in (into.generation_guidance, incoming.generation_guidance) if g
             )
-        into.reference_samples.extend(entity.reference_samples)
+        into.reference_samples.extend(incoming.reference_samples)
+
+    # The surviving entity name and field names per entity key (first definition wins).
+    names = {key: e.entity_name for key, e in merged.items()}
+    fields: dict[str, dict[str, str]] = {key: {} for key in merged}
+    for key, e in merged.items():
+        for f in e.fields:
+            fields[key].setdefault(entity_key(f.name), f.name)
+
+    def survivor(entity_name: str, field_name: str) -> tuple[str, str]:
+        key = entity_key(entity_name)
+        return names.get(key, entity_name), fields.get(key, {}).get(entity_key(field_name), field_name)
+
+    for e in merged.values():
+        seen: set[tuple[str, str, str, str]] = set()
+        kept = []
+        for r in e.structured_relationships:
+            r.source_entity, r.source_field = survivor(r.source_entity, r.source_field)
+            r.target_entity, r.target_field = survivor(r.target_entity, r.target_field)
+            ident = (r.source_entity, r.source_field, r.target_entity, r.target_field)
+            if ident not in seen:
+                seen.add(ident)
+                kept.append(r)
+        e.structured_relationships = kept
     return list(merged.values())
 
 

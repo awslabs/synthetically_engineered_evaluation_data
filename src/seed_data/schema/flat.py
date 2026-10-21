@@ -12,7 +12,9 @@ The fix is to hand the model an equivalent *finite* schema: a chain of distinct
 classes where each level's ``children`` points at the next level down, and the
 last level has no ``children`` at all. Because every level is a subclass of the
 canonical models, instances validate as the real thing, so
-:func:`to_canonical` is a plain re-validation rather than a translation.
+:func:`to_canonical` is a plain re-validation rather than a translation — apart
+from folding same-name entities, which the flat model accepts and the canonical
+one refuses.
 
 ``MAX_NESTING_DEPTH`` is 5. The deepest bundled document schema nests 3 levels,
 so this leaves headroom while keeping the emitted tool spec small — cost grows
@@ -22,16 +24,25 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, create_model
+from pydantic import Field, create_model, model_validator
 
 from seed_data.schema.models import (
     EntitySchema,
     InferredSchema,
     _FieldDefinitionBase,
+    merge_entities,
 )
 
 #: How many levels of nested object/array fields the model may return.
 MAX_NESTING_DEPTH = 5
+
+
+def _accept_duplicate_entities(self):
+    # Overrides InferredSchema's `_entity_names_are_unique` by name. Inherited, it ran
+    # inside the structured-output tool: a model that described one entity twice had
+    # its answer bounced back for another paid turn (or the extraction failed), and
+    # `to_canonical`'s merge was never reached.
+    return self
 
 
 @lru_cache(maxsize=1)
@@ -73,6 +84,9 @@ def flat_inferred_schema() -> type[InferredSchema]:
     return create_model(
         "FlatInferredSchema",
         __base__=InferredSchema,
+        __validators__={
+            "_entity_names_are_unique": model_validator(mode="after")(_accept_duplicate_entities),
+        },
         entities=(
             list[flat_entity],
             Field(description="List of entity schemas with full definitions"),
@@ -86,9 +100,12 @@ def to_canonical(schema: InferredSchema) -> InferredSchema:
     The flat classes subclass the canonical ones, so this is a type normalization:
     it converts the depth-specific ``children`` classes into plain
     :class:`FieldDefinition` instances, so downstream code (and equality checks)
-    sees exactly the model it declares.
+    sees exactly the model it declares. Same-name entities the model returned
+    separately are folded (:func:`~seed_data.schema.models.merge_entities`) on the
+    way, since the canonical model refuses duplicate names.
     """
-    return InferredSchema.model_validate(schema.model_dump())
+    entities = [EntitySchema.model_validate(e.model_dump()) for e in schema.entities]
+    return InferredSchema(entities=merge_entities(entities))
 
 
 __all__ = ["MAX_NESTING_DEPTH", "flat_inferred_schema", "to_canonical"]

@@ -40,7 +40,23 @@ _CALC_BINOPS = {_ast.Add: _op.add, _ast.Sub: _op.sub, _ast.Mult: _op.mul,
                 _ast.Div: _op.truediv, _ast.FloorDiv: _op.floordiv, _ast.Mod: _op.mod,
                 _ast.Pow: _op.pow}
 _CALC_UNARY = {_ast.UAdd: _op.pos, _ast.USub: _op.neg}
-_CALC_FUNCS = {"abs": abs, "round": round, "min": min, "max": max, "sum": lambda *a: sum(a),
+# int.__round__ computes 10 ** -ndigits, so an unbounded ndigits is a CPU bomb:
+# round(5, -10**18) never returns, and a pipeline timeout cannot stop the thread.
+_CALC_MAX_NDIGITS = 15
+
+
+def _calc_round(x, ndigits=None):
+    if ndigits is not None and abs(ndigits) > _CALC_MAX_NDIGITS:
+        raise ValueError(f"round() ndigits beyond +/-{_CALC_MAX_NDIGITS}")
+    return round(x, ndigits)
+
+
+def _calc_sum(*args):
+    # sum(1, 2, 3) or sum([1, 2, 3]): models write both.
+    return sum(args[0]) if len(args) == 1 and isinstance(args[0], list) else sum(args)
+
+
+_CALC_FUNCS = {"abs": abs, "round": _calc_round, "min": min, "max": max, "sum": _calc_sum,
                "sqrt": _math.sqrt, "floor": _math.floor, "ceil": _math.ceil}
 
 
@@ -56,13 +72,23 @@ def _calc_eval(node):
         if isinstance(node.op, _ast.Pow) and abs(right) > _CALC_MAX_EXPONENT:
             raise ValueError(f"exponent larger than {_CALC_MAX_EXPONENT}")
         result = _CALC_BINOPS[type(node.op)](left, right)
+        if isinstance(result, complex):    # a negative base to a fractional power
+            raise ValueError("result is not a real number")
         if abs(result) > _CALC_MAX_ABS:
             raise ValueError("result out of range")
         return result
     if (isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name)
             and node.func.id in _CALC_FUNCS and not node.keywords):
-        return _CALC_FUNCS[node.func.id](*(_calc_eval(a) for a in node.args))
+        return _CALC_FUNCS[node.func.id](*(_calc_arg(a) for a in node.args))
     raise ValueError(f"unsupported expression element: {type(node).__name__}")
+
+
+def _calc_arg(node):
+    # A list/tuple literal is allowed only as a function argument (sum([1, 2])),
+    # never as an operand, where `[0] * 10**9` would allocate gigabytes.
+    if isinstance(node, (_ast.List, _ast.Tuple)):
+        return [_calc_eval(e) for e in node.elts]
+    return _calc_eval(node)
 
 
 def evaluate_arithmetic(expression: str):
@@ -77,7 +103,8 @@ def calculator(expression: str) -> dict:
     """Evaluate an arithmetic expression exactly — use it for every sum, product and total.
 
     Supports numbers, + - * / // % ** (or ^), parentheses, and abs, round, min,
-    max, sum, sqrt, floor, ceil. Example: "round(12.5 * 3 + 7.25, 2)".
+    max, sum, sqrt, floor, ceil; sum, min and max also take a list. Examples:
+    "round(12.5 * 3 + 7.25, 2)", "sum([12.5, 7.25, 3])".
 
     Args:
         expression: The arithmetic expression to evaluate.

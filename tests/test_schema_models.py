@@ -528,3 +528,58 @@ def test_merge_entities_does_not_mutate_inputs():
     a, b = _entity("Customer", ["id"]), _entity("Customer", ["email"])
     merge_entities([a, b])
     assert [f.name for f in a.fields] == ["id"]
+
+
+def _customer_order_from_two_inputs():
+    """A CSV gives `Customer`; a description gives `Order` (pointing at `customer.ID`,
+    listed before its parent) and `customer` — the shape that broke FKs on merge."""
+    from seed_data.schema.models import RelationshipDefinition
+    fk = RelationshipDefinition(source_entity="order", source_field="Customer_ID",
+                                target_entity="customer", target_field="ID",
+                                cardinality="one_to_many")
+    order = _entity("Order", ["customer_id"], structured_relationships=[fk])
+    return [_entity("Customer", ["id"]), order, _entity("customer", ["ID", "email"])]
+
+
+def test_merge_entities_points_relationships_at_the_surviving_entity_and_field():
+    """Generation resolves foreign keys by exact name, so every relationship — in
+    unmerged entities too — must follow the fold to `Customer.id`."""
+    from seed_data.schema.models import merge_entities
+    inputs = _customer_order_from_two_inputs()
+    merged = merge_entities(inputs)
+
+    assert [e.entity_name for e in merged] == ["Customer", "Order"]
+    assert [f.name for f in merged[0].fields] == ["id", "email"]
+    rel = merged[1].structured_relationships[0]
+    assert (rel.source_entity, rel.source_field, rel.target_entity, rel.target_field) == (
+        "Order", "customer_id", "Customer", "id")
+    assert inputs[1].structured_relationships[0].target_entity == "customer"   # input untouched
+
+
+def test_a_merged_foreign_key_still_links_in_generation():
+    pytest.importorskip("numpy", reason="requires the [structured] optional dependencies")
+    from seed_data.schema.models import merge_entities
+    from seed_data.structured.generation import _live_fk_values, _resolve_generation_order
+
+    merged = merge_entities(_customer_order_from_two_inputs())
+    schema_json = InferredSchema(entities=merged).model_dump_json()
+
+    assert _resolve_generation_order({"Order": [], "Customer": []}, schema_json) == ["Customer", "Order"]
+    assert _live_fk_values("Order", merged[1].structured_relationships,
+                           {"Customer": [{"id": 7}]}) == {"customer_id": [7]}
+
+
+def test_merge_entities_folds_case_variant_fields_and_repeated_relationships():
+    """`Email` from a CSV and `email` from text are one column, and a relationship
+    the incoming entity lists twice is kept once."""
+    from seed_data.schema.models import RelationshipDefinition, merge_entities
+    rel = RelationshipDefinition(source_entity="customer", source_field="tier_id",
+                                 target_entity="Tier", target_field="id", cardinality="one_to_many")
+    merged = merge_entities([
+        _entity("Customer", ["Email"]),
+        _entity("customer", ["email", "tier_id"], structured_relationships=[rel, rel.model_copy()]),
+    ])
+    c = merged[0]
+    assert [f.name for f in c.fields] == ["Email", "tier_id"]    # first spelling wins
+    assert len(c.structured_relationships) == 1
+    assert c.structured_relationships[0].source_entity == "Customer"

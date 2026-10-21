@@ -18,9 +18,10 @@ rows. Generation then samples those values straight back into "synthetic" output
   detected span replaced with ``[TYPE]``.
 * **Reference samples** containing PII are dropped.
 
-It **fails closed**: any detector error, or a detector that does not answer for
-every input, raises :class:`ScrubError` and returns nothing — a half-scrubbed
-schema is never handed back.
+It **fails closed**: any detector error, or an answer that is incomplete or
+malformed (a missing result, a finding whose span is not in its input), raises
+:class:`ScrubError` and returns nothing — a half-scrubbed schema is never handed
+back.
 
 The :class:`ScrubReport` names *where* things were removed (field paths) and how
 many, never the values themselves, so it is safe to store next to the dataset.
@@ -30,7 +31,7 @@ SEED stays detector-agnostic: pass anything implementing :class:`PIIDetector`
 """
 from __future__ import annotations
 
-import copy
+import json
 from dataclasses import dataclass, field
 from typing import Iterator, Protocol, Sequence, TYPE_CHECKING
 
@@ -69,6 +70,7 @@ class ScrubReport:
     retyped: list[str] = field(default_factory=list)
     text_redactions: int = 0
     samples_dropped: int = 0
+    # Detected spans per PII type, counted once per distinct string scanned.
     findings_by_type: dict[str, int] = field(default_factory=dict)
 
     @property
@@ -100,7 +102,7 @@ def scrub_schema(schema, detector: PIIDetector):
     The input is not modified.
 
     Raises:
-        ScrubError: if the detector fails or answers incompletely.
+        ScrubError: if the detector fails, or its answer is incomplete or malformed.
         TypeError: for an unsupported schema type.
     """
     from seed_data.schema import Schema
@@ -108,15 +110,20 @@ def scrub_schema(schema, detector: PIIDetector):
 
     if isinstance(schema, InferredSchema):
         scrubber = _Scrubber(detector)
-        out = schema.model_copy(deep=True)
+        # Rebuilt rather than model_copy'd: a deep copy keeps aliasing, so one
+        # FieldDefinition shared by two entities was walked twice, and the second
+        # walk read the first's rewritten description — never sent to the detector.
+        out = InferredSchema.model_validate(schema.model_dump())
         scrubber.prime(_inferred_strings(out))
         for entity in out.entities:
             scrubber.entity(entity)
         return out, scrubber.report
     if isinstance(schema, Schema):
         scrubber = _Scrubber(detector)
-        # to_schema_dict covers both the json_schema and pydantic-model forms.
-        json_schema = copy.deepcopy(schema.to_schema_dict())
+        # to_schema_dict covers both the json_schema and pydantic-model forms. Copied
+        # through JSON, not deepcopy, for the same reason as above: deepcopy keeps a
+        # dict reachable from two properties shared, and the walk visited it twice.
+        json_schema = json.loads(json.dumps(schema.to_schema_dict()))
         scrubber.prime([*_json_strings(json_schema), schema.generation_guidance])
         scrubber.json_schema(json_schema)
         guidance = scrubber.text(schema.generation_guidance)
@@ -148,7 +155,29 @@ class _Scrubber:
                 f"PII detector returned {len(results) if isinstance(results, list) else 'no'} "
                 f"result(s) for {len(unique)} input(s)"
             )
+        for text, hits in zip(unique, results):
+            if not isinstance(hits, list) or not all(
+                isinstance(h, PIIFinding) and isinstance(h.type, str) and isinstance(h.match, str)
+                for h in hits
+            ):
+                raise ScrubError(
+                    "PII detector returned a malformed result: expected a list of "
+                    "PIIFinding per input"
+                )
+            for h in hits:
+                # Spans are redacted by literal replacement. One that does not occur in
+                # the text (an adapter that normalized case or whitespace) cannot be,
+                # and skipping it would store the very value it was found in.
+                if not h.match or h.match not in text:
+                    raise ScrubError(
+                        f"PII detector returned a finding ({h.type}) that does not occur in its input"
+                    )
         self._findings = dict(zip(unique, results))
+        # Counted here, once per distinct string: counting at lookup double-counted a
+        # string used in two places and missed values a short-circuited check skipped.
+        for hits in results:
+            for h in hits:
+                self.report.findings_by_type[h.type] = self.report.findings_by_type.get(h.type, 0) + 1
 
     def _hits(self, value) -> list[PIIFinding]:
         text = _as_text(value)
@@ -158,10 +187,7 @@ class _Scrubber:
             # Every string reaching here was collected by prime(); a miss means the
             # collectors and the transform walk disagree — refuse rather than guess.
             raise ScrubError("internal: value was not submitted to the PII detector")
-        hits = self._findings[text]
-        for h in hits:
-            self.report.findings_by_type[h.type] = self.report.findings_by_type.get(h.type, 0) + 1
-        return hits
+        return self._findings[text]
 
     def is_pii(self, value) -> list[PIIFinding]:
         return self._hits(value)
@@ -170,9 +196,11 @@ class _Scrubber:
         if not value:
             return value
         hits = self._hits(value)
-        # Longest first, so a full name is replaced before a substring of it.
+        # Longest first, so a full name is replaced before a substring of it. That
+        # substring may then be gone (it was inside the longer span); prime() has
+        # already refused any span that was never in the text.
         for h in sorted(hits, key=lambda h: len(h.match), reverse=True):
-            if h.match and h.match in value:
+            if h.match in value:
                 value = value.replace(h.match, f"[{h.type}]")
                 self.report.text_redactions += 1
         return value

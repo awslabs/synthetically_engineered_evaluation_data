@@ -4,7 +4,6 @@
 directly. The `run_ingest` orchestration is tested with the schema-extraction
 agent and infer_schema mocked out, so nothing here needs Bedrock credentials.
 """
-import json
 import pytest
 
 from seed_data.ingest import InputType, detect_input_type, run_ingest
@@ -516,11 +515,22 @@ def test_run_ingest_merges_the_same_entity_from_two_inputs(monkeypatch, tmp_path
     assert [e.entity_name for e in schema.entities] == ["Customer"]
 
 
-def test_extraction_output_with_a_repeated_entity_is_merged_not_rejected(monkeypatch):
-    def fake_extract(**kwargs):
-        one = _fake_schema("Customer").model_dump()["entities"][0]
-        return json.dumps({"entities": [one, {**one, "description": "dup"}]})
+def test_a_repeated_entity_in_one_answer_is_merged_on_the_real_structured_output_path(monkeypatch):
+    """The model describes one entity twice. The uniqueness check used to run inside
+    Strands' structured-output tool, which bounced the answer back for another paid
+    turn, every turn, so extraction failed before any merge. Only the model is
+    scripted here: the Agent, its structured-output tool and `extract_schema` are real.
+    """
+    from tests.scripted_model import ScriptedModel
 
-    monkeypatch.setattr("seed_data.ingest.extract.extract_schema", fake_extract)
-    schema = run_ingest("customers", verbose=False)
+    model = ScriptedModel("FlatInferredSchema", {"entities": [
+        {"entity_name": "Customer", "fields": [{"name": "id", "type": "integer"}]},
+        {"entity_name": "customer", "fields": [{"name": "email", "type": "email"}]},
+    ]})
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: model)
+
+    schema = run_ingest("customers and their emails", verbose=False)
+
+    assert model.turns == 1 and model.tool_feedback == []
     assert [e.entity_name for e in schema.entities] == ["Customer"]
+    assert [f.name for f in schema.entities[0].fields] == ["id", "email"]

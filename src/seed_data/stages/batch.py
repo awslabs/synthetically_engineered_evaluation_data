@@ -29,6 +29,7 @@ from strands.agent.agent_result import AgentResult
 from strands.types.content import ContentBlock, Message
 
 from seed_data.common.deps import require_augment
+from seed_data.metering import token_meter
 from seed_data.utils import make_model
 from seed_data.stages.base import ModelConfig
 from seed_data.stages.pipeline import (
@@ -80,11 +81,15 @@ def plan_scenarios_with_usage(
         "locations, time periods, amounts, and structure so the documents are "
         "diverse. Each scenario must be self-contained and concrete."
     )
-    agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
-    result = agent(
-        f"Brief: {_seeded_brief(brief, seed)}\n\nProduce exactly {count} distinct scenario briefs.",
-        structured_output_model=_ScenarioPlan,
-    )
+    # Metered like every other model call (seed_data.metering). The model is built
+    # inside the block so it binds this meter, which then counts every call the
+    # agent makes, structured-output retries included.
+    with token_meter() as meter:
+        agent = Agent(model=make_model(model, session=session), system_prompt=system_prompt)
+        result = agent(
+            f"Brief: {_seeded_brief(brief, seed)}\n\nProduce exactly {count} distinct scenario briefs.",
+            structured_output_model=_ScenarioPlan,
+        )
     # `structured_output` is None on a guardrail/content-filter refusal. Treated as
     # zero scenarios so the padding below fills every slot with the raw brief: this
     # function is sugar for "vary one brief N ways", and falling back to N copies of
@@ -92,9 +97,7 @@ def plan_scenarios_with_usage(
     # `.scenarios` raised an AttributeError that named neither the step nor the cause.
     plan = result.structured_output
     scenarios = list(plan.scenarios) if plan is not None else []
-    acc = getattr(getattr(result, "metrics", None), "accumulated_usage", None) or {}
-    usage = {"inputTokens": acc.get("inputTokens", 0), "outputTokens": acc.get("outputTokens", 0)}
-    usage["totalTokens"] = usage["inputTokens"] + usage["outputTokens"]
+    usage = meter.usage
 
     shortfall = count - len(scenarios)
     if shortfall > 0:
@@ -173,8 +176,8 @@ def generate_batch(
     *,
     resolved: tuple[dict, str, list] | None = None,
     schema_dir: str | None = None,
-    count: int,
-    brief: str,
+    count: int | None = None,
+    brief: str = "",
     output_dir: str = "./output",
     models: ModelConfig | None = None,
     threshold: int = 7,
@@ -195,11 +198,12 @@ def generate_batch(
     ``GeneratedDoc`` per scenario, ordered to match the planned scenarios.
 
     Args:
+        count: how many scenarios to plan. Required unless ``scenarios`` is given,
+            when it defaults to ``len(scenarios)`` (and must match it if passed).
         scenarios: pre-planned scenario strings (e.g. one slice of a larger
-            :func:`plan_scenarios` result). Planning is skipped and ``count`` must
-            equal ``len(scenarios)``; ``brief`` and ``seed`` are then unused. This
-            lets a caller plan a large set once — keeping it diverse — and
-            generate it in budget-checked waves.
+            :func:`plan_scenarios` result). Planning is skipped; ``brief`` and
+            ``seed`` are then unused. This lets a caller plan a large set once —
+            keeping it diverse — and generate it in budget-checked waves.
         session: optional boto3 Session for in-process use (else env credentials).
         seed: optional seed for scenario planning, for regression-stable sets.
         on_document: optional ``callback(index, total, GeneratedDoc)`` invoked as
@@ -212,12 +216,14 @@ def generate_batch(
         require_augment("augmentation (augment=True / --augment)")
 
     if scenarios is not None:
-        if len(scenarios) != count:
+        if count is not None and count != len(scenarios):
             raise ValueError(
                 f"generate_batch: count={count} but {len(scenarios)} pre-planned "
                 "scenario(s) were given"
             )
         scenarios = list(scenarios)
+    elif count is None:
+        raise TypeError("generate_batch: count is required unless scenarios= is given")
     else:
         if verbose:
             print(f"Planning {count} scenarios from brief: {brief}")

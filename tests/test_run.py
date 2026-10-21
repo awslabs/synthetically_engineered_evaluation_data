@@ -16,17 +16,18 @@ from seed_data.stages.pipeline import GeneratedDoc
 
 
 @pytest.fixture(autouse=True)
-def _structured_extra_present(monkeypatch):
-    """Report the ``[structured]`` extra as installed for every test here.
+def _optional_extras_present(monkeypatch):
+    """Report the ``[structured]`` and ``[augment]`` extras as installed for every test here.
 
-    ``plan_and_generate(output="structured")`` guards on the extra before planning,
-    so on a lean
+    ``plan_and_generate`` guards on the extra its output needs (``[augment]`` only
+    when documents are augmented) before planning, so on a lean
     base install these tests would fail on the guard. They mock the generation half
     outright, so no pandas is ever touched and the extra's real presence is beside
     the point — what is under test is dispatch. The guard itself is covered in
     tests/test_deps_guard.py, which asserts it fires (and that planning is skipped).
     """
     monkeypatch.setattr("seed_data.common.deps.structured_available", lambda: True)
+    monkeypatch.setattr("seed_data.common.deps.augment_available", lambda: True)
 
 
 @pytest.fixture
