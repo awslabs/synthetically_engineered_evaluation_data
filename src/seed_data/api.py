@@ -61,6 +61,14 @@ if TYPE_CHECKING:
     from seed_data.schema import Schema
 
 
+class ScenarioPlan(BaseModel):
+    """Planned scenarios plus the token usage of the planning call."""
+    scenarios: list[str]
+    token_usage: dict = Field(
+        default_factory=lambda: {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    )
+
+
 class BatchResult(BaseModel):
     """Typed result of a batch run — the per-document results plus a rollup."""
     count_requested: int
@@ -206,12 +214,13 @@ class Generator:
         self,
         schema: "str | Schema | InferredSchema",
         *,
-        count: int,
-        scenario: str,
+        count: int | None = None,
+        scenario: str | None = None,
         augment: bool | None = None,
         entity: str | None = None,
         seed: int | None = None,
         on_document: Callable[[int, int, GeneratedDoc], None] | None = None,
+        scenarios: list[str] | None = None,
         verbose: bool = True,
     ) -> BatchResult:
         """Generate a diverse batch of documents from one high-level scenario.
@@ -224,24 +233,38 @@ class Generator:
         ``InferredSchema``.
 
         Args:
+            count: How many documents to generate. Required unless ``scenarios``
+                is given.
             scenario: The high-level theme the planner diversifies into ``count``
                 specific documents. A specific scenario yields far more varied
-                output than a generic one.
+                output than a generic one. Required unless ``scenarios`` is given.
             entity: For a multi-entity ``InferredSchema``, which entity to render.
             seed: optional seed for scenario planning (regression-stable sets).
             on_document: optional ``callback(index, total, GeneratedDoc)`` fired as
                 each document's result is collected — for host-side progress UIs.
+            scenarios: pre-planned scenarios from :meth:`plan_scenarios`. Skips
+                planning, so ``scenario`` is not needed and ``count`` defaults to
+                ``len(scenarios)``. Use it to plan a large set once and generate it
+                in waves (e.g. to enforce a budget between waves) without losing
+                diversity across waves.
         """
         from seed_data.stages.batch import generate_batch as _batch
 
+        if scenarios is None and (count is None or scenario is None):
+            raise TypeError(
+                "generate_batch() needs count= and scenario=, or pre-planned scenarios="
+            )
+        if count is None:
+            count = len(scenarios)
+
         common = dict(
-            count=count, brief=scenario, output_dir=self.output_dir,
+            count=count, brief=scenario or "", output_dir=self.output_dir,
             models=self.models, threshold=self.threshold,
             max_attempts=self.max_attempts, timeout=self.timeout,
             renderer=self.renderer, critic_samples=self.critic_samples,
             augment=self.augment if augment is None else augment,
             verbose=verbose, session=self.session, seed=seed,
-            on_document=on_document,
+            on_document=on_document, scenarios=scenarios,
         )
         resolved = self._resolve_for_documents(schema, entity=entity)
         if resolved is not None:
@@ -256,6 +279,29 @@ class Generator:
             count_failed=len(docs) - succeeded,
             documents=docs,
         )
+
+    def plan_scenarios(
+        self,
+        scenario: str,
+        *,
+        count: int,
+        seed: int | None = None,
+        verbose: bool = True,
+    ) -> ScenarioPlan:
+        """Diversify one high-level scenario into ``count`` specific ones.
+
+        The same planning step :meth:`generate_batch` runs first, exposed so a host
+        can plan once and pass slices back via ``generate_batch(scenarios=...)``.
+        The result carries the planner's token usage, which per-document
+        ``token_usage`` does not include.
+        """
+        from seed_data.stages.batch import plan_scenarios_with_usage
+
+        scenarios, usage = plan_scenarios_with_usage(
+            count, scenario, model=self.models.batch, session=self.session,
+            seed=seed, verbose=verbose,
+        )
+        return ScenarioPlan(scenarios=scenarios, token_usage=usage)
 
     def generate_packet(
         self,
@@ -413,6 +459,7 @@ class Generator:
         an editable schema rather than a throwaway. ``on_question`` enables the
         clarifying dialogue during inference (see ``infer_schema``).
         """
+        self._require_augment_up_front(augment)   # inference is a paid vision call
         schema = self.infer_schema(
             inputs, name=name, model=infer_model, max_docs=max_docs,
             output_dir=output_dir, on_question=on_question, verbose=verbose,
@@ -441,6 +488,7 @@ class Generator:
         ``generate_batch(...)`` against the inferred ``Schema``. ``on_question``
         enables the clarifying dialogue during inference (see ``infer_schema``).
         """
+        self._require_augment_up_front(augment)   # inference is a paid vision call
         schema = self.infer_schema(
             inputs, name=name, model=infer_model, max_docs=max_docs,
             output_dir=output_dir, on_question=on_question, verbose=verbose,
@@ -596,6 +644,10 @@ class Generator:
             from seed_data.common.deps import require_structured
 
             require_structured("Generator.plan_and_generate(output='structured')")
+        else:
+            # Likewise for documents: without the `[augment]` extra the graph build
+            # would raise only after planning had been paid for.
+            self._require_augment_up_front(augment)
 
         schema = self.plan(*inputs, name=name, verbose=verbose)
 
@@ -656,6 +708,17 @@ class Generator:
 
     def _resolve_packet(self, packet: str) -> str:
         return _resolve(packet, "packets")
+
+    def _require_augment_up_front(self, augment: bool | None) -> None:
+        """Raise the ``[augment]`` install hint now if this call would augment.
+
+        For verbs that make a paid model call (inference, planning) before any
+        document graph exists, whose build is otherwise the first check.
+        """
+        if self.augment if augment is None else augment:
+            from seed_data.common.deps import require_augment
+
+            require_augment("augmentation (augment=True / --augment)")
 
     def _resolve_for_documents(
         self, schema: "str | Schema | InferredSchema", *, entity: str | None = None,

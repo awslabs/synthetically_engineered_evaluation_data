@@ -11,7 +11,7 @@ import logging
 
 from seed_data.ingest.detect import InputType, detect_input_type
 from seed_data.logs import configure_progress_logging
-from seed_data.schema.models import InferredSchema
+from seed_data.schema.models import InferredSchema, merge_entities
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,9 @@ def run_ingest(
             schema = _extract_one(itype, spec, model=extraction_model, session=session)
             entities.extend(schema.entities)
 
-    return InferredSchema(entities=entities)
+    # Each input was extracted on its own, so the same entity described by two
+    # inputs (a CSV and a description of it) arrives twice: fold them together.
+    return InferredSchema(entities=merge_entities(entities))
 
 
 def _ingest_documents(specs, *, name, model, session, verbose):
@@ -123,6 +125,8 @@ def _extract_one(
     else:  # pragma: no cover - defensive
         raise ValueError(f"Unhandled input type: {itype}")
 
+    # Already folded: `extract_schema` canonicalizes through `schema.flat.to_canonical`,
+    # which merges an entity the model described twice.
     return InferredSchema.model_validate_json(result)
 
 

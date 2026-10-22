@@ -80,6 +80,9 @@ seed-data packet lending-package \
 seed-data --schema-dir invoice --augment --renderer weasyprint
 ```
 
+`--augment` needs the optional augmentation extra: `pip install "seed-data[augment]"`
+(included in `[all]` and `[dev]`).
+
 Run `seed-data --help` (and `seed-data packet --help`) to see every option.
 
 ## 5. Generate structured data

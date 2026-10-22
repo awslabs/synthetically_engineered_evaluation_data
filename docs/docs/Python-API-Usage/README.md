@@ -85,6 +85,9 @@ doc = gen.generate("invoice", augment=True)    # augment this run only
 doc = gen.generate("invoice", verbose=False)   # suppress stage progress output
 ```
 
+`augment=True` needs the optional augmentation extra (`pip install "seed-data[augment]"`);
+without it the call raises an `ImportError` with that hint before any model call.
+
 ## Batch
 
 `generate_batch` expands a single brief into N distinct scenarios, generates each

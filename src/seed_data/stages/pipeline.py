@@ -18,6 +18,7 @@ from seed_data.utils import load_schema_dir, sha256_file
 from seed_data.stages.base import StageContext, ModelConfig, verdict_of, accepted, rejected
 from seed_data.stages import data as data_stage
 from seed_data.stages import document as doc_stage
+from seed_data.common.deps import require_augment
 from seed_data.stages import augment_stage
 
 
@@ -179,6 +180,7 @@ def build_pipeline_graph(
     builder.add_edge(data_stage.CRITIC_NAME, "doc_loop", condition=accepted(data_stage.CRITIC_NAME))
 
     if augment:
+        require_augment("augmentation (augment=True / --augment)")
         augment_stage.add_to_graph(builder, ctx, after_node="doc_loop")
 
     aug_budget = 8 if augment else 0

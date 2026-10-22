@@ -115,6 +115,46 @@ def test_flat_schema_inherits_validators():
     assert field.enum_values == ["a", "None", "3"]
 
 
+_REPEATED_ENTITY = {"entities": [
+    {"entity_name": "Customer", "fields": [{"name": "id", "type": "integer"}]},
+    {"entity_name": "customer", "fields": [{"name": "email", "type": "email"}]},
+]}
+
+
+def test_flat_schema_accepts_a_repeated_entity_that_to_canonical_folds():
+    """The flat model is what Strands validates the model's answer against.
+
+    Inherited, the canonical uniqueness check bounced a repeated entity back to the
+    model for a paid retry; the flat model accepts it and ``to_canonical`` folds it.
+    """
+    canonical = to_canonical(flat_inferred_schema().model_validate(_REPEATED_ENTITY))
+
+    assert type(canonical) is InferredSchema
+    assert [e.entity_name for e in canonical.entities] == ["Customer"]
+    assert [f.name for f in canonical.entities[0].fields] == ["id", "email"]
+    with pytest.raises(ValueError, match="duplicate entity names"):
+        InferredSchema.model_validate(_REPEATED_ENTITY)   # the canonical model still refuses
+
+
+def test_distribution_inference_folds_a_repeated_entity(monkeypatch):
+    """The other flat-model call site, through the real Agent with a scripted model."""
+    pytest.importorskip("scipy", reason="requires the [structured] optional dependencies")
+    import json
+
+    from seed_data.structured.distributions.inference import infer_distributions
+    from tests.scripted_model import ScriptedModel
+
+    model = ScriptedModel("FlatInferredSchema", _REPEATED_ENTITY)
+    monkeypatch.setattr("seed_data.utils.make_model", lambda *a, **k: model)
+    schema = InferredSchema(entities=[EntitySchema(
+        entity_name="Customer", fields=[FieldDefinition(name="id", type="integer")])])
+
+    out = json.loads(infer_distributions(schema.model_dump_json()))
+
+    assert model.turns == 1
+    assert [e["entity_name"] for e in out["entities"]] == ["Customer"]
+
+
 def test_flat_schema_preserves_doc_gen_extensions():
     """The fields that make an ingested schema render faithfully must survive."""
     instance = flat_inferred_schema().model_validate({
